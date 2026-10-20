@@ -164,6 +164,8 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | ID | Requirement |
 |---|---|
 | NFR-12 | Development is spec-driven and test-driven (see `AGENTS.md`). Tests use synthetic receipts only. |
+| NFR-13 | OCR and the model sit behind backend interfaces. A configuration setting selects the real implementation or a deterministic fake, so tests and E2E runs do not need Tesseract or Ollama and give the same result every time. |
+| NFR-14 | The UI is tested at three levels: component tests (Vitest + React Testing Library, API mocked with MSW), and a few end-to-end tests of the main journeys (Playwright, real backend with the fakes from NFR-13). |
 
 ## 8. Solution outline (decided)
 
@@ -175,6 +177,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | Frontend | React + Vite + TypeScript |
 | Storage | SQLite |
 | Export | CSV first; Google Sheets (gspread) later, behind the same interface |
+| Testing | Backend: pytest. UI: Vitest + React Testing Library + MSW. E2E: Playwright. |
 
 Main stored entities: **category**, **product mapping** (normalized product name →
 category), **receipt** (image hash, file name, store, purchase date, total, raw OCR text,

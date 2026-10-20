@@ -18,11 +18,27 @@ Develop step of SDD. Implements `specs/features/<feature>.md` task by task, test
 | Part | Test framework | Notes |
 |---|---|---|
 | Backend | pytest (+ pytest-cov) | FastAPI `TestClient`; SQLite in a temp file; Tesseract and Ollama behind interfaces and faked in unit tests |
-| Frontend | Vitest + Testing Library | API mocked at the fetch layer |
-| E2E | Playwright | Only for journeys listed in the spec |
+| Frontend | Vitest + React Testing Library (`@testing-library/user-event`, `@testing-library/jest-dom`), jsdom | Most UI tests live here. API mocked with MSW (Mock Service Worker) at the network level; no test-only code in the app |
+| E2E | Playwright | Only for journeys listed in the spec. Real backend with the fake OCR and fake model (see below) |
+| Optional | `@axe-core/playwright` | Accessibility checks in E2E, when a spec asks for them |
 
 Tests that need a real Ollama or Tesseract are marked (e.g. `@pytest.mark.ollama`) and are not
 part of the default run. Commands are in `AGENTS.md` → Commands.
+
+### Fakes for OCR and the model
+
+OCR and the model sit behind backend interfaces. A configuration setting selects the real
+implementation or a deterministic fake that returns fixed results for known synthetic images.
+Unit and integration tests use the fakes by default. E2E tests start the real backend with
+the fakes, so runs are fast and repeatable.
+
+### UI test levels
+
+- **Component tests (most):** behavior a user sees, e.g. changing a category updates subtotals
+  immediately, the sum-mismatch warning shows the difference, adding and deleting lines.
+  Query by role and label, not by CSS class or test id where possible.
+- **Error paths with MSW:** API errors and states such as "model not available".
+- **E2E (few):** main journeys only, e.g. import → open receipt → correct → totals → CSV export.
 
 ## Steps
 

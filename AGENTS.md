@@ -51,6 +51,7 @@ Commands marked *planned* are not verified until the project is scaffolded.
 | Backend lint | `cd backend && ruff check . && ruff format --check .` | planned |
 | Frontend tests | `cd frontend && npm test` | planned |
 | Frontend lint | `cd frontend && npm run lint` | planned |
+| E2E tests | `cd frontend && npx playwright test` | planned |
 | Run backend | `cd backend && uvicorn app.main:app --host 127.0.0.1` | planned |
 | Run frontend | `cd frontend && npm run dev` | planned |
 
