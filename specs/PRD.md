@@ -83,8 +83,8 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 
 | ID | Requirement |
 |---|---|
-| FR-11 | The user manages a list of categories (add, rename, remove when unused). The app ships with a default list. [NEEDS CLARIFICATION: initial category list] |
-| FR-12 | Each line gets a category. A product name the user has corrected before gets the remembered category first. Otherwise the model suggests one from the category list. |
+| FR-11 | The user manages categories and groups (add, rename, move, remove when unused). Categories are organized in at most two levels: a **group** holds categories; a category either belongs to one group or stands alone. The app ships with the default list in [section 6.9](#69-default-categories). |
+| FR-12 | Each line gets a category. A product name the user has corrected before gets the remembered category first. Otherwise the model suggests one from the category list. The model sees each category with its group (e.g. "Ruoka > Maitotuotteet") and can only choose a category, never a group. |
 | FR-13 | When the user changes a line's category, the mapping from that product name to the category is stored and reused for future receipts. |
 | FR-14 | Product names are normalized before matching, so small OCR differences (case, spacing, common character mix-ups) still match a remembered product. |
 | FR-15 | Each line records where its category came from: remembered mapping, model, or user. |
@@ -94,7 +94,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | ID | Requirement |
 |---|---|
 | FR-16 | A receipt view shows the receipt image and an editable table of its lines side by side. |
-| FR-17 | Each line's category is chosen from a dropdown of the categories. |
+| FR-17 | Each line's category is chosen from a dropdown of the categories. Categories are listed under their group headings; groups themselves cannot be chosen. |
 | FR-18 | The user can edit line name, quantity and amount, add a missing line and delete a wrong one. Store, date and total are editable too. |
 | FR-19 | Category subtotals for the receipt update immediately after any edit. |
 | FR-20 | A warning shows when the sum of the lines (including discounts and deposits) differs from the receipt total, with the difference. |
@@ -104,7 +104,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 
 | ID | Requirement |
 |---|---|
-| FR-22 | The app shows the total per category per ISO 8601 week (Monday to Sunday) and per calendar month. |
+| FR-22 | The app shows the total per category per ISO 8601 week (Monday to Sunday) and per calendar month. A group's total is the sum of its categories; the user can expand a group to see its categories. |
 | FR-23 | Totals group by the receipt's purchase date, not by the import date. |
 | FR-24 | Totals update when a receipt is edited. |
 | FR-25 | The user can choose the period shown (for example a month or a range of weeks). |
@@ -113,7 +113,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 
 | ID | Requirement |
 |---|---|
-| FR-26 | The user can export to CSV, generated from the database: receipt lines with category and date, and the weekly and monthly category totals. [NEEDS CLARIFICATION: exact CSV columns, separator (`;` for Finnish Excel?) and decimal format] |
+| FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. [NEEDS CLARIFICATION: exact CSV columns, separator (`;` for Finnish Excel?) and decimal format] |
 | FR-27 | Exporters implement one common interface, so new targets can be added without changing the rest of the app. |
 | FR-28 | *Later release:* export to a private Google Sheet with gspread and a service account. |
 
@@ -125,6 +125,48 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-30 | The model is loaded when the app starts and kept loaded while the app runs. |
 | FR-31 | If Ollama or the model is not available, the app says so clearly, and import waits instead of failing images. |
 | FR-32 | Settings (folders, model name, Tesseract path) are kept in one configuration file outside version control, with a committed example file. |
+
+### 6.8 Product management
+
+A **product** is a named item with one category. The product list is the app's memory of
+which category each product belongs to (FR-12, FR-13). The user can also manage it directly.
+
+| ID | Requirement |
+|---|---|
+| FR-33 | The user can view all products with their categories, filter them by category and search them by name. |
+| FR-34 | The user can add a product with a category, rename a product, change its category and delete it. |
+| FR-35 | Product names are unique after normalization (FR-14). Category and group names share one namespace and are unique, ignoring case and surrounding spaces (e.g. only one "Muut"). |
+| FR-36 | When the user changes a product's category, every saved receipt line of that product moves to the new category, and all totals reflect the change. Deleting a product does not change saved lines: they keep their current category. |
+| FR-37 | A category that is used by a product cannot be deleted; the user is told how many products use it. A group that still has categories cannot be deleted; the user is told how many. |
+| FR-38 | A product always belongs to a category, never directly to a group. |
+| FR-39 | The user can create a new group and add new or existing categories to it, move a category from one group to another, and take a category out of a group. Groups cannot be nested. A category that has products cannot be turned into a group. |
+
+### 6.9 Default categories
+
+Created once, on first start, when there are no categories. The user can change them freely
+afterwards. Names are in Finnish (NFR-15).
+
+| Group | Categories |
+|---|---|
+| Ruoka | Maitotuotteet, Liha, Kala, Hedelmät, Vihannekset, Kananmunat, Lihan korvaajat, Leivät, Kuivatuotteet, Pakasteet |
+| Auto | Polttoaineet, Autotarvikkeet, Autohuolto |
+| (no group) | Juomat, Alkoholi, Herkut, Hygienia, Kodin tarvikkeet, Lemmikit, Ulkona syöminen, Muut |
+
+That is 2 groups and 21 categories.
+
+Categorization rule: a product goes by its product type, not by how it is stored. Frozen
+fish goes to Kala and frozen vegetables to Vihannekset. Pakasteet is for frozen products
+with no type of their own, such as ready meals.
+
+### 6.10 Archiving (later release)
+
+Not part of the MVP. Remaining details are open (see [Open questions](#11-open-questions)).
+
+| ID | Requirement |
+|---|---|
+| FR-40 | When the user chooses to, they can archive the previous calendar year: all receipts whose purchase date is in that year, and their lines, move to separate archive tables. Archiving is never automatic. |
+| FR-41 | The user can permanently delete archived data, after a confirmation. |
+| FR-42 | Archived data is not included in the totals or exports of active data, and does not appear in the normal views. |
 
 ## 7. Non-functional requirements
 
@@ -158,6 +200,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 |---|---|
 | NFR-10 | Runs on Windows (the user's machine). Prerequisites: Python, Node.js, Tesseract with `fin` and `eng`, and Ollama. |
 | NFR-11 | Setup and start are documented in `docs/development.md` and work from a clean checkout. |
+| NFR-15 | The user interface is in Finnish. Documentation and code are in English (see `AGENTS.md`). |
 
 ### 7.5 Quality
 
@@ -179,28 +222,32 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | Export | CSV first; Google Sheets (gspread) later, behind the same interface |
 | Testing | Backend: pytest. UI: Vitest + React Testing Library + MSW. E2E: Playwright. |
 
-Main stored entities: **category**, **product mapping** (normalized product name →
-category), **receipt** (image hash, file name, store, purchase date, total, raw OCR text,
+Main stored entities: **category** (name, optional group; a group is a category without a
+parent that holds other categories), **product** (display name, normalized name, category:
+the remembered product–category mapping), **receipt** (image hash, file name, store, purchase date, total, raw OCR text,
 review state), **receipt line** (name as read, normalized name, quantity, unit price, amount,
-category, category source). The data model is defined in `docs/datamodel.md`.
+category, category source, product). The data model is defined in `docs/datamodel.md`.
 
 ## 9. Releases
 
 | Release | Scope |
 |---|---|
-| MVP | FR-1 to FR-27, FR-29 to FR-32, all NFRs except NFR-5 |
+| MVP | FR-1 to FR-27, FR-29 to FR-39, all NFRs except NFR-5 |
 | Next | FR-28 Google Sheets export (with NFR-5) |
+| Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
 
 A suggested order of feature specs for the MVP:
 
-1. Storage and settings
-2. Import with duplicate detection and file moving
-3. OCR and parsing
-4. Categorization with remembered corrections
-5. Review UI
-6. Totals
-7. CSV export
+1. Product management: groups, categories and products (`specs/features/product-management.md`),
+   including the minimal backend, frontend and SQLite setup it needs
+2. Storage and settings for receipts
+3. Import with duplicate detection and file moving
+4. OCR and parsing
+5. Categorization with remembered corrections
+6. Review UI
+7. Totals
+8. CSV export
 
 ## 10. Success measures
 
@@ -223,8 +270,20 @@ A suggested order of feature specs for the MVP:
 6. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
 7. [NEEDS CLARIFICATION] Is a receipt categorized per line only, or can a whole receipt get
    one category?
-8. [NEEDS CLARIFICATION] Initial category list.
-9. [NEEDS CLARIFICATION] CSV format details (FR-26).
+8. [NEEDS CLARIFICATION] CSV format details (FR-26).
+9. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
+   be archived too (e.g. after a long break)? Can archived data be viewed or exported
+   separately? Can archiving be undone? Does FR-36 recategorization also update archived
+   lines? Are receipt images in `import_done` archived or deleted with the data?
+
+Resolved:
+
+- Default category list: section 6.9 (2026-10-20).
+- UI language: Finnish, NFR-15 (2026-10-20).
+- Two-level categories with user-created groups: FR-11, FR-38, FR-39 (2026-10-20).
+- Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
+- Archiving is by previous calendar year, started by the user; archived data is excluded from
+  active totals and exports: FR-40, FR-42 (2026-10-20).
 
 ## 12. Risks
 
@@ -235,6 +294,7 @@ A suggested order of feature specs for the MVP:
 | Product names vary through OCR noise, so corrections are not reused | Name normalization (FR-14), fuzzy matching if needed |
 | Model too slow on the user's hardware | Model is one setting; smaller model; load once at start |
 | Same receipt imported twice from different photos | Shown to the user; content-based check as a later candidate |
+| Recategorizing a product changes past totals that were already exported (FR-36) | The confirmation tells the user how many saved lines will move; exports are regenerated from the database |
 
 ## 13. Glossary
 
@@ -242,8 +302,10 @@ A suggested order of feature specs for the MVP:
 |---|---|
 | Receipt | One purchase, read from one image. |
 | Line | One item row on a receipt, including discount and deposit rows. |
-| Category | A user-defined group of purchases, e.g. "Groceries". |
-| Product mapping | A remembered link from a normalized product name to a category. |
+| Category | What a product belongs to, e.g. "Maitotuotteet". Totals are calculated per category. |
+| Group | A category that holds other categories, e.g. "Ruoka". Its total is the sum of its categories. Products cannot belong to a group directly. |
+| Product | A named item with one category, stored once per normalized name. The product list is the remembered product–category mapping. |
+| Normalized name | A product or category name after normalization, used for matching and uniqueness. |
 | ISO week | Week as defined by ISO 8601: Monday start; week 1 contains the first Thursday of the year. |
 | Pantti | Bottle and can deposit, shown as its own line on Finnish receipts. |
 
