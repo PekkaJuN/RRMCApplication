@@ -27,6 +27,7 @@ The file has three independent domains: [Documentation](#1-documentation), [Spec
 - Do not commit, push or open PRs unless asked. When asked, use short imperative commit messages.
 - If a request conflicts with a spec or this file, say so and ask instead of silently choosing.
 - When something is unknown (stack, requirement, intent), ask or record it as an open question. Do not guess.
+- All `*.md` documents are always written in English: docs, specs, `README.md`, `AGENTS.md`, `SKILL.md` files, and `docs/learnings.md`. This holds even when the user writes to you in another language. Reply to the user in the language they use.
 
 ## Request Processing Steps
 For every user request:
@@ -480,7 +481,7 @@ Update documentation **in the same change** as the code when you:
 Do not leave docs describing behavior that no longer exists.
 
 ### Writing style
-- Plain, direct English. Short sentences. Active voice.
+- English only in every `*.md` file (see General rules). Plain, direct English. Short sentences. Active voice.
 - Lead with what the reader needs to do or know; put background after.
 - Use headings, lists and tables for scanning. Keep paragraphs short.
 - Use fenced code blocks with a language tag for commands and code. Commands must be copy-pasteable and tested.
