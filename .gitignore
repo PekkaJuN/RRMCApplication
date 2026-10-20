@@ -1,0 +1,15 @@
+# Personal coding preferences database (coding-preferences skill)
+.agents/skills/coding-preferences/*.db
+.agents/skills/coding-preferences/*.sqlite
+.agents/skills/coding-preferences/*.sqlite3
+.agents/skills/coding-preferences/*.db-journal
+.agents/skills/coding-preferences/*.db-wal
+.agents/skills/coding-preferences/*.db-shm
+
+# Dependencies
+node_modules/
+
+# Secrets and local environment (API keys such as GEMINI_API_KEY)
+.env
+.env.*
+!.env.example

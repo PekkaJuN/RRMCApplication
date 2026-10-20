@@ -45,6 +45,7 @@ Create only when the trigger applies. When one is started, move it into the tabl
 | Deployment | `docs/deployment.md` | Environments, CI/CD, infrastructure | The app is deployed or CI exists |
 | Integration Guide | `docs/integration.md` | External services, third-party APIs | The app calls an external service |
 | Features & Use Cases | `docs/features.md` | Feature inventory, use case documentation | Features outgrow `projectdescription.md` |
+| Learnings | `docs/learnings.md` | Log of fixed errors and their solutions | The first error is fixed with the fix workflow |
 
 ## Tier 2: Subsystems (`docs/subsystems/<name>/README.md`)
 

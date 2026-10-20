@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working in **RRMCApplication** (Receipt Reader Mapper Calculator).
 
-The file has three independent domains: [Documentation](#1-documentation), [Spec-Driven Development](#part-2-spec-driven-development), and [Skills & Tools](#3-skills--tools). Each can be followed on its own. Where one relies on another, it links to it.
+The file has three independent domains: [Documentation](#1-documentation), [Spec-Driven Development](#part-2-spec-driven-development), and [Skills & Tools](#part-3-skills--tools). Each can be followed on its own. Where one relies on another, it links to it.
 
 ## Project overview
 
@@ -27,6 +27,29 @@ The file has three independent domains: [Documentation](#1-documentation), [Spec
 - Do not commit, push or open PRs unless asked. When asked, use short imperative commit messages.
 - If a request conflicts with a spec or this file, say so and ask instead of silently choosing.
 - When something is unknown (stack, requirement, intent), ask or record it as an open question. Do not guess.
+
+## Request Processing Steps
+For every user request:
+
+1. **Read the request:** identify the goal, affected subsystems, and complexity.
+2. **Navigate documentation:** use both strategies (top-down + feature-wise) and consult all 3 tiers. See [Documentation Navigation](#documentation-navigation).
+3. **Determine complexity**
+   - **Complex** (new feature, refactor, multi-file) → run the [`spec`](#workflow-spec) workflow first.
+   - **Simple** (bug fix, config, single-file) → proceed to [`develop`](#workflow-develop) directly.
+   - If the request is unclear, run [`research`](#workflow-research) first. Where it is unclear whether a spec is needed, "When required" and "When optional" in the `spec` workflow decide.
+4. **Present analysis**
+
+````text
+Request type: [type]
+Complexity: [Complex | Simple]
+Spec required: [Yes | No]
+Workflow: [spec → develop → tdd | develop → tdd | fix | research]
+Affected subsystems: [list with Tier 2 doc links]
+Documentation refs: [Tier 1, 2, 3 docs consulted]
+````
+
+5. **Execute workflow:** follow the steps of the chosen workflow.
+6. **Record and audit:** update docs, log changes, and audit if a spec existed (see [`audit`](#workflow-audit)).
 
 ---
 
@@ -67,6 +90,7 @@ docs/                                   TIER 1: Architecture & high-level
   deployment.md                         optional: environments, CI/CD, infrastructure
   integration.md                        optional: external services, third-party APIs
   features.md                           optional: feature inventory, use cases
+  learnings.md                          log of fixed errors and their solutions (created by the fix workflow)
   adr/NNNN-title.md
   subsystems/
     <name>/                             TIER 2: Subsystem
@@ -92,7 +116,7 @@ docs/                                   TIER 1: Architecture & high-level
   | 4 | Development Guide | `docs/development.md` | Setup, commands, code standards, testing, local dev |
   | 5 | API Reference | `docs/api-reference.md` | REST endpoints, auth, request/response formats |
 
-  - Supporting Tier 1 files, also indexed in the content plan: `docs/README.md` (entry point), `docs/content-plan.md`, `docs/glossary.md`, and `docs/adr/`.
+  - Supporting Tier 1 files, also indexed in the content plan: `docs/README.md` (entry point), `docs/content-plan.md`, `docs/glossary.md`, `docs/adr/`, and `docs/learnings.md` (created by the first run of the fix workflow).
   - `docs/development.md` is the source of truth for build, test and lint commands. Keep the [Commands](#commands) table in this file in sync with it.
   - If the project has no REST API (yet), still create `docs/api-reference.md` and state that plainly, so the gap is explicit rather than a missing file. Fill it in once endpoints exist.
 - **Optional documents.** Add these as the project grows. Create one only when its trigger applies, not in advance. Never create an empty placeholder.
@@ -413,7 +437,7 @@ src/                                     → Source code
 
 Files to read along the way, in order:
 
-1. `docs/features.md` (if it exists; otherwise the key features in `docs/projectdescription.md`) and any spec in `specs/features/<feature>.md` (its "Affected files" lists the files to read): what the feature must do and its acceptance criteria.
+1. `docs/features.md` (if it exists; otherwise the key features in `docs/projectdescription.md`) and any spec in `specs/features/<feature>.md` (its "Files to Modify" and "Related Documentation" list what to read): what the feature must do and its acceptance criteria.
 2. `docs/api-reference.md`: the endpoints the feature uses or exposes.
 3. `docs/datamodel.md`: the entities the feature reads or writes.
 4. `docs/subsystems/<name>/README.md` of **each** subsystem the feature touches, following "Data Flow" and "Dependencies" links to trace the flow from entry point to storage.
@@ -503,19 +527,21 @@ Document → Spec → Develop → Audit
 
 | Step | Workflow | Purpose | Needs | Produces |
 |---|---|---|---|---|
-| 1 | **Document** | Create or update the three-tier docs so they match the code | `docs/content-plan.md`, source code | Tier 1/2/3 docs, updated content plan |
-| 2 | **Spec** | Define what a feature must do, and how and in what order to build it | Request, docs from step 1 | Approved `specs/features/<feature>.md` (spec, plan, tasks) |
-| 3 | **Develop** | Implement the approved spec task by task | Approved spec | Code, tests, updated docs |
-| 4 | **Audit** | Check that code, spec and docs agree | Implemented code, spec, docs | Audit findings, content plan statuses |
+| 1 | **Document**: [`document`](#workflow-document) | Create or update the three-tier docs so they match the code | `docs/content-plan.md`, source code | Tier 1/2/3 docs, updated content plan |
+| 2 | **Spec**: [`spec`](#workflow-spec) | Define what a feature must do, and how and in what order to build it | Request, docs from step 1 | Approved `specs/features/<feature>.md` (spec, plan, tasks) |
+| 3 | **Develop**: [`develop`](#workflow-develop), using [`tdd`](#workflow-tdd) | Implement the approved spec task by task | Approved spec | Code, tests, updated docs |
+| 4 | **Audit**: [`audit`](#workflow-audit), which runs [`review`](#workflow-review) | Check that code, spec and docs agree | Implemented code, spec, docs | Audit findings, content plan statuses |
+
+Two more workflows support the chain: [`research`](#workflow-research) (understand a task before planning) and [`fix`](#workflow-fix) (diagnose and resolve errors).
 
 - **Chaining:** the output of one step is the input of the next. Audit findings feed back into Document (Outdated docs) or Spec (gaps and deviations).
 - **Standalone use:** each workflow can be run on its own. Before starting, check its "Needs". If something is missing, stop and say what, rather than guessing or silently running the earlier step. For example, Develop does not start without an approved spec.
-- **Research:** [Workflow: research](#workflow-research) is a read-only step that comes before planning. It can precede any of the four steps, and is not one of them.
-- **Where the details are:** the phases below map to the steps: Specify, Plan and Tasks are the Spec step, Implement is the Develop step, and Verify is part of the Audit step. The Document step follows the rules in [Documentation](#1-documentation).
+- **Research:** [Workflow: research](#workflow-research) is a read-only step that comes before planning. It can precede any of the four steps, and is not one of them. [Workflow: fix](#workflow-fix) can be used at any point, including during Develop.
+- **Where the details are:** each workflow is defined in its own section below. The Specify, Plan and Tasks phases belong to the Spec step, Implement belongs to the Develop step, and Verify belongs to the Audit step. The Document step also follows the rules in [Documentation](#1-documentation).
 
-The spec is the source of truth. Code implements a spec; it does not define one. For any non-trivial feature, bug fix with behavior change, or new module, write or update the spec **before** writing code.
+The spec is the source of truth. Code implements a spec; it does not define one. When a change falls under "When required" in [Workflow: spec](#workflow-spec), write or update the spec **before** writing code.
 
-A change is *trivial* (no spec needed) if it is a typo, formatting, comment, dependency bump without behavior change, or a refactor with no observable change. If unsure, write a short spec.
+A spec is optional for changes listed under "When optional". Changes that are trivial (a typo, formatting, a comment, a dependency bump without behavior change, or a refactor with no observable change) need no spec. If unsure whether a change needs one, write a short spec.
 
 ### Workflow: research
 **Goal:** Understand a task thoroughly before planning.
@@ -602,6 +628,25 @@ A change is *trivial* (no spec needed) if it is a typo, formatting, comment, dep
 - **Before finishing:** run the checks in [Quality checks before finishing](#quality-checks-before-finishing), and give the scan report as the final output.
 - If `docs/content-plan.md` does not exist, create it first, using the content plan template, and then continue.
 
+### Workflow: spec
+**Goal:** Create a specification before implementation.
+
+**When required:** new features, major refactorings, API changes, architectural changes, multi-subsystem changes.
+
+**When optional:** bug fixes, minor refactorings, documentation updates, config changes, single-file changes.
+
+**Steps:**
+
+1. **Study documentation (grounding)**
+   - Read relevant docs from all 3 tiers using both navigation strategies. See [Documentation Navigation](#documentation-navigation); [Workflow: research](#workflow-research) findings can serve as the starting point.
+   - Understand existing patterns, business rules, and data flow.
+   - Ground the spec in documentation: reference actual files and patterns.
+2. **Create spec:** `specs/features/<feature-name>.md`
+   - Write it using the phases below (Specify, Plan, Tasks), the [Layout](#layout), the [Rules](#rules) and the [Spec template](#spec-template).
+   - Fill in "Files to Modify" and "Related Documentation" from the files and docs found in step 1.
+
+An approved spec is the input to the Develop step.
+
 ### Layout
 ```
 specs/
@@ -609,64 +654,460 @@ specs/
   features/
     <feature>.md            one file per feature: spec, plan and tasks
 ```
-Each feature has one file. It starts with the spec (what and why: requirements, acceptance criteria, affected files). The `## Plan` and `## Tasks` sections are added to the same file in later phases. Use a short kebab-case name for `<feature>`, e.g. `receipt-upload.md`. Create this structure on first use. Do not scaffold empty specs.
+Each feature has one file. It starts with the spec (see the [Spec template](#spec-template)). The `## Plan` and `## Tasks` sections are added at the end of the same file in later phases. Use a short kebab-case name for `<feature>`, e.g. `receipt-upload.md`. Create this structure on first use. Do not scaffold empty specs.
 
 ### Workflow
 Work through the phases in order. Do not start a phase until the previous one is agreed.
 
 1. **Specify** (the spec sections of `specs/features/<feature>.md`). Describe *what* and *why*, never *how*. Include:
-   - Problem and goal; who it is for.
-   - Functional requirements, each with an ID (`FR-1`, `FR-2`, ...).
-   - Acceptance criteria in Given/When/Then form, each tied to requirement IDs.
-   - Edge cases and error behavior (for this project: unreadable or partial receipts, unknown items, multiple currencies, tax and rounding, duplicate receipts).
-   - Out of scope.
-   - **Affected files:** the source files and docs expected to change, and why. Find them with the Feature-Wise strategy (see [Documentation Navigation](#documentation-navigation)). If a subsystem involved is not documented, list it and ask the user to document it first.
-   - **Open questions.** Mark ambiguity as `[NEEDS CLARIFICATION: ...]`. Do not resolve it by guessing. Ask the user.
-2. **Plan** (the `## Plan` section). Describe *how*: components, data flow, data model, interfaces, dependencies, test strategy, risks. Record significant decisions as ADRs (see [Documentation](#1-documentation)). Check the plan against every requirement, and refine "Affected files".
-3. **Tasks** (the `## Tasks` section). Break the plan into small, ordered, independently verifiable tasks. Each task names the requirement IDs it satisfies and its test. Use `- [ ]` checkboxes.
+   - Problem statement, current behavior (referencing Tier 2/3 docs) and the proposed change. State what is out of scope in the proposed change.
+   - Acceptance criteria in Given/When/Then form (`AC1`, `AC2`, ...), including edge cases and error behavior (for this project: unreadable or partial receipts, unknown items, multiple currencies, tax and rounding, duplicate receipts).
+   - **Files to Modify:** the source files and docs expected to change, and why. Find them with the Feature-Wise strategy (see [Documentation Navigation](#documentation-navigation)). List docs that need updating as rows too. If a subsystem involved is not documented, list it and ask the user to document it first.
+   - Risk assessment, a comprehensive testing strategy, and related documentation (the last two are mandatory).
+   - **Ambiguity.** Mark it where it occurs as `[NEEDS CLARIFICATION: ...]`. Do not resolve it by guessing. Ask the user.
+2. **Plan** (the `## Plan` section). Describe *how*: components, data flow, data model, interfaces and dependencies. Record significant decisions as ADRs (see [Documentation](#1-documentation)). Check the plan against every acceptance criterion, and refine "Files to Modify".
+3. **Tasks** (the `## Tasks` section). Break the plan into small, ordered, independently verifiable tasks. Each task names the acceptance criteria (AC IDs) it satisfies and its test. Use `- [ ]` checkboxes.
 4. **Implement.** Take tasks in order. Write the test for a task first when practical, then the code. Tick the checkbox when the task's test passes.
 5. **Verify.** Run the full test suite and walk through each acceptance criterion. Report any criterion not met.
 
 ### Rules
-- Every requirement needs at least one acceptance criterion; every acceptance criterion needs at least one test.
-- Keep traceability: tests and commits reference requirement IDs where useful (e.g. `FR-3`).
+- Every acceptance criterion needs at least one test in the Testing Strategy, and every part of the proposed change needs at least one acceptance criterion.
+- "Testing Strategy" and "Related Documentation" are mandatory. A spec that does not pass the [Spec Readiness Checklist](#spec-readiness-checklist) is not ready for Review or approval.
+- Keep traceability: tests and commits reference acceptance criteria IDs where useful (e.g. `AC3`).
 - If implementation reveals the spec is wrong or incomplete, **stop and update the spec first**, then continue. Never let code and spec drift.
 - Do not add behavior that is not in the spec. Propose it as a spec change instead.
 - Keep specs small and focused: one feature per spec file. Split large features.
-- Keep "Affected files" current. If implementation touches a file that is not listed, add it to the spec. When the work is done, update the docs listed under "Docs to update" (see [Agent workflow](#agent-workflow)).
-- Mark spec status in `specs/README.md`: `draft` → `approved` → `implemented` → `superseded`. Only the user approves a spec.
+- Keep "Files to Modify" current. If implementation touches a file that is not listed, add it to the spec. When the work is done, update the docs listed there (see [Agent workflow](#agent-workflow)).
+- Spec status is `Draft` → `Review` → `Approved` → `In Progress` → `Done`. Record it in the spec's Overview and in `specs/README.md`. Only the user approves a spec. Set `In Progress` when the Develop step starts and `Done` when its "Update docs" step is complete.
 - Ask for approval before moving from Specify to Plan, and from Plan to Implement, unless the user said to proceed autonomously.
 
 ### Spec template
-```markdown
-# Feature name
-Status: draft
+````markdown
+# Feature: [Name]
 
-## Summary
-## Problem and goals
-## Requirements
-- FR-1: ...
-## Acceptance criteria
-- AC-1 (FR-1): Given ... When ... Then ...
-## Edge cases
-## Out of scope
-## Affected files
-| File | Change | Why |
-|------|--------|-----|
-| `src/[path]/file.ts` | modify / add / remove | [reason] |
+## Overview
+- **Status:** Draft | Review | Approved | In Progress | Done
+- **Created:** [Date]
+- **Affected Subsystems:** [List — with links to Tier 2 docs]
 
-**Docs to update:** [e.g. `docs/subsystems/[name]/modules/[module].md`, `docs/datamodel.md`, `docs/api-reference.md`]
-## Open questions
-- [NEEDS CLARIFICATION: ...]
-## Plan
-(added in the Plan phase)
-## Tasks
-(added in the Tasks phase)
-```
+## Problem Statement
+[What problem does this solve? Why is it needed?]
+
+## Current Behavior
+[What the system does now — reference Tier 2/3 docs]
+
+## Proposed Change
+[What it should do after implementation]
+
+## Acceptance Criteria
+
+### AC1: [Descriptive name]
+**Given** [precondition — system state before]
+**When** [action — what the user/system does]
+**Then** [expected result — observable outcome]
+
+### AC2: [Descriptive name]
+**Given** [precondition]
+**When** [action]
+**Then** [result]
+
+## Files to Modify
+
+| File | Change Description |
+|------|--------------------|
+| `src/[path]/file.ts` | [What changes and why] |
+
+## Risk Assessment
+- **What could break:** [List affected subsystems]
+- **Rollback plan:** [How to undo]
+- **Dependencies:** [External services, other teams]
+
+## Testing Strategy (MANDATORY — must be comprehensive)
+
+### Unit Tests
+For each function/component, define specific test cases:
+| Function | Test Case | Given | When | Then | Mocks |
+|----------|-----------|-------|------|------|-------|
+| `functionA` | happy path | [setup] | [action] | [result] | [deps] |
+| `functionA` | edge case | [setup] | [action] | [result] | [deps] |
+| `functionA` | error | [setup] | [action] | [error] | [deps] |
+
+### Integration Tests
+API endpoint or service layer tests with real dependencies:
+| Scenario | Method | Input | Expected Output | Status Code |
+|----------|--------|-------|----------------|-------------|
+| [happy path] | POST /api/x | {...} | {...} | 200 |
+| [error case] | POST /api/x | {...} | {...} | 400 |
+
+### E2E Tests (if applicable)
+User flow scenarios from start to finish:
+| User Journey | Steps | Expected Outcome |
+|-------------|-------|-----------------|
+| [happy path] | 1. ... 2. ... 3. ... | [result] |
+| [error flow] | 1. ... 2. ... | [error handled] |
+
+### Coverage Target
+- Minimum: [X]% (e.g., 80%)
+- Critical paths: 100%
+
+### Test Data
+- Fixtures: [describe test data needed]
+- Mocks: [list external dependencies to mock]
+
+## Related Documentation (MANDATORY)
+- **Tier 1:** [Link to architecture/data model docs]
+- **Tier 2:** [Link to subsystem docs]
+- **Tier 3:** [Link to module docs]
+- **Patterns:** [Link to relevant patterns]
+````
+
+The Plan and Tasks phases append `## Plan` and `## Tasks` sections to the end of this file.
+
+### Spec Readiness Checklist
+- [ ] Every AC has Given/When/Then format
+- [ ] Files to modify are listed with specific changes
+- [ ] Risk assessment identifies what could break
+- [ ] Testing strategy is comprehensive (unit + integration + E2E)
+- [ ] Every functional requirement has corresponding test case(s)
+- [ ] Every user story has corresponding E2E scenario(s)
+- [ ] Error conditions and edge cases are covered in tests
+- [ ] Coverage target is defined
+- [ ] Related Documentation links all 3 tiers
+- [ ] Spec is grounded in existing docs (not invented from scratch)
+
+**Validation:** If the testing strategy is incomplete (missing test cases for requirements, no edge cases, no coverage target), the spec is NOT ready for approval. Complete the testing strategy before proceeding.
+
+- In this template, the functional requirements are the parts of "Proposed Change" and the acceptance criteria. User stories are the user journeys they describe.
+- Where the template marks a test type "if applicable" (E2E), write why it does not apply instead of leaving it empty.
+
+### Workflow: tdd
+**Goal:** Implement a feature using Test-Driven Development: Red → Green → Refactor.
+
+**When to use:** new features with clear requirements, business logic, API endpoints, utility functions, bug fixes (write a test that reproduces the bug first).
+
+**Prerequisites:** a spec with a comprehensive Testing Strategy section (run the [`spec` workflow](#workflow-spec) first).
+
+**TDD principles**
+- **Red:** write a failing test first (test what doesn't exist yet).
+- **Green:** write minimal code to make the test pass (simplest implementation).
+- **Refactor:** improve code quality while keeping all tests passing.
+- **Iterate:** repeat for each requirement until the feature is complete.
+
+**Steps**
+
+1. **Preparation**
+   - Read the specification file (`specs/features/<feature-name>.md`).
+   - Extract all functional requirements and acceptance criteria. In this template the requirements are the parts of "Proposed Change".
+   - Review the Testing Strategy section. This is your roadmap.
+   - Prioritize: start with core logic, then edge cases, then integrations.
+   - Set up test infrastructure (test files, fixtures, mocks).
+   - Verify the test framework runs with an empty test.
+2. **TDD cycle**: for EACH requirement:
+
+````text
+Phase 1: RED (Write Failing Test)
+├── Pick the next unimplemented requirement from spec
+├── Write a test that describes the desired behavior
+│   ├── Test name describes the requirement
+│   ├── Given: set up test data and mocks
+│   ├── When: call the function/method that doesn't exist yet
+│   └── Then: define expected outcome
+├── Write ONLY the test — NO implementation code
+└── Run test → confirm it FAILS for the right reason
+
+Phase 2: GREEN (Make Test Pass)
+├── Write the SIMPLEST code that makes the test pass
+├── Implement ONLY what's needed for THIS test
+├── Do not over-engineer or optimize
+├── Run test → confirm it PASSES
+└── Run ALL tests → confirm no regressions
+
+Phase 3: REFACTOR (Improve Code)
+├── Review implementation for improvements:
+│   ├── Remove duplication (DRY)
+│   ├── Improve naming
+│   ├── Extract reusable functions
+│   └── Improve readability
+├── Run ALL tests after EACH refactoring
+└── CRITICAL: Tests must stay green throughout
+````
+
+3. **Edge cases and error conditions**: after core functionality works, repeat the TDD cycle for:
+   - Invalid inputs (null, empty, wrong type).
+   - Boundary conditions (min/max values, empty arrays).
+   - Error scenarios (network failures, database errors).
+   - Each edge case: RED → GREEN → REFACTOR.
+4. **Integration tests (if applicable)**: once unit tests pass, apply the same TDD cycle for integration:
+   - Test interactions between modules, API endpoints, database.
+   - RED: write an integration test that fails.
+   - GREEN: wire up components to make it pass.
+   - REFACTOR: improve integration code.
+5. **E2E tests (if applicable)**: once integration works, apply the TDD cycle for user flows:
+   - RED: write an E2E test for the complete user journey.
+   - GREEN: complete the implementation to make the flow work.
+   - REFACTOR: improve UX/code.
+6. **Continuous validation**
+   - Run the full test suite frequently.
+   - Check test coverage against the spec's target.
+   - If coverage is below target, identify untested paths and write tests.
+7. **Verify against spec**
+   - Review every requirement in the spec: does it have tests?
+   - Review every AC: is it met?
+   - All tests pass? Coverage target met?
+8. **Final refactoring pass**
+   - Review ALL implementation code for final improvements.
+   - Run the full test suite after each change.
+   - All tests must remain green.
+
+**Test template**
+
+````typescript
+describe('[FunctionName]', () => {
+  it('should [expected behavior] when [condition]', () => {
+    // Given: [setup — preconditions]
+    // When: [action — call the function]
+    // Then: [assertion — verify result]
+  });
+
+  it('should [handle edge case] when [boundary condition]', () => {
+    // Given / When / Then
+  });
+
+  it('should [error behavior] when [invalid input]', () => {
+    // Given / When / Then
+  });
+});
+````
+
+The template is shown in TypeScript. Use the test framework and language chosen for this project (see `docs/development.md`).
+
+**TDD best practices**
+- **Baby steps:** smallest possible test, then smallest code to pass it.
+- **Test first, always:** never write implementation before writing the test.
+- **One test at a time:** focus on one test before writing the next.
+- **Refactor fearlessly:** with tests as a safety net, refactor aggressively.
+- **Keep tests fast:** unit tests should run in milliseconds.
+- **Meaningful names:** test names should describe what they verify.
+- **Test behavior, not implementation:** test what code does, not how.
+- **No skipping RED:** always verify the test actually fails first.
+
+**TDD progress tracking**
+
+Track requirement status: `❌ No test → 🔴 RED → 🟢 GREEN → ✅ Refactored`
+
+**In this project**
+- The failing tests come from the spec's Testing Strategy, and each one traces to an acceptance criterion (see Rules). Take the tasks in the spec's `## Tasks` section in order, and tick each one when its tests pass.
+- For a bug fix with no spec, the test that reproduces the bug is the Red step. Keep it as the regression test.
+- This is the Implement phase of the spec workflow, and the way to run the Develop step.
+
+### Workflow: develop
+**Goal:** Implement code following the spec and project patterns.
+
+**Steps:**
+
+1. **Check for spec:** if it is a complex task, read `specs/features/<name>.md`. If none exists, ask whether to create one first. (A spec is required for the changes listed under "When required" in [Workflow: spec](#workflow-spec).)
+2. **Research patterns:** navigate Tier 2 and Tier 3 docs for the affected subsystem. Read `patterns.md` for reusable patterns.
+3. **Implement:** follow documented patterns. Match existing code style. Update only files listed in the spec. If a file that is not listed needs to change, update the spec first (see Rules).
+4. **TDD:** use the acceptance criteria from the spec as test cases. Run the [`tdd` workflow](#workflow-tdd).
+5. **Update docs:** update the affected Tier 2/3 docs. Mark the spec status as "In Progress" → "Done".
+
+### Workflow: review
+**Goal:** Comprehensive multi-pass review of an implementation against its specification, including security, architecture, performance, and testing audits.
+
+**When to use:** after feature implementation is complete, before marking as production-ready, or when reviewing changes for correctness.
+
+Review can run during development. The final gate before merging is [Workflow: audit](#workflow-audit), which runs this workflow for depth.
+
+**Steps:**
+
+1. **Preparation**
+   - Identify the specification file (`specs/features/<feature-name>.md`).
+   - Read the complete specification.
+   - Identify all files created/modified for this feature.
+   - Read all implementation files.
+   - Locate test files.
+
+2. **Spec compliance audit**
+   - **a. Requirements verification:** for each functional requirement in the spec, mark it:
+     - ✅ Fully implemented and working
+     - ⚠️ Partially implemented or has limitations
+     - ❌ Not implemented
+
+     Document evidence (file names, line numbers, test results).
+   - **b. Acceptance criteria:** for each AC in the spec, mark it as met ✅ or unmet ❌. Calculate: X/Y acceptance criteria met.
+   - **c. Files verification:** compare "Files to Modify" in the spec with the actual files changed. Document any missing or unexpected files.
+   - **d. API contract verification (if applicable):** for each endpoint specified, verify the implementation exists. Check that request/response formats match the spec.
+
+3. **Test coverage audit**
+
+   | Category | Spec Requires | Actually Written | Coverage |
+   |---|---|---|---|
+   | Unit tests | [count] | [count] | [X]% |
+   | Integration tests | [count] | [count] | [X]% |
+   | E2E tests | [count] | [count] | [X]% |
+
+   - Compare the spec's test cases with the implemented tests.
+   - Run the test coverage tool and compare it to the spec's target.
+   - List missing tests explicitly.
+   - Identify tests that are specified but not written.
+
+4. **Security audit**
+   - **a. Input validation:**
+     - All user inputs validated?
+     - SQL injection vulnerabilities (raw queries, string concatenation)?
+     - XSS vulnerabilities (`innerHTML`, `dangerouslySetInnerHTML`, `eval`)?
+   - **b. Authentication and authorization:**
+     - Auth mechanisms correct?
+     - Hardcoded credentials?
+     - API endpoints properly protected?
+   - **c. Data protection:**
+     - Secrets in code (API keys, passwords, tokens)?
+     - Sensitive data in logs?
+     - Environment variables used for secrets?
+   - **d. Dependencies:**
+     - Run a security audit (`npm audit`, `pip-audit`, etc.).
+     - Known vulnerabilities in dependencies?
+
+5. **Architecture audit**
+   - **a. Code organization:**
+     - Separation of concerns (UI, business logic, data access)?
+     - Circular dependencies?
+     - Code smells (God classes, duplicated code)?
+   - **b. Design patterns:**
+     - Consistent with the project architecture (`docs/architecture.md`)?
+     - Patterns applied correctly?
+   - **c. Data flow:**
+     - Trace data flow end-to-end.
+     - Error propagation correct?
+     - Proper async/await usage?
+   - **d. Scalability:**
+     - N+1 query problems?
+     - Pagination implemented?
+     - Memory leaks (unclosed connections, event listeners)?
+     - Algorithmic complexity acceptable?
+
+6. **Performance audit**
+   - Database query efficiency.
+   - API response times.
+   - Caching opportunities.
+   - Bundle sizes (frontend).
+   - Unnecessary re-renders or watchers.
+   - Asset optimization.
+
+**Output format:**
+
+````markdown
+## Review Report: [Feature Name]
+
+### Executive Summary
+- Spec compliance: [X]%
+- Test coverage: [X]% (target: [Y]%)
+- Security issues: [X] critical, [Y] high, [Z] medium
+- Production ready: Yes / No / Partial
+
+### Spec Compliance
+| # | Requirement | Status | Evidence |
+|---|-------------|--------|----------|
+| FR-1 | [desc] | ✅/⚠️/❌ | [file:line] |
+
+### Security Findings
+| # | Severity | File:Line | Issue | Recommendation |
+|---|----------|-----------|-------|----------------|
+
+### Architecture Findings
+| # | Severity | File:Line | Issue | Recommendation |
+|---|----------|-----------|-------|----------------|
+
+### Performance Findings
+| # | Severity | File:Line | Issue | Recommendation |
+|---|----------|-----------|-------|----------------|
+
+### Missing Tests
+[List of tests specified but not written]
+
+### Verdict: APPROVE | REQUEST CHANGES | BLOCK
+[1-2 sentence recommendation for what to do next]
+````
+
+The spec template has no numbered functional requirements. In the "Requirement" column, list the numbered parts of "Proposed Change" or the acceptance criteria (AC1, AC2, ...) and use their IDs in the "#" column.
+
+**Review principles**
+- **Be honest:** don't claim 100% if it's 78%. Identify real gaps.
+- **Be specific:** cite line numbers, file names, test names.
+- **Be critical but constructive:** for each issue, suggest a fix.
+- **Be thorough:** check everything the spec requires.
+- **Be practical:** distinguish "must fix before production" from "nice to have later".
+
+### Workflow: audit
+**Goal:** Post-implementation audit: verify completeness, then run [`review`](#workflow-review) for depth.
+
+**When to use:** after a feature is "done", before merging or marking complete. Unlike `review` (which can run during development), `audit` is the final gate.
+
+This is the Audit step of the [spec-driven workflow](#part-2-spec-driven-development).
+
+**Steps:**
+
+1. **Completeness check**
+   - Read the spec (`specs/features/<feature-name>.md`).
+   - Verify every acceptance criterion is met (✅ / ❌).
+   - Verify every file listed in the spec was created/modified.
+   - Verify documentation was updated (Tier 2/3 docs, `content-plan.md`).
+   - Verify the spec status is updated to "Done".
+2. **Run review**
+   - Execute the [`review` workflow](#workflow-review) (above) for a full multi-pass audit.
+   - This covers: spec compliance, tests, security, architecture, performance.
+3. **Documentation audit**
+   - Run the [`document` workflow](#workflow-document) in scan-only mode. In scan-only mode, run steps 1 and 2 and produce the Documentation Scan Report, but do not change any files.
+   - Verify new code has corresponding documentation.
+   - Verify cross-tier references are intact.
+4. **Final test run**
+   - Run the complete test suite.
+   - Verify coverage meets the spec target.
+   - No skipped or TODO tests.
+5. **Produce audit summary**
+
+````markdown
+## Audit Summary: [Feature Name]
+
+### Completeness
+- Acceptance criteria: [X/Y] met
+- Files: [all present / missing: ...]
+- Docs updated: Yes / No
+- Spec status: Done / Not updated
+
+### Review Results
+[Link to or embed review report]
+
+### Verdict: PASS | FAIL | REQUIRES ADJUSTMENT
+[What must be fixed before this can ship]
+````
+
+**Max retries:** if the audit fails, fix the issues and re-audit. Maximum 3 cycles before escalating to human review.
+
+### Workflow: fix
+**Goal:** Diagnose and resolve errors systematically.
+
+**Steps:**
+
+1. **Gather context:** check [Learnings](#learnings) (`docs/learnings.md`), affected Tier 2/3 docs, error messages.
+2. **Hypothesize:** identify 1-2 likely causes.
+3. **Validate:** add temporary logging, run tests.
+4. **Fix:** smallest change that resolves the issue.
+5. **Verify:** all tests pass, no regressions.
+6. **Document:** record the solution in `docs/learnings.md`.
+
+Do not loop more than 3 times without asking for help.
+
+**Notes**
+- For a bug in behavior, write the test that reproduces it first (see [Workflow: tdd](#workflow-tdd)), and keep it as the regression test.
+- Remove the temporary logging from step 3 before step 5.
+- `docs/learnings.md` is a log, newest entry first. Create it on the first fix. Write each entry with the [Learnings entry template](#entry-template), add the date, and link to the Tier 2/3 doc it relates to.
+- If the fix shows that a doc is wrong or missing, update it, or mark it `Outdated` in `docs/content-plan.md`.
 
 ---
 
-## 3. Skills & Tools
+### PART 3: Skills & Tools
+Register CLI tools, define sub-agents, and configure verification hooks. This section makes custom tools discoverable and usable by AI agents.
 
 ### Principles
 - Use the least powerful tool that does the job. Prefer reading and searching over editing, and editing over running arbitrary commands.
@@ -687,18 +1128,31 @@ Status: draft
 | Look up library or API behavior | Official documentation first; cite the version |
 | Parallel or large searches | Delegate to a sub-agent only when the work is independent and broad |
 
-### Skills
+### Custom Skills
+Each skill is documented in `.agents/skills/<name>/SKILL.md` following the [OpenAI Codex skills convention](https://developers.openai.com/codex/skills/). Each SKILL.md has YAML frontmatter with `name` and `description` (trigger conditions), followed by command, options, requirements, and examples.
+
 A skill is a reusable, self-contained instruction set for a recurring task.
 
-- Store project skills in `.agents/skills/<skill-name>/SKILL.md` (plus any helper scripts or templates in the same folder).
-- Each `SKILL.md` starts with front matter:
-  ```markdown
+- Store project skills in `.agents/skills/<name>/SKILL.md` (plus any helper scripts or templates in the same folder).
+- Template for a `SKILL.md`:
+  ````markdown
   ---
   name: skill-name
-  description: One sentence on what it does and when to use it.
+  description: One sentence on what it does and when to use it (the trigger conditions).
   ---
-  ```
-  Follow with numbered steps, inputs, expected outputs and a checklist for done.
+
+  ## Command
+  [How to run it]
+
+  ## Options
+  [Flags and arguments]
+
+  ## Requirements
+  [Tools, access or setup it needs]
+
+  ## Examples
+  [One or more worked examples]
+  ````
 - Before starting a task, check whether a matching skill exists and follow it. If a skill conflicts with this file, this file wins; tell the user.
 - Create a new skill only when a procedure has recurred or the user asks. Keep it short and specific, with one task per skill.
 - Candidate skills for this project, to be created when needed:
@@ -706,12 +1160,118 @@ A skill is a reusable, self-contained instruction set for a recurring task.
   - `add-adr`: create the next numbered ADR (see [Documentation](#1-documentation)).
   - `receipt-fixture`: generate a synthetic receipt fixture for tests. It must never use real data.
 
+#### Skill Inventory
+| Skill | Command | Description |
+|---|---|---|
+| `gemini` | `npm run gemini` | Text generation, vision, document analysis, grounded search via Gemini API |
+| `html-to-md` | `npm run html-to-md` | Scrape webpage to Markdown |
+| `github-cli` | `npm run github` | GitHub PRs, issues, releases, repos, workflows |
+| `google-search` | `npm run google-search` | Real-time Google Search via Gemini grounding |
+| `datetime` | `npm run datetime` | Current date/time in various formats and timezones |
+| `coding-preferences` | `npm run coding-preferences` | Store and retrieve personal coding preferences (SQLite in skill folder) |
+
+- Each skill listed here must have a `.agents/skills/<name>/SKILL.md`. Add a row when a skill is created and remove it when the skill is removed.
+- `gemini` sends its input to an external API. Follow the network rule in Principles: do not send repository contents or receipt data to it without the user's approval. Keep the API key in an environment variable, never in code or docs.
+
 ### Project tools
 Register any project-specific scripts or MCP/tool integrations here so agents can discover them. Remove this note when the first one is added.
 
 | Tool | Purpose | How to run | Notes |
 |---|---|---|---|
 | _none yet_ | | | |
+
+### Sub-Agent Definitions
+Define specialized agents with non-overlapping responsibilities.
+
+#### Agent template
+````markdown
+### [Agent Name]
+**Role:** [1 sentence — what this agent does]
+**Skills:** [List of registered skills this agent can use]
+
+**Process:**
+1. [Step]
+2. [Step]
+3. [Step]
+
+**Can:** [Permitted actions]
+**Cannot:** [Forbidden actions — prevents overlap with other agents]
+
+**Output Format:**
+[Define structured output this agent produces]
+````
+
+#### Principles
+- **Single Responsibility:** each agent has ONE job, no overlap.
+- **Skills Bridge:** agents use registered skills (see [Skill Inventory](#skill-inventory)) to invoke tools.
+- **Constraints Prevent Drift:** "Cannot" is as important as "Can".
+- **Structured Output:** every agent produces a defined format.
+- **Chain Results:** each agent's output feeds the next agent's input.
+
+#### Defined agents
+| Agent | Role |
+|---|---|
+| _none yet_ | |
+
+Add each new agent as a `###` section below this table using the template, and list it in the table. An agent may only list skills that are in the Skill Inventory.
+
+### Hooks & Verification
+Hooks are quality gates that run at defined points in the pipeline.
+
+| Hook | When | Purpose |
+|---|---|---|
+| `PreToolUse` | Before a tool executes | Approve dangerous operations |
+| `PostToolUse` | After a tool completes | Validate output format and quality |
+| `Stop` | Agent marks task complete | Final verification before "done" |
+
+#### Hook configuration template
+````markdown
+## Hooks
+
+### PreToolUse
+- Require approval for: [list dangerous operations]
+- Block: operations outside the agent's "Can" list
+
+### PostToolUse
+- Validate: output matches agent's defined format
+- Check: all required sections present
+- Log: action for audit trail
+
+### Stop (Completion Gate)
+- Verify: [acceptance criteria met / coverage threshold / all agents ran]
+- Max retries: [N] cycles before escalating to human
+````
+
+#### Hooks for this project
+These follow rules already in this file. Add hooks for each sub-agent in its own section when it is defined.
+
+- **PreToolUse**
+  - Require approval for: deleting files, force-pushing or rewriting history, dropping data, changing remotes, installing global packages, creating or merging PRs and releases, and sending repository contents or receipt data to an external service (see Principles).
+  - Block: reading or modifying files outside the repository, and any operation outside the agent's "Can" list.
+- **PostToolUse**
+  - Validate: output matches the format the agent or workflow defines (for example the review report or the audit summary).
+  - Check: all required sections are present.
+  - Log: the action taken, for the audit trail.
+- **Stop (completion gate)**
+  - Verify: the spec's acceptance criteria are met, the tests pass, the coverage target is met, and docs and `docs/content-plan.md` are updated (see [Workflow: audit](#workflow-audit)).
+  - Max retries: 3 cycles before escalating to human review.
+
+Hooks are rules for the agent unless they are also configured in the tool the agent runs in. Where a hook can be enforced by tooling, register it there and record it in the table above as enforced.
+
+### Learnings
+Check this section FIRST when encountering errors. Add solutions here so the same problem is never debugged twice.
+
+The entries are kept in `docs/learnings.md` (newest first), so that this file stays short. Read that file before debugging, and add an entry after every fix (see [Workflow: fix](#workflow-fix)).
+
+#### Entry template
+````markdown
+### [Short description]
+**Context:** [When/where this occurs]
+**Symptom:** [What you see]
+**Root cause:** [Why it happens]
+**Solution:** [How to fix]
+**Prevention:** [How to avoid in future]
+````
 
 ### Reporting
 When you finish, state in a few lines: what changed, how you verified it (commands and results), and anything left open or uncertain. If spec or doc updates were needed, say which files.
