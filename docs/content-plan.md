@@ -1,6 +1,6 @@
 # Content Plan
 
-The index of all project documentation. It tracks what exists, what is missing, and the order in which docs should be generated. **Read this file first**, then follow the links down into the tiers (see [AGENTS.md](../AGENTS.md#part-1-documentation-plan)).
+The index of all project documentation. It tracks what exists, what is missing, and the order in which docs should be generated. **Read this file first**, then follow the links down into the tiers (see [AGENTS.md](../AGENTS.md#documentation)).
 
 Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems](subsystems/)
 
@@ -12,14 +12,14 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-19
+Last reviewed: 2026-10-20
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
 | 1 Architecture | 8 | 0 | 0 | 0 | 8 |
-| 2 Subsystems | 3 | 0 | 0 | 0 | 3 |
+| 2 Subsystems | 7 | 0 | 0 | 0 | 7 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -53,9 +53,13 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 
 | Order | Subsystem | Path | Purpose | Depends on | Status |
 |------:|-----------|------|---------|------------|--------|
-| 9 | Receipt reading | `docs/subsystems/receipt-reading/README.md` | Turn a receipt (image, PDF or text) into structured line items | 3, 4 | Not Started |
-| 10 | Mapping | `docs/subsystems/mapping/README.md` | Map line items to categories; rules and unknown items | 4, 9 | Not Started |
-| 11 | Calculation | `docs/subsystems/calculation/README.md` | Totals, tax, rounding, currency | 4, 10 | Not Started |
+| 9 | Storage | `docs/subsystems/storage/README.md` | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | Not Started |
+| 10 | Import | `docs/subsystems/import/README.md` | Read images from the import folder, detect duplicates by image hash, move processed images to import_done | 4, 9 | Not Started |
+| 11 | Receipt reading | `docs/subsystems/receipt-reading/README.md` | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Not Started |
+| 12 | Categorization | `docs/subsystems/categorization/README.md` | Map line items to categories; remembered user corrections first, then the model | 4, 9, 11 | Not Started |
+| 13 | Calculation | `docs/subsystems/calculation/README.md` | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check | 4, 12 | Not Started |
+| 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
+| 15 | UI | `docs/subsystems/ui/README.md` | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | Not Started |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
@@ -67,12 +71,12 @@ No modules yet: there is no source code. Add a row here when a module with non-o
 
 ## Gaps and open items
 
-- Tech stack not chosen; blocks `architecture.md`, `development.md` commands, and all `@file` references.
-- Unknown whether the app exposes a REST API; `api-reference.md` must say so explicitly until it is decided.
+- Tech stack decided (see [AGENTS.md](../AGENTS.md#stack-decided)); record the choices as ADRs when `architecture.md` is written. Commands stay unverified until the project is scaffolded.
+- The FastAPI backend exposes a local REST API (127.0.0.1 only); endpoints are defined by specs.
 - Subsystem boundaries are provisional until `architecture.md` is drafted.
 
 ## Related documents
 
 - ↓ Tier 1: `docs/README.md`, `docs/architecture.md` (to be created, see order above)
 - ↓ Tier 2: `docs/subsystems/` (to be created)
-- Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#2-spec-driven-development).
+- Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

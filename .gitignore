@@ -13,3 +13,25 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Real receipt data: never commit (see AGENTS.md, Privacy and security)
+source/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend build output
+dist/
+
+# Google Sheets service-account keys (keep them outside the repository)
+service_account*.json

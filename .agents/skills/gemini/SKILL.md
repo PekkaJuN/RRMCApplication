@@ -1,6 +1,6 @@
 ---
 name: gemini
-description: Use when a task needs text generation, image understanding (vision), document analysis, or grounded web search through the Gemini API, for example reading a receipt image or looking up current external information. Do not use for anything that can be done from the repository itself.
+description: Use when a task needs text generation, image understanding (vision), document analysis, or grounded web search through the Gemini API, for example looking up current external information. Never use it for receipt images, OCR text or other receipt data. Do not use for anything that can be done from the repository itself.
 ---
 
 # gemini
