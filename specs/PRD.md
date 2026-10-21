@@ -45,14 +45,14 @@ rather than in a spreadsheet.
 ## 5. Main user flow
 
 1. The user saves receipt photos into the import folder (`source/import`).
-2. The user starts the import in the app.
+2. The user presses the import button in the app.
 3. For each image, the app reads the text (OCR), extracts the store, date, lines and total,
    and suggests a category for each line.
 4. The user opens a receipt and sees the image next to an editable table of its lines.
 5. The user fixes wrong categories (and, if needed, line text or amounts). Totals update
    immediately. A warning shows if the lines do not add up to the receipt total.
 6. The user confirms the receipt. Processed images have already been moved to
-   `source/import_done`.
+   `source/import_done`, and images that failed to `source/import_failed`.
 7. The user views category totals per week and per month, and exports them as CSV.
 
 ## 6. Functional requirements
@@ -64,9 +64,10 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | ID | Requirement |
 |---|---|
 | FR-1 | The app reads receipt images from a configurable import folder (default `source/import`). |
+| FR-45 | The user copies images into the import folder by hand and starts the import with a button in the UI. The app does not watch the folder. |
 | FR-2 | Supported formats: JPEG and PNG. [NEEDS CLARIFICATION: HEIC from iPhone? PDF?] |
 | FR-3 | Each image gets an identifier computed from its content (SHA-256 hash). An image whose identifier already exists is reported as a duplicate and is not imported again. |
-| FR-4 | After an image's data is committed to the database, the image moves to a configurable done folder (default `source/import_done`). An image that fails is not lost: it stays in place or moves to a failed folder, with the reason shown to the user. |
+| FR-4 | After an image's data is committed to the database, the image moves to a configurable done folder (default `source/import_done`). An image that fails moves to a configurable failed folder (default `source/import_failed`), and the reason is shown to the user without receipt content (NFR-3). A failed image's identifier is not stored, so the user can move it back to the import folder and retry without it being reported as a duplicate. A file whose name already exists in the target folder gets a numbered suffix (e.g. `kuitti (2).jpg`); no file is overwritten. |
 | FR-5 | The import reports, per run, how many images were imported, skipped as duplicates and failed. |
 
 ### 6.2 Reading and parsing
@@ -126,7 +127,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-29 | The model name is one setting. The default starts in the 7–9B class; switching to a 14B model only needs that setting changed. |
 | FR-30 | The model is loaded when the app starts and kept loaded while the app runs. |
 | FR-31 | If Ollama or the model is not available, the app says so clearly, and import waits instead of failing images. |
-| FR-32 | Settings (folders, model name, Tesseract path) are kept in one configuration file outside version control, with a committed example file. |
+| FR-32 | Settings (import, done and failed folders, model name, Tesseract path) are kept in one configuration file outside version control, with a committed example file. |
 
 ### 6.8 Product management
 
@@ -234,7 +235,7 @@ category, category source, product). The data model is defined in `docs/datamode
 
 | Release | Scope |
 |---|---|
-| MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43, FR-44, all NFRs except NFR-5 |
+| MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-45, all NFRs except NFR-5 |
 | Next | FR-28 Google Sheets export (with NFR-5) |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
@@ -264,16 +265,15 @@ A suggested order of feature specs for the MVP:
 
 1. [NEEDS CLARIFICATION] Hardware: is there a GPU, and how much memory? This decides
    whether 9B or 14B is practical, and the NFR-8 target.
-2. [NEEDS CLARIFICATION] Import trigger: a button in the UI, or automatic folder watching?
-3. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? HEIC support needed?
-4. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
-5. [NEEDS CLARIFICATION] Model choice: compare Tesseract + text model against a vision model
+2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? HEIC support needed?
+3. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
+4. [NEEDS CLARIFICATION] Model choice: compare Tesseract + text model against a vision model
    on 20–30 real receipts before the parsing spec is approved.
-6. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
-7. [NEEDS CLARIFICATION] Is a receipt categorized per line only, or can a whole receipt get
+5. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
+6. [NEEDS CLARIFICATION] Is a receipt categorized per line only, or can a whole receipt get
    one category?
-8. [NEEDS CLARIFICATION] CSV format details (FR-26).
-9. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
+7. [NEEDS CLARIFICATION] CSV format details (FR-26).
+8. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
    be archived too (e.g. after a long break)? Can archived data be viewed or exported
    separately? Can archiving be undone? Does FR-36 recategorization also update archived
    lines? Are receipt images in `import_done` archived or deleted with the data?
@@ -286,6 +286,9 @@ Resolved:
 - Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
 - Line editing: fields are independent and never recalculated; discounts are merged into the item's net amount; negative amounts are allowed (deposit refunds); a renamed line follows a matching product: FR-9, FR-18, FR-43 (2026-10-21).
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
+- Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
+- Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
+- Single user stays: no buyer or family-member field on receipts (2026-10-21).
 - Archiving is by previous calendar year, started by the user; archived data is excluded from
   active totals and exports: FR-40, FR-42 (2026-10-20).
 
