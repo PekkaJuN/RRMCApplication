@@ -76,7 +76,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-6 | Images are preprocessed for OCR (for example grayscale, deskew, contrast, scaling). |
 | FR-7 | Text is read with Tesseract using the Finnish and English language packs (`fin+eng`). |
 | FR-8 | A local language model through Ollama turns the OCR text into structured data: store, purchase date (and time if present), line items (name, quantity, unit price, amount) and receipt total. The output is validated against a schema; invalid output is a failure, not silent data. |
-| FR-9 | Parsing handles Finnish receipt conventions: decimal comma, discount lines (negative), deposit lines (pantti), weighed items spread over two lines, bonus lines, the VAT summary, and the card payment slip after the total, which is ignored. |
+| FR-9 | Parsing handles Finnish receipt conventions: decimal comma, deposit lines (pantti), weighed items spread over two lines, bonus lines, the VAT summary, and the card payment slip after the total, which is ignored. A discount line printed under an item is merged into that item: the line's amount is the net price after the discount, and no separate discount line is created. A deposit refund (panttipalautus) stays its own line with a negative amount and is marked as a deposit refund (see FR-44). |
 | FR-10 | The raw OCR text is stored with the receipt, so a receipt can be re-parsed without re-running OCR. |
 
 ### 6.3 Categorization
@@ -95,9 +95,10 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 |---|---|
 | FR-16 | A receipt view shows the receipt image and an editable table of its lines side by side. |
 | FR-17 | Each line's category is chosen from a dropdown of the categories. Categories are listed under their group headings; groups themselves cannot be chosen. |
-| FR-18 | The user can edit line name, quantity and amount, add a missing line and delete a wrong one. Store, date and total are editable too. |
+| FR-18 | The user can edit a line's name, quantity, unit price and amount, add a missing line and delete a wrong one. Store, date and total are editable too. The fields are independent: the app never recalculates one from another (changing the quantity or the amount does not change the other or the unit price). An amount may be negative (e.g. a deposit refund). |
+| FR-43 | When the user changes a line's name and the new name matches an existing product (after normalization), the line is linked to that product and takes its category and group. If no product matches, the line keeps its category and the new name is stored as a new product with that category (as in FR-13). |
 | FR-19 | Category subtotals for the receipt update immediately after any edit. |
-| FR-20 | A warning shows when the sum of the lines (including discounts and deposits) differs from the receipt total, with the difference. |
+| FR-20 | A warning shows when the sum of the line amounts (including deposits and deposit refunds) differs from the receipt total, with the difference. Deposit refunds are part of this check because the printed total already has them deducted. |
 | FR-21 | A list view shows all receipts with date, store, total, warning state and review state (unreviewed / confirmed). |
 
 ### 6.5 Totals
@@ -108,6 +109,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-23 | Totals group by the receipt's purchase date, not by the import date. |
 | FR-24 | Totals update when a receipt is edited. |
 | FR-25 | The user can choose the period shown (for example a month or a range of weeks). |
+| FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
 
@@ -232,7 +234,7 @@ category, category source, product). The data model is defined in `docs/datamode
 
 | Release | Scope |
 |---|---|
-| MVP | FR-1 to FR-27, FR-29 to FR-39, all NFRs except NFR-5 |
+| MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43, FR-44, all NFRs except NFR-5 |
 | Next | FR-28 Google Sheets export (with NFR-5) |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
@@ -282,6 +284,8 @@ Resolved:
 - UI language: Finnish, NFR-15 (2026-10-20).
 - Two-level categories with user-created groups: FR-11, FR-38, FR-39 (2026-10-20).
 - Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
+- Line editing: fields are independent and never recalculated; discounts are merged into the item's net amount; negative amounts are allowed (deposit refunds); a renamed line follows a matching product: FR-9, FR-18, FR-43 (2026-10-21).
+- Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
 - Archiving is by previous calendar year, started by the user; archived data is excluded from
   active totals and exports: FR-40, FR-42 (2026-10-20).
 
@@ -301,13 +305,14 @@ Resolved:
 | Term | Meaning |
 |---|---|
 | Receipt | One purchase, read from one image. |
-| Line | One item row on a receipt, including discount and deposit rows. |
+| Line | One item row on a receipt, with the item's net amount after any discount. Deposits and deposit refunds are lines of their own. |
 | Category | What a product belongs to, e.g. "Maitotuotteet". Totals are calculated per category. |
 | Group | A category that holds other categories, e.g. "Ruoka". Its total is the sum of its categories. Products cannot belong to a group directly. |
 | Product | A named item with one category, stored once per normalized name. The product list is the remembered product–category mapping. |
 | Normalized name | A product or category name after normalization, used for matching and uniqueness. |
 | ISO week | Week as defined by ISO 8601: Monday start; week 1 contains the first Thursday of the year. |
-| Pantti | Bottle and can deposit, shown as its own line on Finnish receipts. |
+| Pantti | Bottle and can deposit, shown as its own line on Finnish receipts. Counted as spending. |
+| Panttipalautus | Deposit refund for returned bottles and cans, a negative line on the receipt. Not deducted from spending (FR-44). |
 
 ## Related documents
 
