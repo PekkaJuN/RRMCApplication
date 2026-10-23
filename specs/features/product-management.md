@@ -4,7 +4,9 @@
 - **Status:** Draft
 - **Created:** 2026-10-20
 - **Updated:** 2026-10-20: groups, default list from PRD 6.9, Finnish UI, FR-36 rule;
-  2026-10-21: FR-43 and FR-44 noted as out of scope
+  2026-10-21: FR-43 and FR-44 noted as out of scope;
+  2026-10-23: project setup moved to the foundation spec
+- **Depends on:** [Project foundation](foundation.md)
 - **Implements:** PRD FR-11, FR-33, FR-34, FR-35, FR-37, FR-38, FR-39, the default list in
   PRD 6.9, NFR-15 for this page, and the basic part of FR-14 (name normalization without OCR
   mix-ups). FR-36 is recorded as a rule; it is implemented with receipt lines (see Out of Scope).
@@ -59,8 +61,8 @@ None (new). There is no source code yet.
   has categories cannot be deleted. The user is told how many products or categories are
   in the way.
 - **PC8 Persistence.** Groups, categories and products are stored in SQLite and survive a
-  restart. The database location comes from the settings file (PRD FR-32); the default is a
-  file outside version control.
+  restart. The database, its location and the migration mechanism come from the
+  [foundation spec](foundation.md); this feature adds its tables as a migration.
 - **PC9 Products page (Finnish UI).** The UI has a page "Tuotteet" with:
   - a category panel showing the groups with their categories, then the categories without
     a group; actions to add, rename, move, convert and delete, with counts;
@@ -303,38 +305,36 @@ That is 2 groups (category counts 10 and 3) and 21 categories, all with `product
 
 ## Files to Modify
 
-The project has no code yet. This spec includes the minimal backend and frontend setup that
-this feature needs. Exact paths are fixed in the Plan phase.
+This feature builds on the [foundation spec](foundation.md), which provides the containers,
+settings, database and migrations, error format, API client and app shell. Exact paths are
+fixed in the Plan phase.
 
 | File | Change |
 |---|---|
-| `backend/pyproject.toml` | New: backend project, dependencies (FastAPI, Uvicorn, pytest, ruff) |
-| `backend/app/main.py` | New: FastAPI app, routers, startup seeding (PC2) |
-| `backend/app/settings.py` | New: settings file loading, database path (PC8) |
-| `backend/app/db.py` | New: SQLite connection; schema for categories (kind, parent) and products |
-| `backend/app/catalog/` | New: normalization, hierarchy rules, category and product services, API routes, default list |
-| `backend/tests/` | New: unit and integration tests |
-| `config.example.toml` | New: example settings file (database path) |
-| `frontend/` (Vite scaffold) | New: React + TypeScript project, Vitest, Testing Library, MSW, Playwright |
+| `backend/app/migrations/` | New migration: tables for categories (kind, parent) and products |
+| `backend/app/catalog/` | New: normalization, hierarchy rules, category and product services, API routes, default list and startup seeding (PC2) |
+| `backend/app/main.py` | Update: register the catalog routes and seeding |
+| `backend/tests/` | New: unit and integration tests for the catalog |
 | `frontend/src/api/catalog.ts` | New: API client for categories and products |
 | `frontend/src/pages/ProductsPage.tsx` | New: Tuotteet page (PC9) |
-| `frontend/src/i18n/fi.ts` | New: Finnish UI texts in one place |
+| `frontend/src/App.tsx` | Update: add `Tuotteet` to the navigation |
+| `frontend/src/i18n/fi.ts` | Update: texts of the Tuotteet page |
 | `frontend/src/**/*.test.tsx`, `frontend/e2e/` | New: component and E2E tests |
-| `docs/datamodel.md` | New: category (kind, parent) and product entities |
-| `docs/api-reference.md` | New: the endpoints above |
-| `docs/development.md` | New: setup and commands, then sync the Commands table in `AGENTS.md` |
-| `docs/subsystems/storage/README.md`, `docs/subsystems/categorization/README.md`, `docs/subsystems/ui/README.md` | New |
+| `docs/datamodel.md` | Update: category (kind, parent) and product entities |
+| `docs/api-reference.md` | Update: the endpoints above |
+| `docs/subsystems/storage/README.md`, `docs/subsystems/ui/README.md` | Update |
+| `docs/subsystems/categorization/README.md` | New |
 | `docs/glossary.md` | New: group, category, product, normalized name |
 | `docs/content-plan.md` | Update statuses |
-| `docs/adr/0001-...` | New: record the decided stack |
-| `specs/README.md` | New: spec index |
+| `specs/README.md` | Update status |
 
 ## Risk
 - **What could break:** nothing existing (greenfield). Later specs depend on the category and
   product schema; a schema change after receipts exist needs a migration. The schema must
   let receipt lines reference products (FR-36).
-- **Rollback:** delete the database file and revert the commit.
-- **Dependencies:** Python, Node.js; no Tesseract or Ollama needed for this feature.
+- **Rollback:** revert the commit and remove the database volume (see `docs/development.md`).
+- **Dependencies:** the foundation spec (Docker); runs with `RRMC_ENGINES=fake`, so no
+  Tesseract or Ollama is needed for this feature.
 - **Privacy:** product names describe purchases. They stay in the local database and are not
   logged.
 
@@ -425,12 +425,12 @@ this feature needs. Exact paths are fixed in the Plan phase.
 
 ## Related Documentation (MANDATORY)
 - PRD: `specs/PRD.md` sections 6.3, 6.7 (FR-32), 6.8, 6.9, 7.2, 7.4 (NFR-15), 7.5
-- Tier 1: `docs/datamodel.md`, `docs/api-reference.md`, `docs/development.md` (to be written
-  in this feature)
-- Tier 2: storage, categorization and ui subsystem READMEs (to be written in this feature)
+- Spec: [Project foundation](foundation.md)
+- Tier 1: `docs/datamodel.md`, `docs/api-reference.md`, `docs/development.md` (written in the
+  foundation feature)
+- Tier 2: storage and ui subsystem READMEs (foundation), categorization README (this feature)
 - Development rules: `AGENTS.md`; workflows: `.agents/skills/spec/SKILL.md`,
   `.agents/skills/tdd/SKILL.md`
 
 ## Open Questions
-1. [NEEDS CLARIFICATION] Confirm that the minimal backend and frontend setup belongs in this
-   spec rather than in a separate setup spec.
+None. The project setup is in the [foundation spec](foundation.md) (resolved 2026-10-23).

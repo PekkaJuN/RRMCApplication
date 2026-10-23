@@ -12,13 +12,13 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-20
+Last reviewed: 2026-10-22
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 8 | 0 | 0 | 0 | 8 |
+| 1 Architecture | 8 | 0 | 3 | 0 | 5 |
 | 2 Subsystems | 7 | 0 | 0 | 0 | 7 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
@@ -27,13 +27,13 @@ Last reviewed: 2026-10-20
 | Order | Doc | Path | Purpose | Depends on | Status |
 |------:|-----|------|---------|------------|--------|
 | 1 | Docs index | `docs/README.md` | Entry point; links to every Tier 1 doc and subsystem | none | Not Started |
-| 2 | Project Description (required) | `docs/projectdescription.md` | Purpose, target users, key features, business domain | 1 | Not Started |
-| 3 | System Architecture (required) | `docs/architecture.md` | Tech stack, folder structure, component map, deployment | 2 | Not Started |
+| 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | In Progress |
+| 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | In Progress |
 | 4 | Data Model (required) | `docs/datamodel.md` | Core entities, schema overview, relationships | 3 | Not Started |
 | 5 | Development Guide (required) | `docs/development.md` | Setup, commands, code standards, testing, local dev | 3 | Not Started |
 | 6 | API Reference (required) | `docs/api-reference.md` | REST endpoints, auth, request/response formats | 3, 4 | Not Started |
 | 7 | Glossary | `docs/glossary.md` | Domain terms used across all tiers | 2 | Not Started |
-| 8 | ADRs | `docs/adr/` | One file per significant decision; created as decisions are made | 3 | Not Started |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md) | 3 | In Progress |
 
 ### Optional Tier 1 docs (not yet planned)
 
@@ -71,12 +71,12 @@ No modules yet: there is no source code. Add a row here when a module with non-o
 
 ## Gaps and open items
 
-- Tech stack decided (see [AGENTS.md](../AGENTS.md#stack-decided)); record the choices as ADRs when `architecture.md` is written. Commands stay unverified until the project is scaffolded.
+- Tech stack decided and recorded in [ADR 0001](adr/0001-tech-stack.md). Commands stay unverified until the project is scaffolded.
 - The FastAPI backend exposes a local REST API (127.0.0.1 only); endpoints are defined by specs.
-- Subsystem boundaries are provisional until `architecture.md` is drafted.
+- Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design, two open points marked `[NEEDS CLARIFICATION]`).
 
 ## Related documents
 
-- ↓ Tier 1: `docs/README.md`, `docs/architecture.md` (to be created, see order above)
+- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md); `docs/README.md` and the rest to be created (see order above)
 - ↓ Tier 2: `docs/subsystems/` (to be created)
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

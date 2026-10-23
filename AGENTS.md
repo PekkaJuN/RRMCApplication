@@ -25,7 +25,8 @@ This file holds the rules that apply to every task. Detailed workflows live in s
 | Storage | SQLite |
 | Export | CSV first, behind a common exporter interface. Google Sheets (gspread) later. |
 
-Significant choices are recorded as ADRs in `docs/adr/`.
+Significant choices are recorded as ADRs in `docs/adr/`. The stack is
+[ADR 0001](docs/adr/0001-tech-stack.md).
 
 ### Planned layout
 
@@ -36,6 +37,7 @@ docs/               documentation (see Documentation)
 specs/              feature specs (see Workflows)
 source/import/      incoming receipt images      (gitignored, real data)
 source/import_done/ processed images              (gitignored, real data)
+source/import_failed/ images that failed to import (gitignored, real data)
 ```
 
 The import folders are configurable. Paths above are defaults.

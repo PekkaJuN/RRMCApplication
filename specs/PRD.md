@@ -77,7 +77,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-6 | Images are preprocessed for OCR (for example grayscale, deskew, contrast, scaling). |
 | FR-7 | Text is read with Tesseract using the Finnish and English language packs (`fin+eng`). |
 | FR-8 | A local language model through Ollama turns the OCR text into structured data: store, purchase date (and time if present), line items (name, quantity, unit price, amount) and receipt total. The output is validated against a schema; invalid output is a failure, not silent data. |
-| FR-9 | Parsing handles Finnish receipt conventions: decimal comma, deposit lines (pantti), weighed items spread over two lines, bonus lines, the VAT summary, and the card payment slip after the total, which is ignored. A discount line printed under an item is merged into that item: the line's amount is the net price after the discount, and no separate discount line is created. A deposit refund (panttipalautus) stays its own line with a negative amount and is marked as a deposit refund (see FR-44). |
+| FR-9 | Parsing handles Finnish receipt conventions: decimal comma, deposit lines (pantti), weighed items spread over two lines, bonus lines, the VAT summary, and the card payment slip after the total, which is ignored. A discount line printed under an item is merged into that item: the line's amount is the net price after the discount, and no separate discount line is created. A deposit line (pantti) printed under an item is merged into that item the same way: the line's amount includes the deposit (e.g. 1,89 € + 0,40 € = 2,29 €), so the deposit counts as spending in the item's category, and no separate deposit line is created. A deposit refund (panttipalautus) stays its own line with a negative amount and is marked as a deposit refund (see FR-44). |
 | FR-10 | The raw OCR text is stored with the receipt, so a receipt can be re-parsed without re-running OCR. |
 
 ### 6.3 Categorization
@@ -99,7 +99,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-18 | The user can edit a line's name, quantity, unit price and amount, add a missing line and delete a wrong one. Store, date and total are editable too. The fields are independent: the app never recalculates one from another (changing the quantity or the amount does not change the other or the unit price). An amount may be negative (e.g. a deposit refund). |
 | FR-43 | When the user changes a line's name and the new name matches an existing product (after normalization), the line is linked to that product and takes its category and group. If no product matches, the line keeps its category and the new name is stored as a new product with that category (as in FR-13). |
 | FR-19 | Category subtotals for the receipt update immediately after any edit. |
-| FR-20 | A warning shows when the sum of the line amounts (including deposits and deposit refunds) differs from the receipt total, with the difference. Deposit refunds are part of this check because the printed total already has them deducted. |
+| FR-20 | A warning shows when the sum of the line amounts (including deposit refunds) differs from the receipt total, with the difference. Deposit refunds are part of this check because the printed total already has them deducted. |
 | FR-21 | A list view shows all receipts with date, store, total, warning state and review state (unreviewed / confirmed). |
 
 ### 6.5 Totals
@@ -127,7 +127,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-29 | The model name is one setting. The default starts in the 7–9B class; switching to a 14B model only needs that setting changed. |
 | FR-30 | The model is loaded when the app starts and kept loaded while the app runs. |
 | FR-31 | If Ollama or the model is not available, the app says so clearly, and import waits instead of failing images. |
-| FR-32 | Settings (import, done and failed folders, model name, Tesseract path) are kept in one configuration file outside version control, with a committed example file. |
+| FR-32 | Settings (import, done and failed folders, Ollama address, model name, ports) are kept in one `.env` file outside version control, with a committed `.env.example`. |
 
 ### 6.8 Product management
 
@@ -201,8 +201,8 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 
 | ID | Requirement |
 |---|---|
-| NFR-10 | Runs on Windows (the user's machine). Prerequisites: Python, Node.js, Tesseract with `fin` and `eng`, and Ollama. |
-| NFR-11 | Setup and start are documented in `docs/development.md` and work from a clean checkout. |
+| NFR-10 | Runs on Windows (the user's machine) with Docker. Prerequisites: Docker Desktop, Git and Ollama. Python, Node.js and Tesseract with `fin` and `eng` run in containers; Ollama runs on Windows. |
+| NFR-11 | Setup and start are documented in `docs/development.md` and work from a clean checkout with `docker compose up`. The same way of running is used for normal use and for development. |
 | NFR-15 | The user interface is in Finnish. Documentation and code are in English (see `AGENTS.md`). |
 
 ### 7.5 Quality
@@ -224,6 +224,7 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 | Storage | SQLite |
 | Export | CSV first; Google Sheets (gspread) later, behind the same interface |
 | Testing | Backend: pytest. UI: Vitest + React Testing Library + MSW. E2E: Playwright. |
+| Runtime | Docker Compose: a backend container (with Tesseract) and a UI container (Vite dev server), both on `127.0.0.1`; Ollama on Windows. Used for both normal use and development. |
 
 Main stored entities: **category** (name, optional group; a group is a category without a
 parent that holds other categories), **product** (display name, normalized name, category:
@@ -286,9 +287,11 @@ Resolved:
 - Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
 - Line editing: fields are independent and never recalculated; discounts are merged into the item's net amount; negative amounts are allowed (deposit refunds); a renamed line follows a matching product: FR-9, FR-18, FR-43 (2026-10-21).
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
+- A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
 - Single user stays: no buyer or family-member field on receipts (2026-10-21).
+- Installation and development use Docker; Ollama stays on Windows; settings are in one `.env` file; one way of running for normal use and development: FR-32, NFR-10, NFR-11 (2026-10-23).
 - Archiving is by previous calendar year, started by the user; archived data is excluded from
   active totals and exports: FR-40, FR-42 (2026-10-20).
 
@@ -308,13 +311,13 @@ Resolved:
 | Term | Meaning |
 |---|---|
 | Receipt | One purchase, read from one image. |
-| Line | One item row on a receipt, with the item's net amount after any discount. Deposits and deposit refunds are lines of their own. |
+| Line | One item row on a receipt, with the item's amount after any discount and including any deposit. Deposit refunds are lines of their own. |
 | Category | What a product belongs to, e.g. "Maitotuotteet". Totals are calculated per category. |
 | Group | A category that holds other categories, e.g. "Ruoka". Its total is the sum of its categories. Products cannot belong to a group directly. |
 | Product | A named item with one category, stored once per normalized name. The product list is the remembered product–category mapping. |
 | Normalized name | A product or category name after normalization, used for matching and uniqueness. |
 | ISO week | Week as defined by ISO 8601: Monday start; week 1 contains the first Thursday of the year. |
-| Pantti | Bottle and can deposit, shown as its own line on Finnish receipts. Counted as spending. |
+| Pantti | Bottle and can deposit, printed as its own line under the item on Finnish receipts. Part of the item's price: merged into the item's line and counted as spending in its category (FR-9). |
 | Panttipalautus | Deposit refund for returned bottles and cans, a negative line on the receipt. Not deducted from spending (FR-44). |
 
 ## Related documents
