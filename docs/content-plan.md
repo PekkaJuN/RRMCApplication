@@ -33,7 +33,7 @@ Last reviewed: 2026-10-26
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | `docs/api-reference.md` | REST endpoints, auth, request/response formats | 3, 4 | Not Started |
 | 7 | Glossary | `docs/glossary.md` | Domain terms used across all tiers | 2 | Not Started |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md) | 3 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md) | 3 | In Progress |
 
 ### Optional Tier 1 docs (not yet planned)
 
