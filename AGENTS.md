@@ -72,6 +72,21 @@ Run the tests and lint for every part you changed before declaring work done.
   only when the spec's plan calls for it.
 - All `*.md` files are written in English. Reply to the user in the language they use.
 
+## Guardrails
+
+These override every other rule and every skill.
+
+- Never touch `.env`; never run a command that deletes data.
+- Never "fix" a failing test by editing the test. The spec decides which one is wrong, and
+  the spec is corrected first.
+- Stop after three consecutive red rounds, report and ask the user. Do not thrash.
+  (The planned first Red of a TDD cycle does not count.)
+- Stop if the same file changes three times in a row.
+- Stop and ask when the spec does not cover the case.
+- Never let real receipt data (images, OCR text, product names from real receipts, the
+  database) leave this machine, enter the repository, or appear in tests, logs or prompts
+  to external services.
+
 ## Privacy and security
 
 Receipts are personal financial data.
