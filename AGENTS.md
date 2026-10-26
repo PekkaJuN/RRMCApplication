@@ -51,17 +51,22 @@ Commands marked *planned* are not verified until the project is scaffolded.
 |---|---|---|
 | Backend tests | `cd backend && pytest` | planned |
 | Backend lint | `cd backend && ruff check . && ruff format --check .` | planned |
+| Backend type check | `cd backend && pyright` | planned |
 | Frontend tests | `cd frontend && npm test` | planned |
 | Frontend lint | `cd frontend && npm run lint` | planned |
+| Frontend format check | `cd frontend && npx prettier --check .` | planned |
+| Frontend type check | `cd frontend && npx tsc --noEmit` | planned |
 | E2E tests | `cd frontend && npx playwright test` | planned |
 | Run backend | `cd backend && uvicorn app.main:app --host 127.0.0.1` | planned |
 | Run frontend | `cd frontend && npm run dev` | planned |
 
-Run the tests and lint for every part you changed before declaring work done.
+Run the tests, lint, format check and type check for every part you changed before declaring
+work done.
 
 ## General rules
 
 - Prefer the smallest change that satisfies the request. Do not refactor unrelated code.
+- Follow the code standards in [docs/development.md](docs/development.md#code-standards).
 - If a request conflicts with a spec or this file, say so and ask. Do not choose silently.
 - When something is unknown, ask or record it as `[NEEDS CLARIFICATION: ...]`. Do not guess.
 - Do not commit, push or open PRs unless asked. Use short imperative commit messages.

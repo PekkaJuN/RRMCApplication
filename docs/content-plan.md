@@ -12,13 +12,13 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-22
+Last reviewed: 2026-10-26
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 8 | 0 | 3 | 0 | 5 |
+| 1 Architecture | 8 | 0 | 4 | 0 | 4 |
 | 2 Subsystems | 7 | 0 | 0 | 0 | 7 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
@@ -30,7 +30,7 @@ Last reviewed: 2026-10-22
 | 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | In Progress |
 | 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | In Progress |
 | 4 | Data Model (required) | `docs/datamodel.md` | Core entities, schema overview, relationships | 3 | Not Started |
-| 5 | Development Guide (required) | `docs/development.md` | Setup, commands, code standards, testing, local dev | 3 | Not Started |
+| 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | `docs/api-reference.md` | REST endpoints, auth, request/response formats | 3, 4 | Not Started |
 | 7 | Glossary | `docs/glossary.md` | Domain terms used across all tiers | 2 | Not Started |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md) | 3 | In Progress |

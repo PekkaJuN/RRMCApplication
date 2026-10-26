@@ -138,7 +138,9 @@ design in [architecture.md](../../docs/architecture.md).
   `Taustapalveluun ei saada yhteyttä.` when the backend cannot be reached.
 - **PC11 Developer commands.** Each command below runs in containers, needs nothing on the
   computer but Docker, and succeeds on the fresh scaffold:
-  backend tests, backend lint and format check, frontend tests, frontend lint, E2E tests
+  backend tests, backend lint and format check, backend type check (pyright, strict),
+  frontend tests, frontend lint, frontend format check (Prettier), frontend type check
+  (`tsc --noEmit`), E2E tests
   (Playwright, real backend with `RRMC_ENGINES=fake` and a temporary database).
   The exact commands are fixed in the plan and documented in `docs/development.md`;
   the Commands table in `AGENTS.md` is updated to match.
@@ -340,18 +342,18 @@ Exact paths are fixed in the Plan phase.
 | File | Change |
 |---|---|
 | `compose.yaml` | New: `backend` and `frontend` services, ports on `127.0.0.1`, mounts, database volume (PC1, PC2, PC4) |
-| `backend/Dockerfile` | New: Python, Tesseract with `fin` and `eng` |
+| `backend/Dockerfile` | New: Python, Tesseract with `fin` and `eng`, Node.js for pyright |
 | `frontend/Dockerfile` | New: Node.js for Vite, Vitest and Playwright |
 | `.env.example` | New: every PC3 setting with its default and a comment |
 | `.gitignore` | Update: test output, anything else PC12 needs |
-| `backend/pyproject.toml` | New: dependencies (FastAPI, Uvicorn, settings library, HTTP client, pytest, ruff) |
+| `backend/pyproject.toml` | New: dependencies (FastAPI, Uvicorn, settings library, HTTP client, pytest, ruff, pyright); ruff and pyright settings per `docs/development.md#code-standards` |
 | `backend/app/main.py` | New: app factory, CORS, error handlers, request logging, startup (settings, migrations, model load) |
 | `backend/app/settings.py` | New: settings and validation (PC3) |
 | `backend/app/db.py`, `backend/app/migrations/` | New: SQLite connection and migration runner (PC4) |
 | `backend/app/health.py` | New: health endpoint and checks (PC5) |
 | `backend/app/engines/` | New: `OcrEngine`, `ReceiptModel`, real and fake implementations with availability checks (PC6, PC7) |
 | `backend/tests/` | New: unit and integration tests |
-| `frontend/` (Vite scaffold) | New: React + TypeScript, ESLint, Vitest, Testing Library, MSW, Playwright |
+| `frontend/` (Vite scaffold) | New: React + TypeScript (strict), ESLint, Prettier, `eslint-config-prettier`, Vitest, Testing Library, MSW, Playwright; settings per `docs/development.md#code-standards` |
 | `frontend/src/api/client.ts`, `frontend/src/api/health.ts` | New: shared API client and health client |
 | `frontend/src/App.tsx`, `frontend/src/components/StatusLine.tsx` | New: app shell and status line (PC10) |
 | `frontend/src/i18n/fi.ts` | New: Finnish UI texts |
