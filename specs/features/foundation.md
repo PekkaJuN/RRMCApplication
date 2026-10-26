@@ -1,7 +1,7 @@
 # Feature: Project foundation
 
 ## Overview
-- **Status:** Approved (2026-10-26); Plan approved (2026-10-26); Tasks in review
+- **Status:** In Progress (2026-10-26); Approved (2026-10-26); Plan and Tasks approved (2026-10-26)
 - **Created:** 2026-10-23
 - **Implements:** PRD FR-29 (model name as one setting), FR-30 (model loaded at start),
   FR-31 (clear message when Ollama or the model is unavailable; the import part is in the
@@ -130,6 +130,7 @@ design in [architecture.md](../../docs/architecture.md).
   | `model` `missing_model` | `Mallia <model_name> ei ole ladattu. Lataa se komennolla: ollama pull <model_name>` |
   | `ocr` `unavailable` | `Tekstintunnistus ei ole käytettävissä.` |
   | `folders` `unavailable` | `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` |
+  | `database` `unavailable` | `Tietokanta ei ole käytettävissä.` (added 2026-10-26) |
   | backend does not answer | `Taustapalveluun ei saada yhteyttä.` |
 
   When several checks fail, each text is shown. The shell has the navigation area where
@@ -497,7 +498,7 @@ Approved spec: 2026-10-26. This plan follows the code standards in
 
 | Service | Image | Command | Ports | Mounts |
 |---|---|---|---|---|
-| `backend` | `backend/Dockerfile` | `python -m app.prestart && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log` | `127.0.0.1:${RRMC_BACKEND_PORT:-8000}:8000` | `./backend:/app`; `${RRMC_IMPORT_DIR:-./source/import}:/data/import`; same for `import_done`, `import_failed`; named volume `rrmc-data:/data/db` |
+| `backend` | `backend/Dockerfile` | `python -m app.prestart && uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --reload --no-access-log` | `127.0.0.1:${RRMC_BACKEND_PORT:-8000}:8000` | `./backend:/app`; `${RRMC_IMPORT_DIR:-./source/import}:/data/import`; same for `import_done`, `import_failed`; named volume `rrmc-data:/data/db` |
 | `frontend` | `frontend/Dockerfile` | `npm run dev` (Vite on `0.0.0.0:5173`) | `127.0.0.1:${RRMC_UI_PORT:-5173}:5173` | `./frontend:/app`; named volume `rrmc-node-modules:/app/node_modules` |
 | `backend-e2e` (profile `e2e`) | backend image | as `backend`, with `RRMC_ENGINES=fake` and `/data` on `tmpfs` | none | `./backend:/app` |
 | `e2e` (profile `e2e`) | frontend image | `npx playwright test` | none | `./frontend:/app`, node modules volume |
@@ -533,7 +534,7 @@ because there is one way of running.
 |---|---|
 | `fastapi`, `uvicorn[standard]` | Stack (ADR 0001); `standard` brings `watchfiles` for reload |
 | `pydantic-settings` | Reads `RRMC_*` from the environment with typed validation (PC3) |
-| `httpx` | Ollama client and FastAPI `TestClient`; `httpx.MockTransport` fakes Ollama in tests, so no extra mock library |
+| `httpx2` | Ollama client and FastAPI `TestClient` (Starlette 1.10 types its `TestClient` on `httpx2`; plain `httpx` is deprecated there, decided 2026-10-26); `httpx2.MockTransport` fakes Ollama in tests, so no extra mock library |
 | dev: `pytest`, `pytest-cov`, `ruff`, `pyright` | Tests, coverage, lint and format, strict type check |
 
 Lock file: **`uv.lock`** (the choice left open in development.md). Migrations use the
@@ -555,7 +556,7 @@ one local database and match the development.md rule.
 | `app/errors.py` | `AppError(code, message, status)`; handlers for `AppError`, 404, `RequestValidationError` (→ `invalid_request`) and `Exception` (→ `internal_error`, logged with `logger.exception`) | PC8 |
 | `app/texts.py` | The backend text module: Finnish error messages | PC8 |
 | `app/logging_setup.py` | Standard `logging` to stdout at `RRMC_LOG_LEVEL`; middleware logs `GET /api/health 200 12ms` at `INFO` (method, path without query string, status, duration); no bodies | PC9 |
-| `app/main.py` | `create_app(settings=None, extra_routers=())`: settings, logging, CORS (`http://127.0.0.1:{ui_port}` only), error handlers, request logging, routers, lifespan (migrations, `ModelLoader.start()`); `app = create_app()` for Uvicorn. `extra_routers` lets tests add the test-only endpoints of AC20 and AC21; production has no test endpoints | all |
+| `app/main.py` | `create_app(settings=None, extra_routers=(), engines=None, migrations_dir=MIGRATIONS_DIR)`: settings, logging, CORS (`http://127.0.0.1:{ui_port}` only), error handlers, request logging, routers, lifespan (migrations, `ModelLoader.start()`); Uvicorn calls it with `--factory`, so importing the module reads no settings. `extra_routers`, `engines` and `migrations_dir` let tests add the test-only endpoints of AC20 and AC21, fake servers and throwaway migrations; production passes none | all |
 
 `app/engines/` is a shared adapter package used by receipt-reading and categorization; the
 reading and parsing methods are added there by their specs. Health is its own small package
@@ -569,19 +570,19 @@ image), with the tag matching the `@playwright/test` version in `package-lock.js
 | Dependency | Why |
 |---|---|
 | `react`, `react-dom` | Stack |
-| dev: `vite`, `@vitejs/plugin-react`, `typescript` | Build tool and language |
+| dev: `vite`, `@vitejs/plugin-react`, `typescript`, `@types/react`, `@types/react-dom`, `@types/node` | Build tool, language and type definitions. TypeScript 6.0: `typescript-eslint` 8 supports TypeScript below 6.1 |
 | dev: `vitest`, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, `msw` | Component tests (NFR-14) |
 | dev: `@playwright/test` | E2E |
-| dev: `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-jsx-a11y`, `prettier`, `eslint-config-prettier` | Lint and format per development.md |
+| dev: `eslint`, `@eslint/js`, `globals`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-jsx-a11y`, `prettier`, `eslint-config-prettier` | Lint and format per development.md. ESLint 9: `eslint-plugin-jsx-a11y` 6 does not support ESLint 10 yet |
 
 No router library yet: the shell has one page. The navigation area is a `<nav>` that feature
 specs fill; the product management plan decides whether a router is added.
 
 | File | Contents | PC |
 |---|---|---|
-| `src/api/client.ts` | `apiGet<T>(path)` and friends: return `{ok: true, data}` or `{ok: false, error: {code, message}}`; network failure → code `network_error` with `Taustapalveluun ei saada yhteyttä.` | PC10 |
+| `src/api/client.ts` | `apiGet<T>(path)` and friends: return `{ok: true, data}` or `{ok: false, error: {code, message}}`; network failure, or an error answer not in the API error format (the Vite proxy when the backend is down), → code `network_error` with `Taustapalveluun ei saada yhteyttä.` | PC10 |
 | `src/api/health.ts` | `getHealth()` and the `Health` type mirroring the backend schema | PC10 |
-| `src/components/StatusLine.tsx` | Calls `getHealth()` on mount and every 30 s (`setInterval`, cleared on unmount); maps checks to texts in the PC10 order: model, ocr, folders | PC10 |
+| `src/components/StatusLine.tsx` | Calls `getHealth()` on mount and every 30 s (`setInterval`, cleared on unmount); maps checks to texts in the PC10 order: model, ocr, folders, database; shows nothing until the first answer | PC10 |
 | `src/App.tsx` | Heading `Kuittisovellus`, `<nav>`, `StatusLine` | PC10 |
 | `src/i18n/fi.ts` | All UI texts, including the template `Mallia {model} ei ole ladattu...` | PC10 |
 | `index.html` | `<html lang="fi">`, `<title>Kuittisovellus</title>` | PC10 |
@@ -660,88 +661,88 @@ image with `docker build` and `docker run`.
 
 ### Repository and backend base
 
-- [ ] **T1 Version control hygiene** (AC27). Update `.gitignore` (P1, PC12) and add
+- [x] **T1 Version control hygiene** (AC27). Update `.gitignore` (P1, PC12) and add
   `.env.example` with every PC3 setting, default and comment.
   Proof: `git check-ignore` lists the five AC27 paths and not `.env.example`.
-- [ ] **T2 Backend image and project** (AC26 backend part). `backend/Dockerfile`,
+- [x] **T2 Backend image and project** (AC26 backend part). `backend/Dockerfile`,
   `pyproject.toml` with ruff and pyright settings, `uv.lock`, empty `app` package, a minimal
   `compose.yaml` with the `backend` service (build, `env_file`, `./backend:/app`).
   Proof: `docker compose run --rm backend pytest` (one placeholder test, removed in T3),
   ruff and pyright pass; `tesseract --list-langs` in the container lists `fin` and `eng`.
-- [ ] **T3 Settings** (AC6, AC7). `app/settings.py`, `load_settings()`, `SettingsError`.
+- [x] **T3 Settings** (AC6, AC7). `app/settings.py`, `load_settings()`, `SettingsError`.
   Proof: unit tests `test_ac6_defaults`, `test_ac7_invalid_engines`,
   `test_ac7_invalid_log_level`, `test_ac7_invalid_ollama_url`.
-- [ ] **T4 Migration runner** (AC8, AC9, AC10). `app/storage/db.py`, `app/storage/migrate.py`,
+- [x] **T4 Migration runner** (AC8, AC9, AC10). `app/storage/db.py`, `app/storage/migrate.py`,
   empty `app/storage/migrations/`.
   Proof: unit tests with throwaway migrations: first run, second run, failing migration.
-- [ ] **T5 Prestart** (AC7, AC10). `app/prestart.py`: settings, logging, migrations; one log
+- [x] **T5 Prestart** (AC7, AC10). `app/prestart.py`: settings, logging, migrations; one log
   line and exit 1 on failure.
   Proof: unit tests calling `main()` with invalid settings and with a failing migration
   assert exit code 1 and the log line.
 
 ### Backend API
 
-- [ ] **T6 App factory, errors and texts** (AC19, AC20, AC21). `app/main.py`
+- [x] **T6 App factory, errors and texts** (AC19, AC20, AC21). `app/main.py`
   (`create_app`, `extra_routers`), `app/errors.py`, `app/texts.py`; test-only routers in
   `tests/integration/`.
   Proof: integration tests for unknown path, invalid body and non-JSON body, unexpected
   error with `SECRET-LINE-123` absent from response and captured log.
-- [ ] **T7 Request logging** (AC22). `app/logging_setup.py`, middleware.
+- [x] **T7 Request logging** (AC22). `app/logging_setup.py`, middleware.
   Proof: integration test with `caplog` at `INFO` and `WARNING`.
-- [ ] **T8 CORS** (AC3). CORS for `http://127.0.0.1:{ui_port}` only.
+- [x] **T8 CORS** (AC3). CORS for `http://127.0.0.1:{ui_port}` only.
   Proof: integration tests with the allowed and a foreign `Origin`.
-- [ ] **T9 Engines** (AC12, AC13, AC14, AC15). `app/engines/ocr.py`, `model.py`,
+- [x] **T9 Engines** (AC12, AC13, AC14, AC15). `app/engines/ocr.py`, `model.py`,
   `factory.py` with real and fake implementations.
   Proof: unit tests with a fake subprocess (`--list-langs` with and without `fin`), an
-  `httpx.MockTransport` (refused, no answer for 10 s → `unavailable` within 3 s, model list
+  `httpx2.MockTransport` (refused, no answer for 10 s → `unavailable` within 3 s, model list
   matching), and spies proving the fakes make no calls.
-- [ ] **T10 Health endpoint** (AC12, AC14, AC15, AC16). `app/health/` package: database,
+- [x] **T10 Health endpoint** (AC12, AC14, AC15, AC16). `app/health/` package: database,
   folders, OCR and model checks, overall status.
   Proof: unit tests of `overall_status` and the folder check; integration tests of
   `GET /api/health` for fakes, Ollama down, model missing and folder missing.
-- [ ] **T11 Model loading** (AC17, AC18). `ModelLoader` in `app/health/service.py`, started
+- [x] **T11 Model loading** (AC17, AC18). `ModelLoader` in `app/health/service.py`, started
   in the lifespan.
   Proof: integration tests with a mock Ollama counting load requests: one at start; with
   Ollama down at start, one after it comes up and none on the second health call.
-- [ ] **T12 Startup migrations** (AC8, AC9). Lifespan runs migrations.
+- [x] **T12 Startup migrations** (AC8, AC9). Lifespan runs migrations.
   Proof: integration test starting the app twice on one temporary database.
 
 ### Containers
 
-- [ ] **T13 Full backend service** (AC1 backend part, AC2, AC11). Complete `compose.yaml`
+- [x] **T13 Full backend service** (AC1 backend part, AC2, AC11). Complete `compose.yaml`
   for `backend`: `prestart` command, ports on `127.0.0.1`, folder mounts, `rrmc-data` volume,
   `extra_hosts`, `WATCHFILES_FORCE_POLLING`.
   Proof: `docker compose up backend`; `GET http://127.0.0.1:8000/api/health` answers 200.
 
 ### Frontend
 
-- [ ] **T14 Frontend scaffold** (AC26 frontend part). `frontend/Dockerfile`, Vite + React +
+- [x] **T14 Frontend scaffold** (AC26 frontend part). `frontend/Dockerfile`, Vite + React +
   TypeScript, ESLint, Prettier, Vitest with MSW setup, Playwright config, `frontend` service
   in Compose with the `/api` proxy, polling and node modules volume.
   Proof: frontend tests (one placeholder, removed in T15), lint, format check and type check
   pass; `http://127.0.0.1:5173` opens.
-- [ ] **T15 API client and health client** (AC23 error mapping). `src/api/client.ts`,
+- [x] **T15 API client and health client** (AC23 error mapping). `src/api/client.ts`,
   `src/api/health.ts`.
   Proof: component-level tests with MSW: success, 404 error body, network error.
-- [ ] **T16 Status line** (AC23, AC24). `src/components/StatusLine.tsx`, texts in
+- [x] **T16 Status line** (AC23, AC24). `src/components/StatusLine.tsx`, texts in
   `src/i18n/fi.ts`.
   Proof: tests for each PC10 row, two failures, backend down, and a 30 s refresh with fake
   timers.
-- [ ] **T17 App shell** (AC25). `src/App.tsx`, `index.html` (`lang="fi"`, title).
+- [x] **T17 App shell** (AC25). `src/App.tsx`, `index.html` (`lang="fi"`, title).
   Proof: test for the heading, the title and no English text.
 
 ### End-to-end and container tests
 
-- [ ] **T18 E2E** (AC1, AC25). Profile `e2e` with `backend-e2e` and `e2e`; test in
+- [x] **T18 E2E** (AC1, AC25). Profile `e2e` with `backend-e2e` and `e2e`; test in
   `frontend/e2e/`.
   Proof: `docker compose --profile e2e run --rm e2e` passes.
-- [ ] **T19 Container tests** (AC2, AC5, AC7, AC11, AC13, AC27). `scripts/container-tests.ps1`
+- [x] **T19 Container tests** (AC2, AC5, AC7, AC11, AC13, AC27). `scripts/container-tests.ps1`
   with Compose project `rrmc-test` and a temporary settings file.
   Proof: the script passes on the user's computer and prints the cleanup command.
 
 ### Documentation and final check
 
-- [ ] **T20 Documentation.** `docs/development.md` (setup, prerequisites with
+- [x] **T20 Documentation.** `docs/development.md` (setup, prerequisites with
   `OLLAMA_NO_CLOUD=1` and `ollama pull`, the P5 commands marked verified, manual checks,
   troubleshooting, `uv.lock`, `app/texts.py`), `AGENTS.md` (stack, layout, Commands table),
   `docs/architecture.md`, `docs/datamodel.md`, `docs/api-reference.md`, the storage,

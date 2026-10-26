@@ -1,37 +1,173 @@
 # Development Guide
 
-- **Status:** In Progress (code standards written; setup and local development are added
-  with the foundation spec)
+- **Status:** In Progress (setup, commands and code standards written; the manual checks of
+  the foundation spec are not yet run on a fresh clone)
 - **Updated:** 2026-10-26
 
 ## Overview
 
-How to work on RRMCApplication: commands and code standards. The system's structure and
-boundaries are in [architecture.md](architecture.md); development rules, SDD and TDD are in
-[AGENTS.md](../AGENTS.md).
+How to install, run and work on RRMCApplication: setup, commands and code standards. The
+system's structure and boundaries are in [architecture.md](architecture.md); development
+rules, SDD and TDD are in [AGENTS.md](../AGENTS.md). Why everything runs in Docker is in
+[ADR 0002](adr/0002-docker.md).
+
+## Setup
+
+Prerequisites on Windows: **Docker Desktop** (WSL 2 backend), **Git** and **Ollama**.
+Python, Node.js and Tesseract run in the containers; do not install them for this project.
+
+1. Turn off Ollama's cloud features so receipts never leave the computer. Set the user
+   environment variable `OLLAMA_NO_CLOUD=1`, then restart Ollama:
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable("OLLAMA_NO_CLOUD", "1", "User")
+   ```
+
+2. Pull the model named in `RRMC_MODEL` (default `qwen2.5:7b`):
+
+   ```powershell
+   ollama pull qwen2.5:7b
+   ```
+
+3. Create the settings file from the example. Change values in `.env` only; it is not
+   committed. Every setting is explained in [.env.example](../.env.example).
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+4. Build and start the app. The first build downloads several gigabytes and takes minutes.
+
+   ```powershell
+   docker compose up --build
+   ```
+
+Open the UI at <http://127.0.0.1:5173>. The status line under the heading tells whether
+the database, the image folders, Tesseract and the model are available. The backend API is
+at <http://127.0.0.1:8000/api/health>.
+
+## Running the app
+
+| Task | Command |
+|---|---|
+| Start (after the first build) | `docker compose up` |
+| Start in the background | `docker compose up -d` |
+| Stop | `docker compose down` |
+| Follow the backend log | `docker compose logs -f backend` |
+
+- Source changes in `backend/` and `frontend/` are picked up without a restart. The
+  containers poll for changes, because file events from Windows folders do not reach them.
+- The backend runs `python -m app.prestart` before Uvicorn. It validates the settings and
+  applies database migrations; on failure it logs one line and the container stops.
+- The database is in the Docker volume `rrmc_rrmc-data`, not in a Windows folder. It survives
+  `down`, `up` and rebuilds. Only `docker compose down -v` deletes it: never run that unless
+  you mean to delete all receipt data.
+- The import folders are the Windows folders in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` and
+  `RRMC_FAILED_DIR`, mounted into the backend container as `/data/import`,
+  `/data/import_done` and `/data/import_failed`.
 
 ## Commands
 
 This table is the source of truth; the Commands table in [AGENTS.md](../AGENTS.md#commands)
-mirrors it. All commands run inside the containers. The exact `docker compose` form is fixed
-in the [foundation spec](../specs/features/foundation.md) plan (PC11). Commands marked
-*planned* are not verified until the project is scaffolded.
+mirrors it. Run the commands from the project root in PowerShell. Each one runs in a
+one-off container and needs nothing on the computer but Docker and `.env`. All were run on
+2026-10-26 with the result shown.
 
 | Task | Command | Status |
 |---|---|---|
-| Backend tests | `cd backend && pytest` | planned |
-| Backend lint | `cd backend && ruff check . && ruff format --check .` | planned |
-| Backend type check | `cd backend && pyright` | planned |
-| Frontend tests | `cd frontend && npm test` | planned |
-| Frontend lint | `cd frontend && npm run lint` | planned |
-| Frontend format check | `cd frontend && npx prettier --check .` | planned |
-| Frontend type check | `cd frontend && npx tsc --noEmit` | planned |
-| E2E tests | `cd frontend && npx playwright test` | planned |
-| Run backend | `cd backend && uvicorn app.main:app --host 127.0.0.1` | planned |
-| Run frontend | `cd frontend && npm run dev` | planned |
+| Backend tests | `docker compose run --rm backend pytest` | verified |
+| Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
+| Backend type check | `docker compose run --rm backend pyright` | verified |
+| Frontend tests | `docker compose run --rm frontend npm test` | verified |
+| Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
+| Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |
+| Frontend type check | `docker compose run --rm frontend npm run typecheck` | verified |
+| E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
+| Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
 
 Before declaring work done, run the tests, lint, format check and type check for every part
 you changed.
+
+Useful variants:
+
+```powershell
+# Backend tests with line and branch coverage
+docker compose run --rm backend pytest --cov=app --cov-branch --cov-report=term-missing
+# Frontend tests with coverage
+docker compose run --rm frontend npm run test:coverage
+# Format the code instead of checking it
+docker compose run --rm backend ruff format .
+docker compose run --rm frontend npm run format
+```
+
+### E2E tests
+
+The E2E tests start `backend-e2e`, a backend with `RRMC_ENGINES=fake` and a temporary `/data`
+(new empty database and folders on every run), and run Playwright in the `e2e` container,
+which starts its own Vite server. `run --rm` leaves `backend-e2e` running; stop it with:
+
+```powershell
+docker compose --profile e2e down
+```
+
+### Container tests
+
+`scripts/container-tests.ps1` checks what only a running Docker setup can show: ports bound
+to `127.0.0.1`, start refused without a settings file, an invalid setting stopping the
+backend, data surviving a rebuild, Tesseract in the image, and the Git ignore rules. It uses
+a separate Compose project `rrmc-test` with its own settings, ports (`18000`, `15173`) and
+folders under `%TEMP%\rrmc-container-tests`, so the real app, `.env` and the real database
+are never touched. It deletes nothing; at the end it prints the cleanup command:
+
+```powershell
+docker compose -p rrmc-test down -v --rmi local
+```
+
+### Manual checks
+
+Run these once on a fresh clone, and again when `compose.yaml` or a Dockerfile changes.
+
+| Check | Steps | Expected outcome |
+|---|---|---|
+| Fresh start (AC1) | Clone, `Copy-Item .env.example .env`, Ollama running, `docker compose up --build` | Within 5 minutes <http://127.0.0.1:8000/api/health> answers and <http://127.0.0.1:5173> shows `Kuittisovellus` |
+| Reload (AC4) | With the app running, change and save a backend source file and a frontend source file | Within 10 seconds the backend serves the change and the browser shows it, without `docker compose` commands |
+
+## Dependencies and lock files
+
+| Part | Lock file | After changing dependencies |
+|---|---|---|
+| Backend | `backend/uv.lock` | Rebuild: `docker compose build backend` |
+| Frontend | `frontend/package-lock.json` | Rebuild, then refresh the `node_modules` volume: `docker compose build frontend`, then `docker compose run --rm frontend npm ci` |
+
+Change `backend/pyproject.toml`, then update the lock file with the uv version of the image:
+
+```powershell
+docker run --rm -v "${PWD}/backend:/app" -w /app ghcr.io/astral-sh/uv:0.9.5-python3.12-bookworm-slim uv lock
+```
+
+Change frontend dependencies inside the container, so `package-lock.json` matches Linux:
+
+```powershell
+docker compose run --rm frontend npm install --save-exact <package>@<version>
+```
+
+Version constraints: TypeScript stays below 6.1 while `typescript-eslint` 8 requires it, and
+ESLint stays on 9 while `eslint-plugin-jsx-a11y` does not support ESLint 10. The Playwright
+image tag in `frontend/Dockerfile` must match the `@playwright/test` version.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `env file ... .env not found` and nothing starts | `.env` is missing. Run `Copy-Item .env.example .env`. |
+| The backend container stops at once; the log has `Invalid setting RRMC_...` | A value in `.env` is not allowed. The line names the setting and the allowed values. |
+| The backend log has `Migration NNNN_... failed` | A migration failed; the database stays at the previous version. Fix the migration file and start again. |
+| Status line: `Ollamaan ei saada yhteyttä. Käynnistä Ollama.` | Ollama is not running on Windows. Start it; the status line updates within 30 seconds. |
+| Status line: `Mallia ... ei ole ladattu.` | Run the `ollama pull` command shown in the status line. |
+| Status line: `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | A folder in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` or `RRMC_FAILED_DIR` is missing or read-only. |
+| Status line: `Taustapalveluun ei saada yhteyttä.` | The backend container is not running. Check `docker compose ps` and `docker compose logs backend`. |
+| `port is already allocated` | Another program uses the port. Set `RRMC_BACKEND_PORT` or `RRMC_UI_PORT` in `.env`. |
+| Frontend errors about missing packages after a dependency change | The `node_modules` volume is stale. Run `docker compose run --rm frontend npm ci`. |
 
 ## Code standards
 
@@ -158,7 +294,7 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
 
 - Every user-facing text in the frontend comes from `src/i18n/fi.ts`; components contain no
   literal UI strings.
-- Backend error messages come from one backend text module (fixed in the foundation plan).
+- Backend error messages come from one backend text module, @backend/app/texts.py.
 - Texts are plain Finnish, short and specific: say what happened and what to do.
 
 ### Tests
@@ -183,8 +319,8 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
 ### Dependencies
 
 - Add a dependency only when a spec's plan calls for it, and say why in the plan.
-- Versions are pinned and lock files are committed (`package-lock.json`; the backend lock
-  file is chosen in the foundation plan).
+- Versions are pinned and lock files are committed (`backend/uv.lock`,
+  `frontend/package-lock.json`); see [Dependencies and lock files](#dependencies-and-lock-files).
 - Prefer the standard library and the tools already in the stack.
 
 ### Commits

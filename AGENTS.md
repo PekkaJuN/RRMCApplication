@@ -12,7 +12,8 @@ This file holds the rules that apply to every task. Detailed workflows live in s
   and total the categories per ISO week and per month. The user corrects categories in a UI,
   and corrections are remembered.
 - **Users:** one person, on their own computer. Single-user, local-only.
-- **Status:** greenfield. Stack decided, no source code yet. See [Greenfield rule](#greenfield-rule).
+- **Status:** foundation in place (containers, settings, database migrations, health
+  endpoint, app shell); no feature code yet. See [Greenfield rule](#greenfield-rule).
 
 ### Stack (decided)
 
@@ -24,15 +25,19 @@ This file holds the rules that apply to every task. Detailed workflows live in s
 | Frontend | React + Vite + TypeScript: receipt image and editable table side by side |
 | Storage | SQLite |
 | Export | CSV first, behind a common exporter interface. Google Sheets (gspread) later. |
+| Runtime | Docker Compose: `backend` and `frontend` containers; Ollama runs on Windows. Settings in one `.env` file. |
 
 Significant choices are recorded as ADRs in `docs/adr/`. The stack is
-[ADR 0001](docs/adr/0001-tech-stack.md).
+[ADR 0001](docs/adr/0001-tech-stack.md); Docker is [ADR 0002](docs/adr/0002-docker.md).
 
-### Planned layout
+### Layout
 
 ```
-backend/            FastAPI app, OCR, parsing, categorization, totals, exporters
-frontend/           React + Vite UI
+backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.toml, uv.lock
+frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
+compose.yaml        Docker Compose: backend, frontend; profile e2e
+.env.example        all settings with defaults; copy to .env (never committed)
+scripts/            container tests
 docs/               documentation (see Documentation)
 specs/              feature specs (see Workflows)
 source/import/      incoming receipt images      (gitignored, real data)
@@ -40,25 +45,27 @@ source/import_done/ processed images              (gitignored, real data)
 source/import_failed/ images that failed to import (gitignored, real data)
 ```
 
-The import folders are configurable. Paths above are defaults.
+The import folders are configurable. Paths above are defaults. The database is in the Docker
+volume `rrmc_rrmc-data`. The backend's structure is in
+[docs/architecture.md](docs/architecture.md#folder-structure).
 
 ### Commands
 
-`docs/development.md` is the source of truth. Keep this table in sync with it.
-Commands marked *planned* are not verified until the project is scaffolded.
+`docs/development.md` is the source of truth. Keep this table in sync with it. Run from the
+project root; every command runs in a container and needs `.env` (see
+[Setup](docs/development.md#setup)).
 
 | Task | Command | Status |
 |---|---|---|
-| Backend tests | `cd backend && pytest` | planned |
-| Backend lint | `cd backend && ruff check . && ruff format --check .` | planned |
-| Backend type check | `cd backend && pyright` | planned |
-| Frontend tests | `cd frontend && npm test` | planned |
-| Frontend lint | `cd frontend && npm run lint` | planned |
-| Frontend format check | `cd frontend && npx prettier --check .` | planned |
-| Frontend type check | `cd frontend && npx tsc --noEmit` | planned |
-| E2E tests | `cd frontend && npx playwright test` | planned |
-| Run backend | `cd backend && uvicorn app.main:app --host 127.0.0.1` | planned |
-| Run frontend | `cd frontend && npm run dev` | planned |
+| Backend tests | `docker compose run --rm backend pytest` | verified |
+| Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
+| Backend type check | `docker compose run --rm backend pyright` | verified |
+| Frontend tests | `docker compose run --rm frontend npm test` | verified |
+| Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
+| Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |
+| Frontend type check | `docker compose run --rm frontend npm run typecheck` | verified |
+| E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
+| Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
 
 Run the tests, lint, format check and type check for every part you changed before declaring
 work done.

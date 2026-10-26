@@ -18,8 +18,8 @@ Last reviewed: 2026-10-26
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 8 | 0 | 4 | 0 | 4 |
-| 2 Subsystems | 7 | 0 | 0 | 0 | 7 |
+| 1 Architecture | 8 | 0 | 6 | 0 | 2 |
+| 2 Subsystems | 7 | 0 | 3 | 0 | 4 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -29,9 +29,9 @@ Last reviewed: 2026-10-26
 | 1 | Docs index | `docs/README.md` | Entry point; links to every Tier 1 doc and subsystem | none | Not Started |
 | 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | In Progress |
 | 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | In Progress |
-| 4 | Data Model (required) | `docs/datamodel.md` | Core entities, schema overview, relationships | 3 | Not Started |
+| 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
-| 6 | API Reference (required) | `docs/api-reference.md` | REST endpoints, auth, request/response formats | 3, 4 | Not Started |
+| 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
 | 7 | Glossary | `docs/glossary.md` | Domain terms used across all tiers | 2 | Not Started |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md) | 3 | In Progress |
 
@@ -53,17 +53,17 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 
 | Order | Subsystem | Path | Purpose | Depends on | Status |
 |------:|-----------|------|---------|------------|--------|
-| 9 | Storage | `docs/subsystems/storage/README.md` | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | Not Started |
+| 9 | Storage | [docs/subsystems/storage/README.md](subsystems/storage/README.md) | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | In Progress |
 | 10 | Import | `docs/subsystems/import/README.md` | Read images from the import folder, detect duplicates by image hash, move processed images to import_done | 4, 9 | Not Started |
-| 11 | Receipt reading | `docs/subsystems/receipt-reading/README.md` | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Not Started |
+| 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
 | 12 | Categorization | `docs/subsystems/categorization/README.md` | Map line items to categories; remembered user corrections first, then the model | 4, 9, 11 | Not Started |
 | 13 | Calculation | `docs/subsystems/calculation/README.md` | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check | 4, 12 | Not Started |
 | 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
-| 15 | UI | `docs/subsystems/ui/README.md` | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | Not Started |
+| 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
-No modules yet: there is no source code. Add a row here when a module with non-obvious business rules or patterns is implemented.
+No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Add a row here when a module with non-obvious business rules or patterns is implemented.
 
 | Order | Module | Path | Subsystem | Source (`@file`) | Status |
 |------:|--------|------|-----------|------------------|--------|
@@ -71,12 +71,13 @@ No modules yet: there is no source code. Add a row here when a module with non-o
 
 ## Gaps and open items
 
-- Tech stack decided and recorded in [ADR 0001](adr/0001-tech-stack.md). Commands stay unverified until the project is scaffolded.
-- The FastAPI backend exposes a local REST API (127.0.0.1 only); endpoints are defined by specs.
-- Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design, two open points marked `[NEEDS CLARIFICATION]`).
+- The foundation spec is implemented: the commands in [development.md](development.md#commands) are verified. Its manual checks (fresh clone, reload) are still to be run on the user's computer.
+- Storage, receipt-reading and UI docs describe only the foundation parts (connection and migrations, engine interfaces, app shell); their feature specs complete them.
+- `docs/README.md` and `docs/glossary.md` are not written yet.
+- Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 
 ## Related documents
 
-- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md); `docs/README.md` and the rest to be created (see order above)
-- ↓ Tier 2: `docs/subsystems/` (to be created)
+- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md); `docs/README.md` and `docs/glossary.md` to be created
+- ↓ Tier 2: [storage](subsystems/storage/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [ui](subsystems/ui/README.md); the others to be created
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

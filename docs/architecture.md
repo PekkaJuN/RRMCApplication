@@ -1,7 +1,7 @@
 # System Architecture
 
-- **Status:** In Progress (target design; no source code yet)
-- **Updated:** 2026-10-22
+- **Status:** In Progress (foundation implemented; feature subsystems are target design)
+- **Updated:** 2026-10-26
 
 ## Overview
 
@@ -13,19 +13,19 @@ products, and view totals. Nothing runs on a server and no receipt data leaves t
 
 This document describes the parts of the system, their boundaries and how data flows between
 them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature is in
-`specs/features/`. Entities are described in `docs/datamodel.md` and endpoints in
-`docs/api-reference.md` (both not written yet).
+`specs/features/`. Entities are described in [datamodel.md](datamodel.md) and endpoints in
+[api-reference.md](api-reference.md).
 
-Until code exists, this is the target design (see the greenfield rule in
-[AGENTS.md](../AGENTS.md#greenfield-rule)). Exact file and package names are fixed in the
-foundation spec's plan.
+The foundation (containers, settings, storage, engine interfaces, health, app shell) exists.
+The feature subsystems are still the target design (see the greenfield rule in
+[AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
 
 | Area | Choice | Notes |
 |---|---|---|
-| Backend | Python 3, FastAPI, Uvicorn | REST API on `127.0.0.1` only |
-| Storage | SQLite (one file) | File location from settings, outside version control |
+| Backend | Python 3.12, FastAPI, Uvicorn | REST API on `127.0.0.1` only |
+| Storage | SQLite (one file) | In a Docker volume, outside version control |
 | Image preprocessing | Python imaging library (chosen in the receipt-reading spec) | Grayscale, deskew, contrast, scaling (FR-6) |
 | OCR | Tesseract 5.x, `fin` + `eng` | Installed in the backend container |
 | Parsing and categorization model | Local model through Ollama | Model name is one setting (FR-29); Ollama on `localhost` with cloud features off |
@@ -42,22 +42,31 @@ The stack is recorded in [ADR 0001](adr/0001-tech-stack.md) and
 ```text
 backend/                 FastAPI app and all processing
   app/
-    main.py              app factory, routers, startup (settings, database, seeding, model check)
-    settings.py          loads settings from the environment (.env)
-    db.py                SQLite connection and schema migrations
-    <subsystem>/         one package per backend subsystem (see Component map)
-  tests/                 unit and integration tests, synthetic fixtures only
+    main.py              app factory: settings, logging, CORS, error handlers, routers, lifespan
+    prestart.py          start checks before Uvicorn: settings and migrations
+    settings.py          settings from RRMC_* environment variables (.env)
+    errors.py            AppError and the API error format
+    texts.py             Finnish texts of the backend (error messages)
+    logging_setup.py     logging to stdout and one log line per request
+    storage/             SQLite connection, migration runner, migrations/
+    engines/             OcrEngine and ReceiptModel: real implementations and fakes
+    health/              GET /api/health and loading the model at start
+    <subsystem>/         one package per feature subsystem (see Component map)
+  tests/unit/            unit tests, one folder per package
+  tests/integration/     FastAPI TestClient tests with a temporary database
 frontend/                React + Vite + TypeScript UI
-  src/api/               typed API clients, one per resource
-  src/pages/             one component per page
+  src/api/               shared API client and typed clients, one per resource
+  src/components/        components; a page component per feature page
   src/i18n/fi.ts         all Finnish UI texts
+  src/test/              MSW setup for component tests
   e2e/                   Playwright tests
+scripts/                 container tests
 docs/                    documentation (see content-plan.md)
 specs/                   PRD and feature specs
 source/import/           incoming receipt images        (default; gitignored, real data)
 source/import_done/      imported images               (default; gitignored, real data)
 source/import_failed/    images that failed to import   (default; gitignored, real data)
-compose.yaml             Docker Compose: backend and frontend services
+compose.yaml             Docker Compose: backend and frontend; profile e2e
 .env.example             committed example settings file; the real .env is not committed
 ```
 
@@ -96,8 +105,10 @@ flowchart LR
 | **export** | Exporter interface and the CSV exporter; later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
 | **ui** | Pages: receipts list, receipt review (image beside an editable table), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, NFR-15 |
 
-Cross-cutting backend modules (`main.py`, `settings.py`, `db.py`) belong to the foundation and
-are used by every subsystem.
+Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
+`texts.py`, `logging_setup.py`) belong to the foundation and are used by every subsystem.
+The `health` package reports the state of the database, the image folders, OCR and the model
+([api-reference.md](api-reference.md#get-apihealth)), and loads the model at start (FR-30).
 
 ### Dependency rules
 
@@ -108,7 +119,8 @@ are used by every subsystem.
 - Dependencies point one way: `import` → `receipt-reading`, `categorization` → `storage`;
   `export` → `calculation` → `storage`. No subsystem depends on `import` or `export`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
-  the interfaces below.
+  the interfaces below. The exception is **health**, which calls only the interfaces'
+  availability checks (`check()`) and the model's `load()`.
 - Services that other subsystems need (for example product lookup by normalized name, used by
   FR-43) are plain Python functions or classes, not only API endpoints.
 
@@ -171,12 +183,16 @@ Exports are generated from the same calculation, so an export always matches the
 
 | Interface | Owner | Real implementation | Purpose |
 |---|---|---|---|
-| `OcrEngine` | receipt-reading | Tesseract | Image in, text (and line data) out |
-| `ReceiptModel` | receipt-reading, categorization | Ollama client | OCR text to structured receipt; line names to category suggestions. Output is validated against a schema; invalid output is an error (FR-8) |
+| `OcrEngine` | receipt-reading | Tesseract | Image in, text (and line data) out; `check()` tells whether Tesseract with `fin` and `eng` can run |
+| `ReceiptModel` | receipt-reading, categorization | Ollama client | OCR text to structured receipt; line names to category suggestions. Output is validated against a schema; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
 | `Exporter` | export | CSV writer; later Google Sheets | Write lines and totals to a target (FR-27) |
 
-The model is loaded at backend start and kept loaded while the backend runs (FR-30). The
-model name is read from settings, so switching model size needs no code change (FR-29).
+Both interfaces live in the shared `engines` package (see
+[receipt-reading](subsystems/receipt-reading/README.md#interfaces)); the reading and parsing
+methods are added by the receipt-reading spec. The model is loaded at backend start and kept
+loaded while Ollama runs (FR-30); if Ollama is not available then, it is loaded on the first
+health check that finds it. The model name is read from settings, so switching model size
+needs no code change (FR-29).
 
 Whether parsing uses a text model on OCR output or a vision model on the image is still open
 (PRD open question 4). The `ReceiptModel` interface keeps that choice inside receipt-reading.
@@ -198,7 +214,7 @@ Whether parsing uses a text model on OCR output or a vision model on the image i
 - All settings are in one `.env` file in the project root (FR-32).
 - There is no login: the app is local and single-user.
 - Details are in the [foundation spec](../specs/features/foundation.md). Setup and start
-  commands are documented in `docs/development.md` (not written yet).
+  commands are in [development.md](development.md#setup).
 
 ## Cross-cutting rules
 
@@ -222,20 +238,25 @@ Whether parsing uses a text model on OCR output or a vision model on the image i
 
 ## Subsystems
 
-Tier 2 docs are not written yet. Each is created with the first spec that touches it.
+Each Tier 2 doc is created with the first spec that touches its subsystem.
 
-- storage: `docs/subsystems/storage/README.md`
-- import: `docs/subsystems/import/README.md`
-- receipt-reading: `docs/subsystems/receipt-reading/README.md`
-- categorization: `docs/subsystems/categorization/README.md`
-- calculation: `docs/subsystems/calculation/README.md`
-- export: `docs/subsystems/export/README.md`
-- ui: `docs/subsystems/ui/README.md`
+- [storage](subsystems/storage/README.md) — SQLite connection and migrations
+- import: `docs/subsystems/import/README.md` (not written yet)
+- [receipt-reading](subsystems/receipt-reading/README.md) — engine interfaces; reading and
+  parsing come with their spec
+- categorization: `docs/subsystems/categorization/README.md` (not written yet)
+- calculation: `docs/subsystems/calculation/README.md` (not written yet)
+- export: `docs/subsystems/export/README.md` (not written yet)
+- [ui](subsystems/ui/README.md) — app shell, API client, status line
 
 ## Related Documents
 
 - [PRD](../specs/PRD.md): requirements referenced above
 - [Product management spec](../specs/features/product-management.md)
 - [ADR 0001: Technology stack](adr/0001-tech-stack.md)
+- [ADR 0002: Docker](adr/0002-docker.md)
+- [Foundation spec](../specs/features/foundation.md)
+- [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),
+  [development.md](development.md)
 - [AGENTS.md](../AGENTS.md): development rules and stack
 - [Content plan](content-plan.md): documentation index

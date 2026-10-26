@@ -1,0 +1,85 @@
+name: rrmc
+
+services:
+  backend:
+    build: ./backend
+    # prestart exits non-zero on invalid settings or a failed migration, which stops the
+    # container; Uvicorn's reloader would otherwise keep it running.
+    command: >-
+      sh -c "python -m app.prestart
+      && exec uvicorn --factory app.main:create_app
+      --host 0.0.0.0 --port 8000 --reload --no-access-log"
+    env_file:
+      - path: ${RRMC_ENV_FILE:-.env}
+        required: true
+    environment:
+      # File events from Windows folders do not reach the container; poll instead.
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "127.0.0.1:${RRMC_BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - ${RRMC_IMPORT_DIR:-./source/import}:/data/import
+      - ${RRMC_DONE_DIR:-./source/import_done}:/data/import_done
+      - ${RRMC_FAILED_DIR:-./source/import_failed}:/data/import_failed
+      # SQLite locking is unreliable on folders shared from Windows; keep it in a volume.
+      - rrmc-data:/data/db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build: ./frontend
+    command: npm run dev
+    env_file:
+      - path: ${RRMC_ENV_FILE:-.env}
+        required: true
+    environment:
+      VITE_API_TARGET: http://backend:8000
+      VITE_USE_POLLING: "true"
+    ports:
+      - "127.0.0.1:${RRMC_UI_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      # Keeps the Linux node_modules of the image apart from the Windows folder.
+      - rrmc-node-modules:/app/node_modules
+
+  # E2E tests: `docker compose --profile e2e run --rm e2e`.
+  backend-e2e:
+    profiles: [e2e]
+    build: ./backend
+    # /data is a temporary filesystem, so the folders are created here and the database
+    # starts empty on every run.
+    command: >-
+      sh -c "mkdir -p /data/import /data/import_done /data/import_failed
+      && python -m app.prestart
+      && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --no-access-log"
+    env_file:
+      - path: ${RRMC_ENV_FILE:-.env}
+        required: true
+    environment:
+      RRMC_ENGINES: fake
+    volumes:
+      - ./backend:/app
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 2s
+      retries: 30
+
+  e2e:
+    profiles: [e2e]
+    build: ./frontend
+    command: npx playwright test
+    environment:
+      VITE_API_TARGET: http://backend-e2e:8000
+    volumes:
+      - ./frontend:/app
+      - rrmc-node-modules:/app/node_modules
+    depends_on:
+      backend-e2e:
+        condition: service_healthy
+
+volumes:
+  rrmc-data:
+  rrmc-node-modules:
