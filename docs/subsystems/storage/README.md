@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Receipt reading](../receipt-reading/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -8,26 +8,39 @@ Storage owns the SQLite database: opening connections, applying schema migration
 SQL. Other subsystems never run SQL; they call storage's repositories, which feature specs
 add together with their tables. Storage holds no business rules.
 
-Today storage has the connection and the migration runner only. The schema is described in
-[datamodel.md](../../datamodel.md).
+Today storage has the connection, transactions, the migration runner and the catalog
+repository. The schema is described in [datamodel.md](../../datamodel.md).
 
 ## Key Files and Entry Points
 
-- @backend/app/storage/db.py — `connect(path)` opens a connection; `is_available(path)`
-  tells whether an existing database can be read, for the health check
+- @backend/app/storage/db.py — `connect(path)` opens a connection; `transaction(connection)`
+  wraps a block in one transaction; `is_available(path)` tells whether an existing database
+  can be read, for the health check
+- @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
+  categories, products and `app_state`
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
-- @backend/app/storage/migrations/ — the numbered SQL migration files (none yet)
+- @backend/app/storage/migrations/ — the numbered SQL migration files
+  (`0001_catalog.sql`)
 
 ## Interfaces
 
 | Function | Returns | Raises |
 |---|---|---|
-| `connect(path)` | `sqlite3.Connection` with foreign keys on, WAL journal, rows as `sqlite3.Row` | `sqlite3.Error` |
+| `connect(path)` | `sqlite3.Connection` with foreign keys on, WAL journal, rows as `sqlite3.Row`, usable from another thread | `sqlite3.Error` |
+| `transaction(connection)` | context manager: `BEGIN IMMEDIATE`, then `COMMIT`, or `ROLLBACK` and re-raise on any exception | `sqlite3.Error` |
 | `is_available(path)` | `True` when the file exists and its schema can be read | nothing |
 | `migrate_database(db_path, migrations_dir)` | the schema version after migrating | `MigrationError` |
 | `migrate(connection, migrations_dir)` | the versions applied, in order | `MigrationError` |
 | `current_version(connection)` | the newest applied version, 0 for a new database | `sqlite3.Error` |
+
+`CatalogRepository(connection)` returns frozen dataclasses: `CategoryRow` (with
+`product_count` and `category_count`) and `ProductRow` (with `category_name` and
+`group_name`). It has add, get, get by key, list, update and delete for categories and
+products, `get_app_state` and `set_app_state`, and `transaction()` on its own connection. It
+holds no rules: `list_products(query_key, category_or_group_id)` filters but does not sort,
+and callers own the transaction. The rules are in
+[categorization](../categorization/README.md#rules).
 
 ## Data Flow
 
@@ -36,12 +49,14 @@ Today storage has the connection and the migration runner only. The schema is de
    the container.
 2. The app's lifespan calls `migrate_database` again; with nothing pending it applies nothing.
 3. `GET /api/health` calls `is_available` on each request.
+4. Each catalog request opens its own connection and closes it after the response.
 
 ## Dependencies
 
 - Uses: Python's `sqlite3`; nothing else in the app.
-- Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth);
-  later every feature subsystem through its repositories.
+- Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
+  [categorization](../categorization/README.md); later every feature subsystem through its
+  repositories.
 
 ## Modules
 
@@ -50,8 +65,11 @@ None yet.
 ## Known Issues and Gotchas
 
 - Connections are opened with `isolation_level=None`: Python's `sqlite3` does not start
-  transactions on its own. Code that writes must start one with `BEGIN` and end it with
-  `COMMIT` or `ROLLBACK`.
+  transactions on its own. Code that writes uses `transaction()`.
+- Connections are opened with `check_same_thread=False`, because FastAPI may open a
+  request's connection in one threadpool thread and use it in another. A connection is
+  never shared between requests ([learnings](../../learnings.md)).
+- Product search uses `instr()`, not `LIKE`, so `%` and `_` in a query match literally.
 - `is_available` opens the file with `mode=rw`, so it never creates an empty database, and
   reads the schema, because `SELECT 1` would not notice a damaged file.
 - A migration file must not contain `BEGIN` or `COMMIT`; the runner wraps each file in its own
@@ -63,3 +81,4 @@ None yet.
 
 - [datamodel.md](../../datamodel.md): schema and migration rules
 - [Foundation spec](../../../specs/features/foundation.md) PC4
+- [Product management spec](../../../specs/features/product-management.md)
