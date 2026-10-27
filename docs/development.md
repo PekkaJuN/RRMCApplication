@@ -1,8 +1,8 @@
 # Development Guide
 
 - **Status:** In Progress (setup, commands and code standards written; the manual checks of
-  the foundation spec are not yet run on a fresh clone)
-- **Updated:** 2026-10-26
+  the foundation spec passed on a fresh clone on 2026-10-27)
+- **Updated:** 2026-10-27
 
 ## Overview
 

@@ -12,7 +12,7 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-26
+Last reviewed: 2026-10-27
 
 ## Summary
 
@@ -71,7 +71,7 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 
 ## Gaps and open items
 
-- The foundation spec is implemented: the commands in [development.md](development.md#commands) are verified. Its manual checks (fresh clone, reload) are still to be run on the user's computer.
+- The foundation spec is Done (audited 2026-10-27): the commands in [development.md](development.md#commands) are verified and its manual checks (fresh clone, reload) passed.
 - Storage, receipt-reading and UI docs describe only the foundation parts (connection and migrations, engine interfaces, app shell); their feature specs complete them.
 - `docs/README.md` and `docs/glossary.md` are not written yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).

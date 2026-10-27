@@ -1,15 +1,15 @@
 # Feature: Project foundation
 
 ## Overview
-- **Status:** In Progress (2026-10-26); Approved (2026-10-26); Plan and Tasks approved (2026-10-26)
+- **Status:** Done (2026-10-27); In Progress (2026-10-26); Approved (2026-10-26); Plan and Tasks approved (2026-10-26)
 - **Created:** 2026-10-23
 - **Implements:** PRD FR-29 (model name as one setting), FR-30 (model loaded at start),
   FR-31 (clear message when Ollama or the model is unavailable; the import part is in the
   import spec), FR-32 (settings file), NFR-2, NFR-3, NFR-4, NFR-10, NFR-11, NFR-13, NFR-14
   (tooling only), NFR-15 (app shell).
-- **Affected subsystems:** storage, receipt-reading (interfaces only), ui
-  (docs not written yet: `docs/subsystems/storage/README.md`,
-  `docs/subsystems/receipt-reading/README.md`, `docs/subsystems/ui/README.md`)
+- **Affected subsystems:** [storage](../../docs/subsystems/storage/README.md),
+  [receipt-reading](../../docs/subsystems/receipt-reading/README.md) (interfaces only),
+  [ui](../../docs/subsystems/ui/README.md)
 
 ## Problem Statement
 There is no code yet. Every feature spec needs the same base: a backend and a frontend that
@@ -398,6 +398,7 @@ Paths as fixed in the [Plan](#plan).
 | AC8 | migration runner | first run | empty DB, migrations 1–2 | migrate | both applied in order; version 2 | temp SQLite |
 | AC9 | migration runner | idempotent | DB at version 2 | migrate | nothing applied; version 2 | temp SQLite |
 | AC10 | migration runner | failure | DB at version 1, migration 2 creates a table then fails | migrate | error raised; version 1; table absent | temp SQLite |
+| AC10 | migration runner | SQLite rolls back itself | DB at version 1, migration 2 ends with `INSERT OR ROLLBACK` on a key conflict | migrate | same error raised; version 1; table absent | temp SQLite |
 | AC12 | fake engines | availability | `fake` | check | `ok`; no subprocess, no HTTP | spy on subprocess and HTTP |
 | AC13 | `TesseractEngine.check` | languages | `tesseract --list-langs` lists / lacks `fin` | check | `ok` / `unavailable` | fake subprocess |
 | AC14 | `OllamaModel.check` | not reachable | connection refused; no answer for 10 s | check | `unavailable` within 3 s | fake HTTP |
@@ -748,7 +749,7 @@ image with `docker build` and `docker run`.
   `docs/architecture.md`, `docs/datamodel.md`, `docs/api-reference.md`, the storage,
   receipt-reading and ui subsystem READMEs, `docs/content-plan.md`, `specs/README.md`.
   Proof: every link resolves; the Commands tables in `development.md` and `AGENTS.md` match.
-- [ ] **T21 Final check** (AC1, AC4, AC26). On the user's computer: fresh clone, `.env` from
+- [x] **T21 Final check** (AC1, AC4, AC26). On the user's computer: fresh clone, `.env` from
   `.env.example`, `docker compose up --build`; the two manual checks; every P5 command exits
   0; coverage targets met.
   Proof: command output recorded in the review; then hand over to `review-audit`.

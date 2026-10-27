@@ -11,6 +11,12 @@ CREATE_ITEM = "CREATE TABLE item (id INTEGER PRIMARY KEY);"
 # Depends on 0001, so it only succeeds when the migrations run in order.
 ADD_ITEM_NAME = "ALTER TABLE item ADD COLUMN name TEXT NOT NULL DEFAULT '';"
 CREATE_TABLE_THEN_FAIL = "CREATE TABLE half_done (id INTEGER);\nINSERT INTO missing VALUES (1);"
+# The conflict makes SQLite roll back the transaction itself before the error reaches Python.
+CREATE_TABLE_THEN_ROLL_BACK = (
+    "CREATE TABLE rolled_back (id INTEGER PRIMARY KEY);\n"
+    "INSERT INTO rolled_back VALUES (1);\n"
+    "INSERT OR ROLLBACK INTO rolled_back VALUES (1);"
+)
 
 
 @pytest.fixture
@@ -84,4 +90,23 @@ def test_ac10_failing_migration_leaves_database_unchanged(
     assert str(error.value) == "Migration 0002_broken.sql failed"
     assert current_version(connection) == 1
     assert "half_done" not in table_names(connection)
+    assert not connection.in_transaction
+
+
+def test_ac10_migration_rolled_back_by_sqlite_leaves_database_unchanged(
+    connection: sqlite3.Connection, tmp_path: Path
+) -> None:
+    # Given a database at version 1 and a migration 2 whose failure ends the transaction
+    folder = tmp_path / "migrations"
+    migrate(connection, make_migrations(folder, {"0001_create_item.sql": CREATE_ITEM}))
+    make_migrations(folder, {"0002_rolled_back.sql": CREATE_TABLE_THEN_ROLL_BACK})
+
+    # When the migrations run
+    with pytest.raises(MigrationError) as error:
+        migrate(connection, folder)
+
+    # Then the same error is raised, the version is still 1 and the table is absent
+    assert str(error.value) == "Migration 0002_rolled_back.sql failed"
+    assert current_version(connection) == 1
+    assert "rolled_back" not in table_names(connection)
     assert not connection.in_transaction

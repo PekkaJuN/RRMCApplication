@@ -5,5 +5,5 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 
 | Order | Spec | Status | Implements |
 |---:|---|---|---|
-| 1 | [Project foundation](features/foundation.md) | In Progress | FR-29–FR-32, NFRs for runtime, tooling and app shell |
+| 1 | [Project foundation](features/foundation.md) | Done | FR-29–FR-32, NFRs for runtime, tooling and app shell |
 | 2 | [Product management](features/product-management.md) | Draft | FR-11, FR-33–FR-39, PRD 6.9 |
