@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -23,3 +24,10 @@ def make_client(settings: Settings) -> TestClient:
 @pytest.fixture
 def client(settings: Settings) -> TestClient:
     return make_client(settings)
+
+
+@pytest.fixture
+def api(settings: Settings) -> Iterator[TestClient]:
+    """A client whose app has run its startup: migrations and the default list."""
+    with make_client(settings) as client:
+        yield client

@@ -56,3 +56,14 @@ def test_pc8_app_error_uses_the_error_format(client: TestClient) -> None:
 
     assert response.status_code == 409
     assert response.json() == {"error": "test_conflict", "message": "Testiristiriita."}
+
+
+def test_ac13_app_error_extra_fields_are_added_to_the_body(client: TestClient) -> None:
+    response = client.get("/api/test/app-error-extra")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": "test_in_use",
+        "message": "Testi käytössä.",
+        "product_count": 3,
+    }

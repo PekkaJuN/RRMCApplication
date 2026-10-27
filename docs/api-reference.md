@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** In Progress (health endpoint and error format; feature endpoints are added by
-  their specs)
-- **Updated:** 2026-10-26
+- **Status:** In Progress (health and catalog endpoints; receipt, totals and export endpoints
+  are added by their specs)
+- **Updated:** 2026-10-27
 
 ## Overview
 
@@ -24,6 +24,9 @@ Every error response has this body:
 {"error": "<code>", "message": "<Finnish text for the user>"}
 ```
 
+Some codes add fields next to these two, for example `product_count`; the endpoint lists
+them.
+
 `error` is a stable `snake_case` code for programs; `message` is shown to the user as is.
 Messages come from @backend/app/texts.py and never contain receipt content.
 
@@ -34,7 +37,8 @@ Messages come from @backend/app/texts.py and never contain receipt content.
 | 500 | `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Unexpected error; the stack trace is in the backend log |
 
 Feature specs add their own codes in the same format, raised as `AppError`
-(@backend/app/errors.py).
+(@backend/app/errors.py). The catalog codes are listed under
+[Catalog error codes](#catalog-error-codes).
 
 ## Endpoints
 
@@ -71,12 +75,65 @@ neither Tesseract nor Ollama is called.
 
 Implemented in @backend/app/health/.
 
+### Catalog: groups, categories and products
+
+Implemented in @backend/app/categorization/routes.py. The rules behind each code are in
+[categorization](subsystems/categorization/README.md#rules). Names are compared by their
+normalized form, so `"  JUOMAT "` and `"Juomat"` are the same name.
+
+A **catalog item** (group or category):
+
+```json
+{"id": 4, "name": "Liha", "kind": "category", "parent_id": 1, "product_count": 0, "category_count": null}
+```
+
+`product_count` is set for categories and `category_count` for groups; the other one is
+`null`. `parent_id` is the group of a category, or `null`.
+
+A **product**:
+
+```json
+{"id": 7, "name": "Kevytmaito 1L", "category_id": 11, "category_name": "Maitotuotteet", "group_name": "Ruoka"}
+```
+
+| Method and path | Body or query | Success | Errors |
+|---|---|---|---|
+| `GET /api/categories` | | 200, list of items: groups, each followed by its categories, then the categories without a group; Finnish alphabetical order inside each part | |
+| `POST /api/categories` | `{"name", "kind", "parent_id"?}` | 201, the item | 422 `invalid_name`, `invalid_parent`; 409 `duplicate_name` |
+| `PATCH /api/categories/{id}` | any of `name`, `kind`, `parent_id`; a left-out field is kept, `"parent_id": null` takes a category out of its group | 200, the item | 404 `not_found`; 422 `invalid_name`, `invalid_parent`; 409 `duplicate_name`, `category_has_products`, `group_not_empty` |
+| `DELETE /api/categories/{id}` | | 204, no body | 404 `not_found`; 409 `category_in_use`, `group_not_empty` |
+| `GET /api/products` | `q` (part of the name, any case), `category_id` (a category, or a group for all its categories); both combine | 200, list of products sorted by name | 422 `unknown_category` |
+| `POST /api/products` | `{"name", "category_id"}` | 201, the product | 422 `invalid_name`, `unknown_category`, `not_a_category`; 409 `duplicate_name` |
+| `PATCH /api/products/{id}` | any of `name`, `category_id` | 200, the product | 404 `not_found`; 422 as for `POST`; 409 `duplicate_name` |
+| `DELETE /api/products/{id}` | | 204, no body | 404 `not_found` |
+
+A body with a missing field, a wrong JSON type, or a `kind` other than `group` or `category`
+gives the foundation's `invalid_request` (422).
+
+#### Catalog error codes
+
+| Status | `error` | Extra field | `message` |
+|---|---|---|---|
+| 422 | `invalid_name` | | `Nimen pituuden on oltava 1–50 merkkiä.` (groups and categories) or `1–100` (products) |
+| 409 | `duplicate_name` | | `Samanniminen ryhmä tai kategoria on jo olemassa.` / `Samanniminen tuote on jo olemassa.` |
+| 422 | `invalid_parent` | | `Kategorian voi lisätä vain ryhmään, eikä ryhmä voi kuulua toiseen ryhmään.` |
+| 422 | `unknown_category` | | `Kategoriaa ei löydy.` |
+| 422 | `not_a_category` | | `Tuotteen voi lisätä vain kategoriaan, ei ryhmään.` |
+| 409 | `category_has_products` | | `Kategoriaa, jossa on tuotteita, ei voi muuttaa ryhmäksi.` |
+| 409 | `category_in_use` | `product_count` | `Kategoriaa käyttää 3 tuotetta.` (`1 tuote` for one) |
+| 409 | `group_not_empty` | `category_count` | `Ryhmässä on 3 kategoriaa.` (`1 kategoria` for one) |
+
+The texts live in @backend/app/texts.py.
+
 ## Subsystems
 
 - [ui](subsystems/ui/README.md) — the only client of the API
+- [categorization](subsystems/categorization/README.md) — the rules behind the catalog
+  endpoints
 
 ## Related Documents
 
 - [architecture.md](architecture.md): dependency rules and cross-cutting rules
 - [Foundation spec](../specs/features/foundation.md) PC5 and PC8
+- [Product management spec](../specs/features/product-management.md): the catalog endpoints
 - [development.md](development.md#troubleshooting): what the health results mean for the user

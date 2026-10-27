@@ -1,6 +1,7 @@
 """API error format: every error response is `{"error": code, "message": Finnish text}`."""
 
 import logging
+from collections.abc import Mapping
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exception_handlers import http_exception_handler
@@ -14,22 +15,30 @@ logger = logging.getLogger(__name__)
 
 
 class AppError(Exception):
-    """An expected failure with a stable error code, a Finnish message and an HTTP status."""
+    """An expected failure with a stable error code, a Finnish message and an HTTP status.
 
-    def __init__(self, code: str, message: str, status: int) -> None:
+    `extra` holds fields a spec adds to the error body, such as a count.
+    """
+
+    def __init__(
+        self, code: str, message: str, status: int, extra: Mapping[str, int] | None = None
+    ) -> None:
         super().__init__(code)
         self.code = code
         self.message = message
         self.status = status
+        self.extra = dict(extra or {})
 
 
-def error_response(code: str, message: str, status: int) -> JSONResponse:
-    return JSONResponse({"error": code, "message": message}, status_code=status)
+def error_response(
+    code: str, message: str, status: int, extra: Mapping[str, int] | None = None
+) -> JSONResponse:
+    return JSONResponse({"error": code, "message": message, **(extra or {})}, status_code=status)
 
 
 def _handle_app_error(request: Request, exc: Exception) -> Response:
     assert isinstance(exc, AppError)  # noqa: S101 - registered for AppError only
-    return error_response(exc.code, exc.message, exc.status)
+    return error_response(exc.code, exc.message, exc.status, exc.extra)
 
 
 async def _handle_http_error(request: Request, exc: Exception) -> Response:

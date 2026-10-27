@@ -18,8 +18,8 @@ Last reviewed: 2026-10-27
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 8 | 0 | 6 | 0 | 2 |
-| 2 Subsystems | 7 | 0 | 3 | 0 | 4 |
+| 1 Architecture | 9 | 0 | 8 | 0 | 1 |
+| 2 Subsystems | 7 | 0 | 4 | 0 | 3 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -32,8 +32,9 @@ Last reviewed: 2026-10-27
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
-| 7 | Glossary | `docs/glossary.md` | Domain terms used across all tiers | 2 | Not Started |
+| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers; catalog terms so far | 2 | In Progress |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md) | 3 | In Progress |
+| 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 
 ### Optional Tier 1 docs (not yet planned)
 
@@ -45,7 +46,6 @@ Create only when the trigger applies. When one is started, move it into the tabl
 | Deployment | `docs/deployment.md` | Environments, CI/CD, infrastructure | The app is deployed or CI exists |
 | Integration Guide | `docs/integration.md` | External services, third-party APIs | The app calls an external service |
 | Features & Use Cases | `docs/features.md` | Feature inventory, use case documentation | Features outgrow `projectdescription.md` |
-| Learnings | `docs/learnings.md` | Log of fixed errors and their solutions | The first error is fixed with the fix workflow |
 
 ## Tier 2: Subsystems (`docs/subsystems/<name>/README.md`)
 
@@ -56,7 +56,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 9 | Storage | [docs/subsystems/storage/README.md](subsystems/storage/README.md) | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | In Progress |
 | 10 | Import | `docs/subsystems/import/README.md` | Read images from the import folder, detect duplicates by image hash, move processed images to import_done | 4, 9 | Not Started |
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
-| 12 | Categorization | `docs/subsystems/categorization/README.md` | Map line items to categories; remembered user corrections first, then the model | 4, 9, 11 | Not Started |
+| 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); later: map line items to categories, remembered products first, then the model | 4, 9 | In Progress |
 | 13 | Calculation | `docs/subsystems/calculation/README.md` | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check | 4, 12 | Not Started |
 | 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
@@ -72,12 +72,14 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 ## Gaps and open items
 
 - The foundation spec is Done (audited 2026-10-27): the commands in [development.md](development.md#commands) are verified and its manual checks (fresh clone, reload) passed.
-- Storage, receipt-reading and UI docs describe only the foundation parts (connection and migrations, engine interfaces, app shell); their feature specs complete them.
-- `docs/README.md` and `docs/glossary.md` are not written yet.
+- The product management spec is Done (audited 2026-10-27).
+- Storage, categorization and UI docs describe the foundation and the catalog (product management spec); receipt-reading describes only the engine interfaces. Their feature specs complete them.
+- `docs/README.md` is not written yet. The glossary has the catalog terms only.
+- `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 
 ## Related documents
 
-- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md); `docs/README.md` and `docs/glossary.md` to be created
-- ↓ Tier 2: [storage](subsystems/storage/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [ui](subsystems/ui/README.md); the others to be created
+- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md), [glossary.md](glossary.md), [learnings.md](learnings.md); `docs/README.md` to be created
+- ↓ Tier 2: [storage](subsystems/storage/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [ui](subsystems/ui/README.md); the others to be created
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

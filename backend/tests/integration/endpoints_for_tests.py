@@ -29,3 +29,8 @@ def fail_after_reading(body: TextBody) -> None:
 @router.get("/app-error")
 def raise_app_error() -> None:
     raise AppError("test_conflict", "Testiristiriita.", 409)
+
+
+@router.get("/app-error-extra")
+def raise_app_error_with_extra() -> None:
+    raise AppError("test_in_use", "Testi käytössä.", 409, extra={"product_count": 3})

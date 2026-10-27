@@ -1,7 +1,8 @@
 # System Architecture
 
-- **Status:** In Progress (foundation implemented; feature subsystems are target design)
-- **Updated:** 2026-10-26
+- **Status:** In Progress (foundation and the catalog part of categorization implemented;
+  the other feature subsystems are target design)
+- **Updated:** 2026-10-27
 
 ## Overview
 
@@ -16,8 +17,9 @@ them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature i
 `specs/features/`. Entities are described in [datamodel.md](datamodel.md) and endpoints in
 [api-reference.md](api-reference.md).
 
-The foundation (containers, settings, storage, engine interfaces, health, app shell) exists.
-The feature subsystems are still the target design (see the greenfield rule in
+The foundation (containers, settings, storage, engine interfaces, health, app shell) exists,
+and so does the catalog part of categorization with the Tuotteet page. The other feature
+subsystems are still the target design (see the greenfield rule in
 [AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
@@ -48,7 +50,8 @@ backend/                 FastAPI app and all processing
     errors.py            AppError and the API error format
     texts.py             Finnish texts of the backend (error messages)
     logging_setup.py     logging to stdout and one log line per request
-    storage/             SQLite connection, migration runner, migrations/
+    storage/             SQLite connection, transactions, migrations/, repositories
+    categorization/      catalog: names, rules, default list, routes
     engines/             OcrEngine and ReceiptModel: real implementations and fakes
     health/              GET /api/health and loading the model at start
     <subsystem>/         one package per feature subsystem (see Component map)
@@ -56,9 +59,9 @@ backend/                 FastAPI app and all processing
   tests/integration/     FastAPI TestClient tests with a temporary database
 frontend/                React + Vite + TypeScript UI
   src/api/               shared API client and typed clients, one per resource
-  src/components/        components; a page component per feature page
+  src/components/        components; a page component per feature page (ProductsPage)
   src/i18n/fi.ts         all Finnish UI texts
-  src/test/              MSW setup for component tests
+  src/test/              MSW setup and test data for component tests
   e2e/                   Playwright tests
 scripts/                 container tests
 docs/                    documentation (see content-plan.md)
@@ -222,7 +225,7 @@ Whether parsing uses a text model on OCR output or a vision model on the image i
   comma happens only in the UI and the CSV exporter (NFR-6).
 - **Dates:** purchase date is stored as a date; weeks are ISO 8601 (FR-22, FR-23).
 - **Names:** product, category and group names are compared by their normalized form
-  (FR-14, FR-35); see `specs/features/product-management.md`.
+  (FR-14, FR-35); see [categorization](subsystems/categorization/README.md#names).
 - **Errors:** the API returns `{"error": "<code>", "message": "<Finnish text>"}`; codes are
   stable and defined per spec.
 - **Logging:** no receipt content in logs or error messages (NFR-3).
@@ -244,10 +247,11 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - import: `docs/subsystems/import/README.md` (not written yet)
 - [receipt-reading](subsystems/receipt-reading/README.md) — engine interfaces; reading and
   parsing come with their spec
-- categorization: `docs/subsystems/categorization/README.md` (not written yet)
+- [categorization](subsystems/categorization/README.md) — the catalog (groups, categories,
+  products, names, default list); line categorization comes with the receipt specs
 - calculation: `docs/subsystems/calculation/README.md` (not written yet)
 - export: `docs/subsystems/export/README.md` (not written yet)
-- [ui](subsystems/ui/README.md) — app shell, API client, status line
+- [ui](subsystems/ui/README.md) — app shell, API client, status line, Tuotteet page
 
 ## Related Documents
 
