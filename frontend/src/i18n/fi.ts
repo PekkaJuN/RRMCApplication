@@ -53,4 +53,18 @@ export const fi = {
     productCount: (count: number) => (count === 1 ? "1 tuote" : `${count} tuotetta`),
     categoryCount: (count: number) => (count === 1 ? "1 kategoria" : `${count} kategoriaa`),
   },
+  import: {
+    heading: "Tuonti",
+    instruction: "Kopioi kuittikuvat tuontikansioon ja paina Tuo kuitit.",
+    start: "Tuo kuitit",
+    progress: (processed: number, total: number) => `Tuonti käynnissä: ${processed}/${total}`,
+    notRunYet: "Tuontia ei ole vielä ajettu.",
+    reportHeading: "Edellinen tuonti",
+    nothingToImport: "Tuontikansiossa ei ollut kuvia.",
+    imported: (count: number) => `Tuotu: ${count}`,
+    duplicates: (count: number) => `Kaksoiskappaleita: ${count}`,
+    failed: (count: number) => `Epäonnistui: ${count}`,
+    duplicatesHeading: "Jo tuodut kuvat (jätetty tuontikansioon)",
+    failuresHeading: "Epäonnistuneet (siirretty epäonnistuneiden kansioon)",
+  },
 } as const;

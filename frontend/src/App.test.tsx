@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it } from "vitest";
 import indexHtml from "../index.html?raw";
@@ -6,6 +7,7 @@ import type { Health } from "./api/health";
 import { App } from "./App";
 import { fi } from "./i18n/fi";
 import { defaultItems, fakeCatalog } from "./test/catalog";
+import { IDLE } from "./test/imports";
 import { server } from "./test/server";
 
 const HEALTHY: Health = {
@@ -15,7 +17,11 @@ const HEALTHY: Health = {
 };
 
 beforeEach(() => {
-  server.use(http.get("/api/health", () => HttpResponse.json(HEALTHY)));
+  window.history.replaceState(null, "", "/");
+  server.use(
+    http.get("/api/health", () => HttpResponse.json(HEALTHY)),
+    http.get("/api/import", () => HttpResponse.json(IDLE)),
+  );
   fakeCatalog(server);
 });
 
@@ -54,16 +60,37 @@ it("AC25: shows the heading, the navigation and the status line", async () => {
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
 });
 
-it("AC31: the navigation opens the Tuotteet page", async () => {
+// The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti".
+it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   render(<App />);
 
   const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
   const links = within(navigation).getAllByRole("link");
-  expect(links.map((link) => link.textContent)).toEqual(["Tuotteet"]);
+  expect(links.map((link) => link.textContent)).toEqual(["Tuotteet", "Tuonti"]);
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
   expect(within(main).getByRole("heading", { name: "Tuotteet" })).toBeInTheDocument();
   expect(await within(main).findByText("Juomat", { selector: "[data-name]" })).toBeInTheDocument();
+  expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
+});
+
+it("AC26: the Tuonti link opens the Tuonti page", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Tuonti" }));
+
+  const main = screen.getByRole("main");
+  expect(within(main).getByRole("heading", { name: "Tuonti" })).toBeInTheDocument();
+  expect(within(navigation).getByRole("link", { name: "Tuonti" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  expect(within(navigation).getByRole("link", { name: "Tuotteet" })).not.toHaveAttribute(
+    "aria-current",
+  );
+  expect(window.location.pathname).toBe("/tuonti");
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
 });
 

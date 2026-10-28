@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** In Progress (health and catalog endpoints; receipt, totals and export endpoints
-  are added by their specs)
-- **Updated:** 2026-10-27
+- **Status:** In Progress (health, catalog and import endpoints; receipt, totals and export
+  endpoints are added by their specs)
+- **Updated:** 2026-10-28
 
 ## Overview
 
@@ -38,7 +38,7 @@ Messages come from @backend/app/texts.py and never contain receipt content.
 
 Feature specs add their own codes in the same format, raised as `AppError`
 (@backend/app/errors.py). The catalog codes are listed under
-[Catalog error codes](#catalog-error-codes).
+[Catalog error codes](#catalog-error-codes), the import codes under [Import](#import).
 
 ## Endpoints
 
@@ -125,15 +125,75 @@ gives the foundation's `invalid_request` (422).
 
 The texts live in @backend/app/texts.py.
 
+### Import
+
+Implemented in @backend/app/receipt_import/routes.py. The rules are in
+[import](subsystems/import/README.md). A run works in the background: `POST` starts it and
+returns at once, and the UI polls `GET` while the state is `running`.
+
+| Method and path | Success | Errors |
+|---|---|---|
+| `GET /api/import` | 200, the state of the current or latest run | |
+| `POST /api/import` | 202, the state of the new run (`running`, `total` set, `processed` 0) | 409 `import_running`; 503 `folders_unavailable` |
+
+The **run state**:
+
+```json
+{
+  "state": "finished",
+  "total": 4,
+  "processed": 4,
+  "imported": 1,
+  "duplicates": ["b.jpg"],
+  "failures": [
+    {"file_name": "notes.txt", "reason": "unsupported_format", "message": "Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa."}
+  ],
+  "started_at": "2026-10-28T10:00:00Z",
+  "finished_at": "2026-10-28T10:00:02Z"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `state` | `idle` (no run since the backend started), `running`, `finished` |
+| `total` | Files found when the run started; ignored entries are not counted |
+| `processed` | Files handled so far: imported + duplicates + failed |
+| `imported` | Files stored as new receipts and moved to the done folder |
+| `duplicates` | Names of files whose image was imported before; they stay in the import folder |
+| `failures` | One item per failed file, in processing order: its name in the import folder, the reason and the Finnish message |
+| `started_at`, `finished_at` | UTC ISO 8601, or `null` when not reached |
+
+In state `idle` the counts are 0, the lists empty and both times `null`. The state is kept in
+memory, so it is `idle` again after a backend restart.
+
+#### Import error codes
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 409 | `import_running` | `Tuonti on jo käynnissä.` | A run is active |
+| 503 | `folders_unavailable` | `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | The import, done or failed folder is missing, cannot be written to, or cannot be listed |
+
+#### Failure reasons
+
+| `reason` | `message` | When |
+|---|---|---|
+| `unsupported_format` | `Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa.` | Not `.jpg`, `.jpeg` or `.png` with the matching signature, or an empty file |
+| `read_failed` | `Tiedostoa ei voitu lukea.` | The file cannot be read |
+| `save_failed` | `Kuitin tallennus epäonnistui.` | Writing the receipt row fails |
+| `move_failed` | `Tiedostoa ei voitu siirtää valmiiden kansioon.` | The file cannot be moved to the done folder; it stays in the import folder |
+| `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Any other error |
+
 ## Subsystems
 
 - [ui](subsystems/ui/README.md) — the only client of the API
 - [categorization](subsystems/categorization/README.md) — the rules behind the catalog
   endpoints
+- [import](subsystems/import/README.md) — the rules behind the import endpoints
 
 ## Related Documents
 
 - [architecture.md](architecture.md): dependency rules and cross-cutting rules
 - [Foundation spec](../specs/features/foundation.md) PC5 and PC8
 - [Product management spec](../specs/features/product-management.md): the catalog endpoints
+- [Receipt import spec](../specs/features/receipt-import.md): the import endpoints
 - [development.md](development.md#troubleshooting): what the health results mean for the user

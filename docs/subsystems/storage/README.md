@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -8,8 +8,8 @@ Storage owns the SQLite database: opening connections, applying schema migration
 SQL. Other subsystems never run SQL; they call storage's repositories, which feature specs
 add together with their tables. Storage holds no business rules.
 
-Today storage has the connection, transactions, the migration runner and the catalog
-repository. The schema is described in [datamodel.md](../../datamodel.md).
+Today storage has the connection, transactions, the migration runner, and the catalog and
+receipt repositories. The schema is described in [datamodel.md](../../datamodel.md).
 
 ## Key Files and Entry Points
 
@@ -18,10 +18,11 @@ repository. The schema is described in [datamodel.md](../../datamodel.md).
   can be read, for the health check
 - @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
   categories, products and `app_state`
+- @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
-  (`0001_catalog.sql`)
+  (`0001_catalog.sql`, `0002_receipts.sql`)
 
 ## Interfaces
 
@@ -42,6 +43,11 @@ holds no rules: `list_products(query_key, category_or_group_id)` filters but doe
 and callers own the transaction. The rules are in
 [categorization](../categorization/README.md#rules).
 
+`ReceiptRepository(connection)` returns the frozen dataclass `ReceiptRow` (`id`,
+`image_hash`, `file_name`, `imported_at`). It has `add` (raises `sqlite3.IntegrityError` for
+an existing hash), `get_by_hash`, `delete` and `transaction()`. The rules are in
+[import](../import/README.md).
+
 ## Data Flow
 
 1. `python -m app.prestart` runs before Uvicorn and calls `migrate_database`. On
@@ -50,13 +56,15 @@ and callers own the transaction. The rules are in
 2. The app's lifespan calls `migrate_database` again; with nothing pending it applies nothing.
 3. `GET /api/health` calls `is_available` on each request.
 4. Each catalog request opens its own connection and closes it after the response.
+5. An import run opens one connection in its background thread and closes it when the run
+   ends.
 
 ## Dependencies
 
 - Uses: Python's `sqlite3`; nothing else in the app.
 - Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
-  [categorization](../categorization/README.md); later every feature subsystem through its
-  repositories.
+  [categorization](../categorization/README.md), [import](../import/README.md); later every
+  feature subsystem through its repositories.
 
 ## Modules
 
@@ -82,3 +90,4 @@ None yet.
 - [datamodel.md](../../datamodel.md): schema and migration rules
 - [Foundation spec](../../../specs/features/foundation.md) PC4
 - [Product management spec](../../../specs/features/product-management.md)
+- [Receipt import spec](../../../specs/features/receipt-import.md)

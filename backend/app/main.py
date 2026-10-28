@@ -15,6 +15,8 @@ from app.errors import add_error_handlers
 from app.health.routes import create_health_router
 from app.health.service import HealthService, ModelLoader
 from app.logging_setup import add_request_logging, configure_logging
+from app.receipt_import.routes import create_import_router
+from app.receipt_import.service import ImportService
 from app.settings import Settings, load_settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
@@ -26,12 +28,13 @@ def create_app(
     extra_routers: Sequence[APIRouter] = (),
     engines: Engines | None = None,
     migrations_dir: Path = MIGRATIONS_DIR,
+    import_service: ImportService | None = None,
 ) -> FastAPI:
     """Build the application.
 
-    `extra_routers`, `engines` and `migrations_dir` let tests add test-only endpoints, fake
-    servers and throwaway migrations; production passes none of them, and the engines then
-    follow `settings.engines`.
+    `extra_routers`, `engines`, `migrations_dir` and `import_service` let tests add test-only
+    endpoints, fake servers, throwaway migrations and simulated file failures; production
+    passes none of them, and the engines then follow `settings.engines`.
     """
     settings = settings or load_settings()
     engines = engines or create_engines(settings)
@@ -56,6 +59,7 @@ def create_app(
     )
     app.include_router(create_health_router(HealthService(settings, engines, model_loader)))
     app.include_router(create_catalog_router(settings))
+    app.include_router(create_import_router(import_service or ImportService(settings)))
     for router in extra_routers:
         app.include_router(router)
     return app

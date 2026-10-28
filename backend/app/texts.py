@@ -23,3 +23,11 @@ def group_not_empty(category_count: int) -> str:
 
 def invalid_name(max_length: int) -> str:
     return f"Nimen pituuden on oltava 1–{max_length} merkkiä."
+
+
+IMPORT_RUNNING = "Tuonti on jo käynnissä."
+FOLDERS_UNAVAILABLE = "Kuvakansioita ei löydy tai niihin ei voi kirjoittaa."
+UNSUPPORTED_FORMAT = "Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa."
+READ_FAILED = "Tiedostoa ei voitu lukea."
+SAVE_FAILED = "Kuitin tallennus epäonnistui."
+MOVE_FAILED = "Tiedostoa ei voitu siirtää valmiiden kansioon."

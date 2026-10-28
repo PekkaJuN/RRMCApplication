@@ -1,6 +1,6 @@
 # UI
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
 
 ## Overview
 
@@ -8,15 +8,23 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and one page, **Tuotteet**, for groups, categories and
-products. With one page there is no router: the navigation has one link, marked as the
-current page, and the page is always shown. The first spec with a second page adds a
-router.
+reports the backend's health) and two pages: **Tuotteet** for groups, categories and
+products, and **Tuonti** for importing receipt images. The app opens on Tuotteet.
+
+Two pages do not justify a router library. @frontend/src/navigation.ts maps the address to a
+page (`/tuonti` → Tuonti, any other path → Tuotteet) and switches pages with the History API.
+The navigation links are real links (`/` and `/tuonti`); a plain left click is handled in the
+page without reloading, the current link has `aria-current="page"`, the back button works,
+and a reload keeps the page because Vite answers every path with `index.html`.
 
 ## Key Files and Entry Points
 
 - @frontend/src/main.tsx — mounts `App`
-- @frontend/src/App.tsx — app shell: heading, navigation, status line, `<main>`
+- @frontend/src/App.tsx — app shell: heading, navigation, status line, `<main>` with the
+  current page
+- @frontend/src/navigation.ts — `usePage()`, `pageFromPath()`, `PAGE_PATHS`
+- @frontend/src/components/ImportPage.tsx — the Tuonti page: the "Tuo kuitit" button,
+  progress, and the report of the latest run
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -31,6 +39,7 @@ router.
 - @frontend/src/api/health.ts — `getHealth()` and the `Health` type
 - @frontend/src/api/catalog.ts — typed catalog client and the `CatalogItem` and `Product`
   types
+- @frontend/src/api/imports.ts — `getImport()`, `startImport()` and the `ImportState` type
 - @frontend/src/i18n/fi.ts — every Finnish UI text
 - @frontend/index.html — `lang="fi"`, title `Kuittisovellus`
 
@@ -54,6 +63,13 @@ The status line shows one text per failing check, in this order: model, OCR, fol
 database; `Kaikki palvelut toiminnassa` when all are `ok`; and the error message when the
 health cannot be read. It is empty until the first answer arrives. The texts are in the
 foundation spec, PC10.
+
+On the Tuonti page, the state of the latest run is loaded when the page opens. While it is
+`running`, the page asks for it again 1 second after each answer, so requests never overlap,
+and stops when the page closes. A start that is refused (409, 503) or cannot reach the
+backend shows the message next to the button with `role="alert"`; the shown report stays. A
+failed poll shows the same alert and polling goes on. The texts are in the
+[receipt import spec](../../../specs/features/receipt-import.md#ui-texts-tuonti-page).
 
 ## Data Flow
 
@@ -81,6 +97,11 @@ None yet.
   entry with the selector `[data-name]`.
 - Tests that need the 30 second refresh fake only `setInterval` and `clearInterval`, so fetch
   and MSW keep their real timers.
+- The Tuonti page tests use `vi.useFakeTimers({ shouldAdvanceTime: true })` and step the
+  poll with `vi.advanceTimersByTimeAsync(1000)`; `userEvent` gets
+  `advanceTimers: vi.advanceTimersByTime`.
+- Tests that switch pages reset the address with `history.replaceState(null, "", "/")` in
+  `beforeEach`, because jsdom keeps it between tests.
 - The `node_modules` folder lives in a Docker volume; after a dependency change run
   `docker compose run --rm frontend npm ci` ([development.md](../../development.md#dependencies-and-lock-files)).
 
@@ -88,4 +109,5 @@ None yet.
 
 - [Foundation spec](../../../specs/features/foundation.md) PC10
 - [Product management spec](../../../specs/features/product-management.md) PC9
+- [Receipt import spec](../../../specs/features/receipt-import.md) PC11
 - [development.md](../../development.md#code-standards): TypeScript and React rules

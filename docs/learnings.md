@@ -2,6 +2,43 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-10-28: The import E2E test could pass on the previous run's report
+
+- **Context:** Audit of the receipt import feature.
+- **Symptom:** none seen; found in review. The import journey wrote fixed file names and
+  checked the report's counts and names, which the previous run's report already showed.
+- **Root cause:** `docker compose --profile e2e run --rm e2e` leaves `backend-e2e` running,
+  so its database and the in-memory import state survive between E2E runs. A failed start
+  (for example 503) keeps the old report on the page, and the test would still pass.
+- **Solution:** file names and bytes are unique per run, and the test asserts that no error
+  is shown (@frontend/e2e/import.spec.ts).
+- **Prevention:** E2E journeys must not depend on `backend-e2e` being new; check for values
+  that only the current run can produce.
+
+## 2026-10-28: A late first answer hid a started import
+
+- **Context:** Audit of the receipt import feature.
+- **Symptom:** none seen; found in review. Clicking "Tuo kuitit" before the Tuonti page's
+  first `GET /api/import` had answered could show `Tuontia ei ole vielä ajettu.` with the
+  button enabled while a run was active, and polling stopped.
+- **Root cause:** the answer to the first `GET` replaced the newer state from `POST`.
+- **Solution:** after a successful start, the page ignores the first `GET`'s answer
+  (@frontend/src/components/ImportPage.tsx).
+- **Prevention:** `AC27: a late answer to the first request does not hide a started run` in
+  `ImportPage.test.tsx`. When two requests can set the same state, decide which answer wins.
+
+## 2026-10-28: An unexpected error after the commit left a receipt without its file
+
+- **Context:** Audit of the receipt import feature.
+- **Symptom:** none seen; found in review. If moving a file to the done folder raised an
+  error other than `OSError`, the file went to the failed folder but its receipt row stayed,
+  so the image was later reported as a duplicate.
+- **Root cause:** `_import` deleted the row only for `OSError` from the move.
+- **Solution:** the row is deleted for any error from the move, then the error goes on to
+  the `internal_error` handling (@backend/app/receipt_import/run.py).
+- **Prevention:** `test_ac17_unexpected_error_in_move_to_done_deletes_the_row`. After a
+  commit, every failure path must undo what the commit promised.
+
 ## 2026-10-27: A group could become a category inside itself
 
 - **Context:** Audit of the product management feature.
