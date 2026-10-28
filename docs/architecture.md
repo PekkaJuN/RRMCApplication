@@ -56,8 +56,11 @@ backend/                 FastAPI app and all processing
     engines/             OcrEngine and ReceiptModel: real implementations and fakes
     health/              GET /api/health and loading the model at start
     <subsystem>/         one package per feature subsystem (see Component map)
+  evaluation/            development tool, not part of the app: compares reading variants
+                         on the user's receipts (python -m evaluation)
   tests/unit/            unit tests, one folder per package
   tests/integration/     FastAPI TestClient tests with a temporary database
+  tests/evaluation/      tests of the evaluation tool
 frontend/                React + Vite + TypeScript UI
   src/api/               shared API client and typed clients, one per resource
   src/components/        components; a page component per feature page (ProductsPage, ImportPage)
@@ -71,11 +74,16 @@ specs/                   PRD and feature specs
 source/import/           incoming receipt images        (default; gitignored, real data)
 source/import_done/      imported images               (default; gitignored, real data)
 source/import_failed/    images that failed to import   (default; gitignored, real data)
-compose.yaml             Docker Compose: backend and frontend; profile e2e
+source/eval/             evaluation receipts, truth files, results (default; gitignored, real data)
+compose.yaml             Docker Compose: backend and frontend; profiles e2e and eval
 .env.example             committed example settings file; the real .env is not committed
 ```
 
 The real settings file and the database are not committed (FR-32, NFR-4).
+
+`backend/evaluation/` may import from `app` (settings, name normalization); `app` never
+imports from it. It runs only in the `eval` service and adds no endpoint, page or table
+([model evaluation spec](../specs/features/model-evaluation.md)).
 
 ## Component map
 
@@ -227,6 +235,9 @@ Whether parsing uses a text model on OCR output or a vision model on the image i
   lives in a Docker volume, because SQLite file locking is unreliable on Windows folders
   mounted into Linux containers.
 - All settings are in one `.env` file in the project root (FR-32).
+- The `eval` service (profile `eval`) runs the model evaluation tool on demand. It publishes
+  no port and calls only `RRMC_OLLAMA_URL`; see
+  [development.md](development.md#model-evaluation).
 - There is no login: the app is local and single-user.
 - Details are in the [foundation spec](../specs/features/foundation.md). Setup and start
   commands are in [development.md](development.md#setup).

@@ -2,6 +2,45 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-10-28: The evaluation tool could leak a file name or lose a long run
+
+- **Context:** Audit of the model evaluation tool.
+- **Symptom:** none seen; found in review. A `vision:` image that could not be read, any
+  unexpected error, or the same variant given twice stopped the run with a traceback. The
+  traceback could print a receipt's file name, and a repeated variant failed only after the
+  first variant had run, without writing `summary.md`.
+- **Root cause:** only model and OCR errors were caught per receipt; `main` let other
+  exceptions escape; variants were not checked for a shared detail folder.
+- **Solution:** a receipt's image read failure is `image_error`; `main` prints only
+  `Evaluation failed: <error type>` with exit code 3 (AC21); a repeated variant is refused
+  before Ollama is called (AC9) (@backend/evaluation/runner.py, @backend/evaluation/cli.py).
+- **Prevention:** `test_ac21_unexpected_error_prints_only_its_type`,
+  `test_ac9_repeated_variant_is_refused_before_ollama`,
+  `test_ac12_image_file_that_cannot_be_read_is_an_image_error`. A tool that handles private
+  data must never print an exception's message or traceback.
+
+## 2026-10-28: Proxy variables could send evaluation prompts to another host
+
+- **Context:** Audit of the model evaluation tool (AC19).
+- **Symptom:** none seen; found in review. `httpx2.Client` reads `HTTP_PROXY` and
+  `ALL_PROXY` by default, so a proxy set in the environment would receive OCR text and
+  images.
+- **Root cause:** the client's default `trust_env=True`.
+- **Solution:** `OllamaReader` builds its client with `trust_env=False`
+  (@backend/evaluation/ollama.py).
+- **Prevention:** `test_ac19_proxy_settings_are_ignored`. Clients that carry receipt data
+  set `trust_env=False`.
+
+## 2026-10-28: Rounded percentages could meet a 100 % criterion
+
+- **Context:** Audit of the model evaluation tool.
+- **Symptom:** none seen; found in review. 199 valid answers of 200 showed `valid 100 %`
+  and `meets criteria: yes`.
+- **Root cause:** the criteria compared the rounded percentages.
+- **Solution:** the criteria compare exact counts (@backend/evaluation/scoring.py).
+- **Prevention:** `test_ac17_criteria_use_exact_shares_not_rounded_percentages`. Compare
+  thresholds on exact values; round only for display.
+
 ## 2026-10-28: The import E2E test could pass on the previous run's report
 
 - **Context:** Audit of the receipt import feature.

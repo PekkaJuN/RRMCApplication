@@ -21,6 +21,10 @@ gives the Finnish word the user sees.
 | Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |
 | Image identifier | — | SHA-256 of an image file's bytes, 64 lowercase hex characters; stored as `image_hash` |
 | Duplicate | kaksoiskappale | A file whose image identifier is already stored for a receipt; it is not imported again and stays in the import folder |
+| Evaluation folder | — | Where the user keeps receipts for the model evaluation tool, with their truth files and run results (setting `RRMC_EVAL_DIR`; [development.md](development.md#model-evaluation)) |
+| Truth file | — | `<image>.truth.json`: the values the user reads from a paper receipt, against which the evaluation scores a variant |
+| Variant | — | One way of reading a receipt in the evaluation: `ocr:<model>` (Tesseract, then a text model) or `vision:<model>` (the image to a vision model) |
+| Full subset | — | The evaluated receipts whose truth file lists the lines; only they get line scores |
 
 ## Subsystems
 
