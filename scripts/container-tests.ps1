@@ -138,6 +138,12 @@ foreach ($path in $ignored) {
     & git check-ignore -q $path
     Write-Result "AC27 $path is ignored" ($LASTEXITCODE -eq 0)
 }
+# Model evaluation AC20: receipts, truth files and results under the evaluation folder.
+foreach ($path in @("source/eval/a.jpg", "source/eval/a.jpg.truth.json",
+        "source/eval/results/x/summary.md")) {
+    & git check-ignore -q $path
+    Write-Result "Evaluation AC20 $path is ignored" ($LASTEXITCODE -eq 0)
+}
 & git check-ignore -q ".env.example"
 Write-Result "AC27 .env.example is not ignored" ($LASTEXITCODE -eq 1)
 

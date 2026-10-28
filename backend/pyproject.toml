@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic-settings>=2.6",
     "httpx2>=2.16",
+    "pillow>=11.0",
 ]
 
 [dependency-groups]
@@ -36,8 +37,13 @@ select = ["E", "F", "I", "B", "UP", "SIM", "S", "N"]
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
-include = ["app", "tests"]
+include = ["app", "evaluation", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+# Tests that need a real engine run only when asked for: pytest -m tesseract
+addopts = "-m 'not tesseract'"
+markers = [
+    "tesseract: needs the real Tesseract in the backend image",
+]

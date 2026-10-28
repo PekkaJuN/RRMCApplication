@@ -194,7 +194,7 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 
 | ID | Requirement |
 |---|---|
-| NFR-8 | One receipt is processed (OCR plus model) in under [NEEDS CLARIFICATION: target, e.g. 30 s] on the user's computer. |
+| NFR-8 | One receipt is processed (OCR plus model) in under 3 minutes on the user's computer. The model runs on the CPU (see open question 1), and the import runs in the background, so the UI stays usable meanwhile. |
 | NFR-9 | UI edits and total updates feel immediate (under 200 ms). |
 
 ### 7.4 Platform
@@ -264,8 +264,10 @@ A suggested order of feature specs for the MVP:
 
 ## 11. Open questions
 
-1. [NEEDS CLARIFICATION] Hardware: is there a GPU, and how much memory? This decides
-   whether 9B or 14B is practical, and the NFR-8 target.
+1. Resolved (2026-10-28): Intel Core i9-13900H, 64 GB memory, integrated graphics only
+   (Iris Xe), so the model runs on the CPU. Measured with `qwen2.5:7b`: prompt 61 tokens/s,
+   output 9.6 tokens/s. A 14B model fits in memory but is about half as fast. The NFR-8
+   target is 3 minutes per receipt.
 2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? (HEIC is not supported,
    see FR-2.)
 3. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
@@ -292,6 +294,7 @@ Resolved:
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
 - Supported formats are JPEG and PNG only; HEIC and PDF are not supported: FR-2 (2026-10-28).
+- Hardware and processing time: CPU only, 3 minutes per receipt: NFR-8, open question 1 (2026-10-28).
 - Single user stays: no buyer or family-member field on receipts (2026-10-21).
 - Installation and development use Docker; Ollama stays on Windows; settings are in one `.env` file; one way of running for normal use and development: FR-32, NFR-10, NFR-11 (2026-10-23).
 - Archiving is by previous calendar year, started by the user; archived data is excluded from

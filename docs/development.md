@@ -92,7 +92,9 @@ Useful variants:
 
 ```powershell
 # Backend tests with line and branch coverage
-docker compose run --rm backend pytest --cov=app --cov-branch --cov-report=term-missing
+docker compose run --rm backend pytest --cov=app --cov=evaluation --cov-branch --cov-report=term-missing
+# Tests that need the real Tesseract (left out of the default run)
+docker compose run --rm backend pytest -m tesseract
 # Frontend tests with coverage
 docker compose run --rm frontend npm run test:coverage
 # Format the code instead of checking it
@@ -137,6 +139,51 @@ Run these once on a fresh clone, and again when `compose.yaml` or a Dockerfile c
 |---|---|---|
 | Fresh start (AC1) | Clone, `Copy-Item .env.example .env`, Ollama running, `docker compose up --build` | Within 5 minutes <http://127.0.0.1:8000/api/health> answers and <http://127.0.0.1:5173> shows `Kuittisovellus` |
 | Reload (AC4) | With the app running, change and save a backend source file and a frontend source file | Within 10 seconds the backend serves the change and the browser shows it, without `docker compose` commands |
+
+### Model evaluation
+
+`backend/evaluation/` is a development tool that compares ways of reading receipts on the
+user's own receipts ([spec](../specs/features/model-evaluation.md)). It runs in the `eval`
+service. The evaluation folder is `RRMC_EVAL_DIR` (default `./source/eval`), mounted as
+`/data/eval`; it is ignored by Git.
+
+1. Copy receipt images (JPEG or PNG) into the evaluation folder.
+2. Create a truth file template next to each image:
+
+   ```powershell
+   docker compose --profile eval run --rm eval python -m evaluation init
+   ```
+
+3. Fill in each `<image>.truth.json` from the paper receipt: `store`, `date`
+   (`YYYY-MM-DD`), `total_cents` and `line_count`. Optionally fill `lines` with
+   `{"name": "...", "amount_cents": 125}` items to put the receipt in the full subset:
+   discounts and deposits merged into the item, a deposit refund as its own negative line.
+   Images without a filled truth file are skipped.
+4. Pull the models (`ollama pull <name>`) and run one or more variants. `--limit N` and
+   `--subset full` apply to the variant just before them:
+
+   ```powershell
+   docker compose --profile eval run --rm eval python -m evaluation run `
+     --variant ocr:qwen2.5:7b `
+     --variant vision:qwen2.5vl:7b --limit 5
+   ```
+
+The run prints one progress line per receipt and a summary table at the end, and writes it
+under `results/<run id>/` in the evaluation folder: `summary.md`, one folder per variant
+with a detail file per receipt (`ocr-qwen2.5-7b/1.json`), and `receipts.json`, which maps
+the numbers to file names. Exit code 1 means Ollama or a model is not available; 2 means
+invalid input (a variant, a repeated variant, a truth file or an option); 3 means an
+unexpected error, printed only as `Evaluation failed: <error type>` so that no receipt
+content reaches the screen. A receipt whose image cannot be read, whose OCR fails or whose
+model call fails is recorded in its detail file (`image_error`, `ocr_error`, `model_error`,
+`timeout`), counts as wrong, and the run goes on.
+
+Privacy rules:
+
+- The detail files and `receipts.json` contain receipt content. They stay on this computer.
+- Only `summary.md` may be shared, for example in a conversation with an AI assistant: it
+  has aggregate numbers only.
+- Cloud models (`-cloud`, `:cloud`) are refused, so no receipt leaves the computer.
 
 ## Dependencies and lock files
 

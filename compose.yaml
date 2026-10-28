@@ -85,6 +85,21 @@ services:
       backend-e2e:
         condition: service_healthy
 
+  # Model evaluation on the user's own receipts (specs/features/model-evaluation.md):
+  # `docker compose --profile eval run --rm eval python -m evaluation run --variant ...`.
+  # No ports; it calls only RRMC_OLLAMA_URL.
+  eval:
+    profiles: [eval]
+    build: ./backend
+    env_file:
+      - path: ${RRMC_ENV_FILE:-.env}
+        required: true
+    volumes:
+      - ./backend:/app
+      - ${RRMC_EVAL_DIR:-./source/eval}:/data/eval
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   rrmc-data:
   rrmc-node-modules:

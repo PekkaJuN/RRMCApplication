@@ -35,7 +35,7 @@ Significant choices are recorded as ADRs in `docs/adr/`. The stack is
 ```
 backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.toml, uv.lock
 frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
-compose.yaml        Docker Compose: backend, frontend; profile e2e
+compose.yaml        Docker Compose: backend, frontend; profiles e2e and eval
 .env.example        all settings with defaults; copy to .env (never committed)
 scripts/            container tests
 docs/               documentation (see Documentation)
@@ -43,6 +43,7 @@ specs/              feature specs (see Workflows)
 source/import/      incoming receipt images      (gitignored, real data)
 source/import_done/ processed images              (gitignored, real data)
 source/import_failed/ images that failed to import (gitignored, real data)
+source/eval/        model evaluation receipts and results (gitignored, real data)
 ```
 
 The import folders are configurable. Paths above are defaults. The database is in the Docker
