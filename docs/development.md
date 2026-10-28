@@ -103,12 +103,18 @@ docker compose run --rm frontend npm run format
 ### E2E tests
 
 The E2E tests start `backend-e2e`, a backend with `RRMC_ENGINES=fake` and a temporary `/data`
-(new empty database and folders on every run), and run Playwright in the `e2e` container,
-which starts its own Vite server. `run --rm` leaves `backend-e2e` running; stop it with:
+(new empty database and folders each time the container starts), and run Playwright in the
+`e2e` container, which starts its own Vite server. `run --rm` leaves `backend-e2e` running,
+so a second run reuses its database; the journeys are written to pass either way. Stop it
+with:
 
 ```powershell
 docker compose --profile e2e down
 ```
+
+The E2E backend's import folder is the test-only volume `rrmc-e2e-import`, also mounted in
+the `e2e` container at `E2E_IMPORT_DIR`. The import journey (@frontend/e2e/import.spec.ts)
+empties it and writes synthetic files there. It is never the real import folder.
 
 ### Container tests
 

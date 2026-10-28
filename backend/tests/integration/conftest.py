@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.receipt_import.service import ImportService
 from app.settings import Settings
 from tests.integration import endpoints_for_tests
 
@@ -15,8 +16,10 @@ def settings(clean_env: pytest.MonkeyPatch, tmp_path: Path) -> Settings:
     return Settings(engines="fake", data_dir=tmp_path)
 
 
-def make_client(settings: Settings) -> TestClient:
-    app = create_app(settings, extra_routers=[endpoints_for_tests.router])
+def make_client(settings: Settings, import_service: ImportService | None = None) -> TestClient:
+    app = create_app(
+        settings, extra_routers=[endpoints_for_tests.router], import_service=import_service
+    )
     # Unexpected errors must become a 500 response, as they do for a real client.
     return TestClient(app, raise_server_exceptions=False)
 

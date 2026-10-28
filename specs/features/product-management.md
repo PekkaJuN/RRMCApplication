@@ -8,7 +8,9 @@
   2026-10-23: project setup moved to the foundation spec;
   2026-10-27: aligned with the implemented foundation (paths, error format, API client,
   navigation), added AC31–AC34, ready for review; approved by the user; Plan added and approved; Tasks added;
-  2026-10-27: implemented and audited (PASS), see Audit
+  2026-10-27: implemented and audited (PASS), see Audit;
+  2026-10-28: AC31 (one navigation link) superseded by AC26 of the
+  [receipt import spec](receipt-import.md), which adds the Tuonti link
 - **Depends on:** [Project foundation](foundation.md)
 - **Implements:** PRD FR-11, FR-33, FR-34, FR-35, FR-37, FR-38, FR-39, the default list in
   PRD 6.9, NFR-15 for this page, and the basic part of FR-14 (name normalization without OCR
@@ -324,6 +326,9 @@ That is 2 groups (category counts 10 and 3) and 21 categories, all with `product
 **Then** the page heading is "Tuotteet", the category panel heading is "Kategoriat", and the buttons and fields use Finnish labels ("Lisää", "Hae", "Poista", "Tallenna", "Peruuta"); no English text is visible
 
 #### AC31: Navigation opens the Tuotteet page
+*Superseded 2026-10-28 by AC26 of the [receipt import spec](receipt-import.md): the
+navigation now has the links "Tuotteet" and "Tuonti", and the app still opens on Tuotteet.*
+
 **Given** the app is opened at its start address
 **When** it is rendered
 **Then** the navigation "Päävalikko" contains one link "Tuotteet", marked as the current page, and the Tuotteet page is shown below the header with the status line still visible

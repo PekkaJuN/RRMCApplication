@@ -2,8 +2,6 @@ import sqlite3
 
 import pytest
 
-from app.storage.migrate import current_version
-
 
 def add_item(db: sqlite3.Connection, name: str, kind: str, parent_id: int | None = None) -> int:
     cursor = db.execute(
@@ -21,7 +19,8 @@ def table_names(db: sqlite3.Connection) -> set[str]:
 
 def test_ac1_migration_creates_the_catalog_tables(db: sqlite3.Connection) -> None:
     assert {"categories", "products", "app_state"} <= table_names(db)
-    assert current_version(db) == 1
+    # Later migrations raise the newest version; 1 must still be the catalog migration.
+    assert db.execute("SELECT 1 FROM schema_version WHERE version = 1").fetchone() is not None
 
 
 def test_ac4_name_key_is_unique_across_kinds(db: sqlite3.Connection) -> None:

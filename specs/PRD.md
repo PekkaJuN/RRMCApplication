@@ -65,7 +65,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 |---|---|
 | FR-1 | The app reads receipt images from a configurable import folder (default `source/import`). |
 | FR-45 | The user copies images into the import folder by hand and starts the import with a button in the UI. The app does not watch the folder. |
-| FR-2 | Supported formats: JPEG and PNG. [NEEDS CLARIFICATION: HEIC from iPhone? PDF?] |
+| FR-2 | Supported formats: JPEG and PNG. HEIC and PDF are not supported. A file of another format fails and moves to the failed folder (FR-4). |
 | FR-3 | Each image gets an identifier computed from its content (SHA-256 hash). An image whose identifier already exists is reported as a duplicate and is not imported again. |
 | FR-4 | After an image's data is committed to the database, the image moves to a configurable done folder (default `source/import_done`). An image that fails moves to a configurable failed folder (default `source/import_failed`), and the reason is shown to the user without receipt content (NFR-3). A failed image's identifier is not stored, so the user can move it back to the import folder and retry without it being reported as a duplicate. A file whose name already exists in the target folder gets a numbered suffix (e.g. `kuitti (2).jpg`); no file is overwritten. |
 | FR-5 | The import reports, per run, how many images were imported, skipped as duplicates and failed. |
@@ -266,7 +266,8 @@ A suggested order of feature specs for the MVP:
 
 1. [NEEDS CLARIFICATION] Hardware: is there a GPU, and how much memory? This decides
    whether 9B or 14B is practical, and the NFR-8 target.
-2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? HEIC support needed?
+2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? (HEIC is not supported,
+   see FR-2.)
 3. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
 4. [NEEDS CLARIFICATION] Model choice: compare Tesseract + text model against a vision model
    on 20–30 real receipts before the parsing spec is approved.
@@ -290,6 +291,7 @@ Resolved:
 - A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
+- Supported formats are JPEG and PNG only; HEIC and PDF are not supported: FR-2 (2026-10-28).
 - Single user stays: no buyer or family-member field on receipts (2026-10-21).
 - Installation and development use Docker; Ollama stays on Windows; settings are in one `.env` file; one way of running for normal use and development: FR-32, NFR-10, NFR-11 (2026-10-23).
 - Archiving is by previous calendar year, started by the user; archived data is excluded from

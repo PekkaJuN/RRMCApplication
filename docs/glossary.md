@@ -16,10 +16,16 @@ gives the Finnish word the user sees.
 | Default list | oletuskategoriat | The groups and categories created once on the first start ([PRD 6.9](../specs/PRD.md#69-default-categories)) |
 | Display name | — | A name as shown: Unicode NFC, trimmed, inner whitespace collapsed to one space |
 | Normalized name | — | The display name, case-folded; stored as `name_key` and used for every comparison ([names](subsystems/categorization/README.md#names)) |
+| Receipt | kuitti | One purchase, recorded from one image. Today it holds the image identifier, the file name and the import time ([datamodel](datamodel.md#receipts)) |
+| Import run | tuonti, tuontiajo | One press of "Tuo kuitit": the files in the import folder at that moment are processed in the background ([import](subsystems/import/README.md)) |
+| Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |
+| Image identifier | — | SHA-256 of an image file's bytes, 64 lowercase hex characters; stored as `image_hash` |
+| Duplicate | kaksoiskappale | A file whose image identifier is already stored for a receipt; it is not imported again and stays in the import folder |
 
 ## Subsystems
 
 - [categorization](subsystems/categorization/README.md) — catalog terms
+- [import](subsystems/import/README.md) — import terms
 
 ## Related Documents
 

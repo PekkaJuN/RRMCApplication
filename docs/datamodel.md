@@ -1,14 +1,15 @@
 # Data Model
 
-- **Status:** In Progress (catalog entities implemented; receipts and lines come with their specs)
-- **Updated:** 2026-10-27
+- **Status:** In Progress (catalog and receipt entities implemented; receipt lines and the
+  read receipt data come with their specs)
+- **Updated:** 2026-10-28
 
 ## Overview
 
 The app keeps all its data in one SQLite database. This document describes the schema and
-how it changes. Today the schema holds the migration bookkeeping and the catalog: groups,
-categories and products. Receipts and lines are added by their feature specs as new
-migrations.
+how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
+categories and products) and the imported receipts. The read receipt data and receipt lines
+are added by their feature specs as new migrations.
 
 ## Where the database is
 
@@ -69,6 +70,20 @@ One-time facts about the database, as key and value text.
 |---|---|---|
 | `catalog_seeded_at` | UTC ISO 8601 time | The default category list was created; it is never created again, even after the user deletes every item |
 
+### receipts
+
+One row per imported receipt image ([import](subsystems/import/README.md)). The read data
+(store, date, total, OCR text) and receipt lines are added by the receipt-reading spec.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INTEGER PRIMARY KEY` | Stable id; receipt lines will reference it |
+| `image_hash` | `TEXT NOT NULL UNIQUE`, `CHECK (length = 64)` | The image identifier: SHA-256 of the file's bytes, lowercase hex. The `UNIQUE` index is the duplicate lookup (FR-3) |
+| `file_name` | `TEXT NOT NULL` | The file's name in the done folder, after any numbered suffix |
+| `imported_at` | `TEXT NOT NULL` | When the receipt was stored, UTC ISO 8601 with seconds (`2026-10-28T10:00:01Z`) |
+
+A failed import stores no row, so the image can be retried (FR-4).
+
 ### Relationships and rules
 
 ```mermaid
@@ -86,8 +101,8 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there is one, `0001_catalog.sql`, so the schema
-  version is 1.
+  (four digits, then a short name). Today there are two, `0001_catalog.sql` and
+  `0002_receipts.sql`, so the schema version is 2.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
@@ -104,10 +119,12 @@ erDiagram
   all SQL
 - [categorization](subsystems/categorization/README.md) — the rules on top of the catalog
   tables
+- [import](subsystems/import/README.md) — creates the receipt rows
 
 ## Related Documents
 
 - [architecture.md](architecture.md): where storage sits among the subsystems
 - [Foundation spec](../specs/features/foundation.md) PC4: database requirements
 - [Product management spec](../specs/features/product-management.md): the catalog tables
+- [Receipt import spec](../specs/features/receipt-import.md): the `receipts` table
 - [development.md](development.md#running-the-app): where the data lives when the app runs

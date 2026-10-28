@@ -1,8 +1,8 @@
 # System Architecture
 
-- **Status:** In Progress (foundation and the catalog part of categorization implemented;
-  the other feature subsystems are target design)
-- **Updated:** 2026-10-27
+- **Status:** In Progress (foundation, the catalog part of categorization and import without
+  reading implemented; the other feature subsystems are target design)
+- **Updated:** 2026-10-28
 
 ## Overview
 
@@ -18,8 +18,8 @@ them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature i
 [api-reference.md](api-reference.md).
 
 The foundation (containers, settings, storage, engine interfaces, health, app shell) exists,
-and so does the catalog part of categorization with the Tuotteet page. The other feature
-subsystems are still the target design (see the greenfield rule in
+and so do the catalog part of categorization with the Tuotteet page and import (without the
+reading step) with the Tuonti page. The other feature subsystems are still the target design (see the greenfield rule in
 [AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
@@ -52,6 +52,7 @@ backend/                 FastAPI app and all processing
     logging_setup.py     logging to stdout and one log line per request
     storage/             SQLite connection, transactions, migrations/, repositories
     categorization/      catalog: names, rules, default list, routes
+    receipt_import/      import runs: file rules, moves, background run, routes
     engines/             OcrEngine and ReceiptModel: real implementations and fakes
     health/              GET /api/health and loading the model at start
     <subsystem>/         one package per feature subsystem (see Component map)
@@ -59,7 +60,8 @@ backend/                 FastAPI app and all processing
   tests/integration/     FastAPI TestClient tests with a temporary database
 frontend/                React + Vite + TypeScript UI
   src/api/               shared API client and typed clients, one per resource
-  src/components/        components; a page component per feature page (ProductsPage)
+  src/components/        components; a page component per feature page (ProductsPage, ImportPage)
+  src/navigation.ts      page switching between the pages
   src/i18n/fi.ts         all Finnish UI texts
   src/test/              MSW setup and test data for component tests
   e2e/                   Playwright tests
@@ -131,6 +133,10 @@ The `health` package reports the state of the database, the image folders, OCR a
 
 ### Import (FR-45: started with a button)
 
+Implemented without the reading and categorization steps and without the model check; the
+receipt-reading and categorization specs add them. Details are in
+[import](subsystems/import/README.md).
+
 ```mermaid
 sequenceDiagram
   participant U as UI
@@ -140,7 +146,9 @@ sequenceDiagram
   participant C as categorization
   participant S as storage
   U->>A: start import
-  A->>I: run
+  A->>I: start
+  I-->>A: run started (202)
+  A-->>U: running
   I->>I: check model availability (FR-31)
   loop each image in import folder
     I->>I: SHA-256 identifier
@@ -155,18 +163,22 @@ sequenceDiagram
       I->>I: move file to import_done
     end
   end
-  I-->>A: run report: imported, duplicates, failed
-  A-->>U: report
+  U->>A: poll state (every second)
+  A-->>U: progress, then report: imported, duplicates, failed
 ```
 
 - The file moves only after the transaction commits (NFR-7).
 - On any failure for an image, nothing is stored for it, and the file moves to
   `import_failed` with a reason that contains no receipt content (FR-4, NFR-3). Its
-  identifier is not stored, so it can be retried.
+  identifier is not stored, so it can be retried. The exception is a file that cannot be
+  moved to the done folder: it stays in the import folder for a later run.
 - If Ollama or the model is unavailable, the run stops before the first image and reports it;
   no image is moved to `import_failed` for that reason (FR-31).
-- [NEEDS CLARIFICATION: does an import run block the request until it finishes, or run as a
-  background task that the UI polls for progress? To be decided in the import spec.]
+- A run works in a background thread: `POST /api/import` returns at once and the UI polls
+  `GET /api/import` while the run is active. Only one run is active at a time; the state is
+  kept in memory ([receipt import spec](../specs/features/receipt-import.md), PC8).
+- A duplicate stays in the import folder; it is reported on every run until the user
+  removes it.
 
 ### Review and correction
 
@@ -244,19 +256,22 @@ Whether parsing uses a text model on OCR output or a vision model on the image i
 Each Tier 2 doc is created with the first spec that touches its subsystem.
 
 - [storage](subsystems/storage/README.md) — SQLite connection and migrations
-- import: `docs/subsystems/import/README.md` (not written yet)
+- [import](subsystems/import/README.md) — import runs, duplicates, moving files; reading
+  comes with its spec
 - [receipt-reading](subsystems/receipt-reading/README.md) — engine interfaces; reading and
   parsing come with their spec
 - [categorization](subsystems/categorization/README.md) — the catalog (groups, categories,
   products, names, default list); line categorization comes with the receipt specs
 - calculation: `docs/subsystems/calculation/README.md` (not written yet)
 - export: `docs/subsystems/export/README.md` (not written yet)
-- [ui](subsystems/ui/README.md) — app shell, API client, status line, Tuotteet page
+- [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
+  Tuotteet and Tuonti pages
 
 ## Related Documents
 
 - [PRD](../specs/PRD.md): requirements referenced above
 - [Product management spec](../specs/features/product-management.md)
+- [Receipt import spec](../specs/features/receipt-import.md)
 - [ADR 0001: Technology stack](adr/0001-tech-stack.md)
 - [ADR 0002: Docker](adr/0002-docker.md)
 - [Foundation spec](../specs/features/foundation.md)

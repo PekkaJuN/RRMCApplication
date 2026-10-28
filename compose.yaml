@@ -60,6 +60,9 @@ services:
       RRMC_ENGINES: fake
     volumes:
       - ./backend:/app
+      # Test-only import folder, shared with the e2e container, which writes synthetic images
+      # into it. It is never the real import folder.
+      - rrmc-e2e-import:/data/import
     tmpfs:
       - /data
     healthcheck:
@@ -73,9 +76,11 @@ services:
     command: npx playwright test
     environment:
       VITE_API_TARGET: http://backend-e2e:8000
+      E2E_IMPORT_DIR: /e2e-import
     volumes:
       - ./frontend:/app
       - rrmc-node-modules:/app/node_modules
+      - rrmc-e2e-import:/e2e-import
     depends_on:
       backend-e2e:
         condition: service_healthy
@@ -83,3 +88,4 @@ services:
 volumes:
   rrmc-data:
   rrmc-node-modules:
+  rrmc-e2e-import:
