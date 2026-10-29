@@ -75,9 +75,11 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The product management spec is Done (audited 2026-10-27).
 - The receipt import spec is Done (audited 2026-10-28): import runs without the reading step;
   the receipts table; the Tuonti page. The import README describes it.
-- The model evaluation spec is Done (audited 2026-10-28): the tool `backend/evaluation/` and how to run it
-  are in [development.md](development.md#model-evaluation). It is a development tool, not a
-  subsystem.
+- The model evaluation spec is Done (audited 2026-10-28; image orientation change audited
+  2026-10-29): the tool `backend/evaluation/` and how to run it are in
+  [development.md](development.md#model-evaluation). It is a development tool, not a
+  subsystem. The receipt-reading spec needs the same orientation step
+  ([learnings](learnings.md)).
 - Storage, categorization, import and UI docs describe what is implemented; receipt-reading describes only the engine interfaces. Their feature specs complete them.
 - `docs/README.md` is not written yet. The glossary has the catalog and import terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.

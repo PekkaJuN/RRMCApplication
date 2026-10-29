@@ -1,13 +1,16 @@
 # Feature: Model evaluation
 
 ## Overview
-- **Status:** Done
+- **Status:** Done (change: [Image orientation](#change-image-orientation-2026-10-29))
 - **Created:** 2026-10-28
 - **Updated:** 2026-10-28: approved by the user; detail files moved to one folder per variant
   (PC7, AC5, AC6), because several variants would write the same `<index>.json`; Plan added;
   AC12 covers OCR failures (`ocr_error`), approved by the user during implementation;
   audit: AC9 refuses repeated variants, AC12 adds `image_error`, new AC21 (exit code 3),
-  criteria compared on exact shares (approved by the user)
+  criteria compared on exact shares (approved by the user).
+  2026-10-29: images are turned upright before OCR, from EXIF and from Tesseract's
+  orientation detection, and `vision:` images from EXIF (PC4, PC7, AC22–AC26), after the
+  first real run; approved by the user
 - **Depends on:** [Project foundation](foundation.md), [Receipt import](receipt-import.md)
 - **Implements:** the comparison asked for by PRD open question 4 (Tesseract + text model
   against a vision model on 20–30 real receipts), measured against NFR-8 (3 minutes per
@@ -80,8 +83,28 @@ None (new). What exists:
   `t` and `a` are integer cents, `r` is true for a deposit refund line. The instructions in
   the prompt state the Finnish receipt rules of PRD FR-9. The prompt text is the same for
   both kinds of variant, apart from where the receipt comes from (OCR text or image).
-  Preprocessing for `ocr:` variants is grayscale, upscaling so the image is at least 1 500
-  pixels wide, and automatic contrast.
+  Preprocessing for `ocr:` variants, in this order:
+  1. **EXIF orientation:** the image is turned upright as its EXIF orientation tag (values
+     1–8) says. An image without the tag is left as it is; so is an image whose tag cannot
+     be read or has a value outside 1–8, which is recorded as no tag.
+  2. Grayscale, upscaling so the image is at least 1 500 pixels wide, and automatic contrast.
+  3. **Orientation detection:** Tesseract's orientation and script detection (OSD) runs on
+     the preprocessed image. When it reports a rotation of 90, 180 or 270 degrees with an
+     orientation confidence of at least `OSD_MIN_CONFIDENCE` (2.0, one constant in the
+     code), the image is rotated upright before OCR. A rotation of 0, a lower confidence, or
+     a failed detection (for example too little text) leaves the image as it is and is not
+     an error.
+
+  The time of all three steps counts in `seconds`. OSD catches images whose EXIF tag is
+  missing or wrong (scans, edited images, a phone held flat above the receipt). OSD needs
+  enough text: on synthetic receipts it failed with two lines and reported a confidence
+  below 1.5 with eight, but 2.5–4.6 with 20 or more lines, always with the right rotation.
+
+  For `vision:` variants only step 1 applies: an image whose EXIF orientation tag is 2–8 is
+  turned upright and sent in its own format (JPEG at quality 95, also for an MPO file, the
+  multi-picture JPEG of Ultra HDR phone photos; PNG lossless) with original colors and size
+  and its color profile kept; an image without the tag, or with tag 1, is sent as the
+  original file.
 - **PC5 Scoring.** For each receipt and variant (see [Metrics](#metrics)).
 - **PC6 Report.** At the end the tool prints, and saves as `summary.md` in the run folder,
   one row per variant with the aggregate metrics and whether the variant meets the
@@ -91,7 +114,11 @@ None (new). What exists:
   `<variant folder>/<index>.json` (the variant with `:` replaced by `-`, e.g.
   `ocr-qwen2.5-7b/1.json`; the index is the receipt's position in name order, the same for
   every variant) with the OCR text, the model's raw answer, the parsed answer, the scores and the times, so the user
-  can look at failures on their own computer. The run folder is under the evaluation folder,
+  can look at failures on their own computer. For `ocr:` variants it also holds
+  `"orientation": {"exif": <tag value or null>, "osd_rotation": <0, 90, 180 or 270>,
+  "osd_confidence": <number or null>}`; `osd_rotation` is the rotation applied, and
+  `osd_confidence` is `null` when the detection failed. `vision:` variants have
+  `"orientation": {"exif": <tag value or null>}`. The run folder is under the evaluation folder,
   which is ignored by Git.
 - **PC8 Running.** The tool runs in a Compose service `eval` (profile `eval`) built from the
   backend image, with the evaluation folder mounted and the settings file read as for the
@@ -237,6 +264,53 @@ preprocessed or Tesseract fails
 `"error": "model_error"`, `"error": "image_error"` or `"error": "ocr_error"`, and the run
 goes on
 
+### Orientation
+
+The images in these ACs are PNG files drawn with Pillow, so rotations are lossless and two
+images can be compared pixel for pixel.
+
+#### AC22: EXIF orientation
+**Given** an upright synthetic receipt image `U` (taller than wide), and the same image
+stored turned so that its EXIF orientation tag says 6 (also 3 and 8)
+**When** the turned image is preprocessed
+**Then** the result equals the preprocessed `U` pixel for pixel, and the detail file of an
+`ocr:` variant records `"exif": 6` (3, 8)
+
+#### AC23: No EXIF orientation
+**Given** an image without an EXIF orientation tag
+**When** it is preprocessed
+**Then** it is not turned (the result is grayscale, ≥ 1 500 pixels wide, with automatic
+contrast, as before this change), and the detail file records `"exif": null`
+
+#### AC24: Rotation from orientation detection
+**Given** OSD reports a rotation of 90 (also 180 and 270) with orientation confidence 5.0
+**When** an `ocr:` variant reads the receipt
+**Then** OCR receives the preprocessed image turned upright by that rotation, and the detail
+file records `"osd_rotation": 90, "osd_confidence": 5.0`
+**And**, with the real Tesseract, a synthetic receipt of 20 lines drawn upright (the first
+`MAITO 1,25`), turned 90 degrees and stored without an EXIF tag, gives OCR text that
+contains `MAITO` and `1,25`, and `osd_rotation` is 90 or 270
+
+#### AC25: Detection not used
+**Given** OSD reports a rotation of 90 with orientation confidence 1.5; or OSD reports a
+rotation of 0; or OSD fails (Tesseract exits with a non-zero code, or its output has no
+rotation)
+**When** an `ocr:` variant reads the receipt
+**Then** OCR receives the preprocessed image without a further turn, the detail file
+records `"osd_rotation": 0` and the reported confidence (`null` when OSD failed), no
+`ocr_error` is recorded, and the run goes on
+
+#### AC26: Vision image turned from EXIF
+**Given** a `vision:` variant, and a synthetic JPEG whose EXIF orientation tag is 6
+**When** the receipt is read
+**Then** the model receives a JPEG that, opened, has the upright size (height and width
+swapped against the stored image) and no orientation tag, and the detail file records
+`"orientation": {"exif": 6}`
+**Given** the same image without the tag
+**When** the receipt is read
+**Then** the model receives the original file bytes unchanged, and the detail file records
+`"orientation": {"exif": null}`
+
 ### Scoring
 
 #### AC13: Exact fields
@@ -327,6 +401,12 @@ no file name) and exits with code 3; detail files already written stay
   `--limit` and `--subset` keep the slow variants short.
 - **Validity:** 20–30 receipts give rough percentages (one receipt is 3–5 points). The
   decision criteria are a guide for the choice, not a guarantee.
+- **Orientation (AC22–AC25):** OSD can choose a wrong rotation on a receipt with little or
+  unusual text; the confidence limit keeps such cases unturned, and the detail file shows
+  what was applied, so a wrong turn can be found. OSD adds about one to two seconds per
+  receipt. It needs Tesseract's `osd` data, which is in the backend image
+  (`tesseract --list-langs` shows `osd`). Results of runs before this change are not
+  comparable for `ocr:` variants. Rollback: revert the change to `ocr.py`; nothing is stored.
 - **Rollback:** delete the package, the service and the setting; the evaluation folder is the
   user's and is never deleted by the tool or by an agent.
 - **Dependencies:** Tesseract (backend image), Ollama with the models the user pulls.
@@ -342,6 +422,10 @@ no file name) and exits with code 3; detail files already written stay
 | AC7 | `select_receipts` | limit, full subset | five receipts | select | as in AC7 | none |
 | AC8, AC9 | `parse_variant` | cloud, malformed, valid | values of AC8, AC9 | parse | error text, or kind and model | none |
 | AC5 | `preprocess` | small image | 600 px wide synthetic image | preprocess | grayscale, ≥ 1 500 px wide | none |
+| AC22, AC23 | `preprocess` | EXIF 3, 6, 8; no tag; tag 0 or 9; broken EXIF | synthetic PNG and JPEG with and without the tag | preprocess | equal to the preprocessed upright image with its top up; untouched otherwise; tag value reported, `null` for no, invalid or broken tag | none |
+| AC24, AC25 | `TesseractOcr.orient` | rotation 90/180/270 at confidence 5.0; confidence 2.0 (the limit); confidence 1.5; NaN; rotation 0; OSD exit code 1; output without rotation; exception | fake run command answering OSD | orient | image passed to OCR turned or not; orientation values as in the ACs; no error | fake `RunCommand` |
+| AC22–AC25 | `run_evaluation` | detail file | fake `Ocr` reporting an orientation | run | `orientation` object in `ocr:` detail files | fake OCR, fake model |
+| AC26 | `upright_original`, `run_evaluation` | JPEG and MPO with tag 6; JPEG with a color profile; JPEG without tag, with tag 1, 0 or 9; broken EXIF; unreadable image | synthetic JPEG | run a `vision:` variant | turned JPEG without tag and with the profile, or the original bytes; `orientation` in the detail file; `image_error` | fake model |
 | AC5, AC6 | `OllamaReader` | request body | fake HTTP transport | read OCR text; read image | model, `format`, `options.temperature` 0, prompt, `images` base64 | `httpx2.MockTransport` |
 | AC10 | `check_models` | unreachable, missing | fake transport | check | messages of AC10 | `httpx2.MockTransport` |
 | AC11, AC12 | `parse_answer`, `run_variant` | not JSON, missing `t`, HTTP error, timeout | fake model | run | invalid; error recorded; next receipt runs | fake model |
@@ -355,6 +439,7 @@ no file name) and exits with code 3; detail files already written stay
 | AC | Scenario | Input | Expected output |
 |---|---|---|---|
 | AC5 | real Tesseract on a synthetic receipt image drawn with Pillow (`MAITO 1,25`, `YHTEENSÄ 1,25`) | `ocr:` variant with a fake model | OCR text contains `MAITO` and `1,25`; marked `tesseract`, runs in the backend container |
+| AC24 | real Tesseract OSD on a 20-line synthetic receipt turned 90 degrees, without an EXIF tag | `TesseractOcr.orient` after `preprocess`, then `read` | OCR text contains `MAITO` and `1,25`; `osd_rotation` is 90 or 270; marked `tesseract` |
 | AC1–AC18 | CLI end to end with fakes | `python -m evaluation init` and `run` on a temp folder | exit codes, files and output as in the ACs |
 | AC20 | ignore rules | `git check-ignore` | ignored (in `scripts/container-tests.ps1`) |
 
@@ -382,7 +467,8 @@ None: the tool has no UI.
 - Development rules: `AGENTS.md` (Guardrails, Privacy and security)
 
 ## Open Questions
-None.
+None. (2026-10-29: the user chose to turn `vision:` images upright from EXIF too, AC26;
+results of earlier `vision:` runs are therefore not comparable either.)
 
 ## Plan
 
@@ -621,5 +707,91 @@ against this spec; its findings were checked in the code before acting on them.
   the AC18 test uses the spec's marker `SECRET-CONTENT`; `python -m evaluation` is tested
   end to end. `pip-audit` is not installed in the backend image and was not run.
 - Later: phone photos are not turned upright from their EXIF orientation before OCR; check
-  this after the first real run. An invalid answer gets `names` 0.0, while a valid answer
+  this after the first real run (done: see below). An invalid answer gets `names` 0.0, while a valid answer
   with no amount match is left out of the `names` mean, as the Metrics table says.
+
+## Change: Image orientation (2026-10-29)
+
+- **Why:** the first real run (25 phone photos) gave every `ocr:` variant 0 % `total` and
+  `date`, while `vision:qwen2.5vl:7b` had 100 % `total` on five receipts. All 25 photos carry
+  EXIF orientation 6, and `preprocess` dropped the tag, so Tesseract read the receipts on
+  their side: nine OCR texts were empty and most others had only a few digits. Checked from
+  image metadata and OCR text lengths only.
+- **Changes:** PC4 (EXIF turn and OSD; EXIF turn for `vision:`), PC7 (`orientation` in
+  detail files), AC22–AC26, test rows, a Risk entry. AC5's OCR now gets the image after OSD;
+  the other ACs are unchanged.
+- **Status:** spec change approved by the user 2026-10-29; Plan and Tasks approved the same day.
+
+### Plan
+
+| Part | File | Contents | ACs |
+|---|---|---|---|
+| O1 EXIF | `backend/evaluation/ocr.py` | `exif_orientation(image) -> int \| None` (tag `0x0112`); `preprocess` calls `ImageOps.exif_transpose` before grayscale; `upright_original(image) -> bytes` returns the original bytes for no tag or tag 1, otherwise the turned image in its own format (JPEG quality 95, PNG) | AC22, AC23, AC26 |
+| O2 OSD | `backend/evaluation/ocr.py` | `Oriented(image, osd_rotation, osd_confidence)`; `Ocr.orient(image) -> Oriented` next to `read`; `TesseractOcr.orient` runs `tesseract stdin stdout --psm 0`, reads `Rotate:` and `Orientation confidence:`, and turns the image clockwise by `Rotate` degrees (Pillow `rotate(-rotation, expand=True)`, saved as PNG) when the rotation is 90, 180 or 270 and the confidence ≥ `OSD_MIN_CONFIDENCE` (2.0); an exception, a non-zero exit or missing values give `Oriented(image, 0, None)` | AC24, AC25 |
+| O3 Runner | `backend/evaluation/runner.py` | `ocr:` path: `exif_orientation`, `preprocess`, `ocr.orient`, `ocr.read(oriented.image)`; `vision:` path: `upright_original`, an unreadable image is `image_error`; `orientation` in the detail file | AC22–AC26 |
+
+`read` keeps its signature, so OCR and its tests stay as they are; `orient` is a separate
+step that the runner calls. The direction of `Rotate` was checked with the real Tesseract on
+synthetic images: an image turned 90 degrees counterclockwise reports `Rotate: 90`, and
+turning it 90 degrees clockwise puts it upright.
+
+### Tasks
+
+Each task follows Red → Green → Refactor and ends with backend tests, lint, format and type
+checks passing.
+
+- [x] **T17 EXIF in preprocessing** (AC22, AC23). `exif_orientation`, `exif_transpose` in
+  `preprocess`. Proof: `test_eval_ocr.py` — PNGs with tags 3, 6, 8 equal the preprocessed
+  upright image; no tag gives `None` and the old result.
+- [x] **T18 OSD** (AC24, AC25). `Oriented`, `Ocr.orient`, `TesseractOcr.orient`,
+  `OSD_MIN_CONFIDENCE`. Proof: `test_eval_ocr.py` with `FakeRun` for 90/180/270 at 5.0,
+  1.5, 0, exit code 1, output without values, and an exception; `test_eval_tesseract.py`
+  (marker `tesseract`) for the 20-line receipt turned 90 degrees.
+- [x] **T19 Vision image** (AC26). `upright_original`. Proof: `test_eval_ocr.py` — JPEG with
+  tag 6 comes back upright without the tag; without the tag the bytes are unchanged.
+- [x] **T20 Runner** (AC22–AC26). Detail file `orientation`; `FakeOcr.orient` in
+  `eval_fakes.py`. Proof: `test_eval_runner.py`.
+- [x] **T21 Documentation and check.** `docs/development.md`, `docs/learnings.md`,
+  `specs/README.md`; all backend checks, `pytest -m tesseract`, coverage of `evaluation`
+  ≥ 90 %. Then the user reruns the evaluation.
+
+### Files to Modify
+
+| File | Change |
+|---|---|
+| `backend/evaluation/ocr.py` | `exif_orientation`; EXIF turn in `preprocess`; `upright_original`; `Oriented`, `Ocr.orient` and `TesseractOcr.orient` with `OSD_MIN_CONFIDENCE` |
+| `backend/evaluation/runner.py` | `ocr:` path through `orient`; `vision:` path through `upright_original` (unreadable image: `image_error`); `orientation` in detail files |
+| `backend/tests/evaluation/test_eval_ocr.py`, `test_eval_tesseract.py`, `test_eval_runner.py`, `eval_fakes.py` | Tests for AC22–AC26 |
+| `docs/development.md` | Model evaluation: images are turned upright (EXIF, then OSD); `orientation` in detail files |
+| `docs/learnings.md` | Entry: phone photos read on their side |
+| `specs/README.md` | Status of this spec |
+| `docs/content-plan.md` | Note that the orientation change is audited and that receipt reading needs it too |
+
+### Audit
+
+Audited 2026-10-29, verdict PASS after one fix cycle. An independent reviewer read the code
+against this change; its findings were checked in the container before acting on them.
+
+- Acceptance criteria: AC22–AC26 met, each with tests whose names carry the AC ID; the
+  earlier AC1–AC21 are unchanged and their tests pass.
+- Tests: backend 500 passed, `pytest -m tesseract` 2 passed; coverage of
+  `backend/evaluation/` 98 % with branches (`ocr.py` 99 %, the uncovered line is the
+  subprocess call; `runner.py` 100 %). Lint, format and type checks clean. Frontend
+  unchanged.
+- Fixed from the review:
+  - an MPO file (Ultra HDR phone photo) with an EXIF turn was sent to a `vision:` model as
+    PNG; it is now JPEG;
+  - the color profile was dropped when a `vision:` image was turned; it is now kept;
+  - an EXIF value outside 1–8 was recorded and made `upright_original` re-encode the image;
+    it now counts as no tag (PC4 says so);
+  - an OSD confidence of NaN would have turned the image and written invalid JSON; it now
+    counts as failed OSD;
+  - tests now check that the top of the image is up (a constant extra turn would have
+    passed before) and the confidence limit 2.0 itself;
+  - test rows and Files to Modify named `TesseractOcr.read` instead of `orient`.
+- Not reproduced: the reviewer expected broken EXIF data to stop the run. Pillow 13 skips
+  it in ten synthetic cases (garbage, short and truncated headers, bad offsets and counts,
+  wrong tag types); a regression test keeps it so (`test_ac23_broken_exif_counts_as_no_tag`).
+- Security: no new output to the screen or `summary.md`; detail files gain only numbers.
+  Pillow's warning `Corrupt EXIF data` goes to stderr without file names or content.
+  `pip-audit` is not installed in the backend image and was not run; no dependency changed.
