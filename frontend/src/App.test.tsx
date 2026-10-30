@@ -8,6 +8,7 @@ import { App } from "./App";
 import { fi } from "./i18n/fi";
 import { defaultItems, fakeCatalog } from "./test/catalog";
 import { IDLE } from "./test/imports";
+import { RECEIPT_A, SUMMARY_A, SUMMARY_B } from "./test/receipts";
 import { server } from "./test/server";
 
 const HEALTHY: Health = {
@@ -60,13 +61,14 @@ it("AC25: shows the heading, the navigation and the status line", async () => {
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
 });
 
-// The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti".
+// The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti" and
+// receipt-review PC7 "Kuitit".
 it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   render(<App />);
 
   const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
   const links = within(navigation).getAllByRole("link");
-  expect(links.map((link) => link.textContent)).toEqual(["Tuotteet", "Tuonti"]);
+  expect(links.map((link) => link.textContent)).toEqual(["Tuotteet", "Tuonti", "Kuitit"]);
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
   expect(within(main).getByRole("heading", { name: "Tuotteet" })).toBeInTheDocument();
@@ -122,4 +124,63 @@ it("AC25: the page is Finnish and the tab title is Kuittisovellus", () => {
 
   expect(page.documentElement.lang).toBe("fi");
   expect(page.title).toBe("Kuittisovellus");
+});
+
+// Receipt review spec: the Kuitit page and one receipt.
+
+function receiptAnswers() {
+  server.use(
+    http.get("/api/receipts", () => HttpResponse.json([SUMMARY_B, SUMMARY_A])),
+    http.get("/api/receipts/3", () => HttpResponse.json(RECEIPT_A)),
+  );
+}
+
+it("AC20: the Kuitit link opens the receipt list", async () => {
+  receiptAnswers();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Kuitit" }));
+
+  const main = screen.getByRole("main");
+  expect(within(main).getByRole("heading", { name: "Kuitit" })).toBeInTheDocument();
+  expect(await within(main).findByRole("table", { name: "Kuittilista" })).toBeInTheDocument();
+  expect(within(navigation).getByRole("link", { name: "Kuitit" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  expect(window.location.pathname).toBe("/kuitit");
+});
+
+it("AC22: a receipt opens from the list and the back link returns", async () => {
+  receiptAnswers();
+  window.history.replaceState(null, "", "/kuitit");
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(await screen.findByRole("link", { name: "5.10.2026" }));
+
+  expect(window.location.pathname).toBe("/kuitit/3");
+  expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
+  expect(await screen.findByText("Testikauppa")).toBeInTheDocument();
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+  expect(within(navigation).getByRole("link", { name: "Kuitit" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await user.click(screen.getByRole("link", { name: "Takaisin kuittilistaan" }));
+
+  expect(window.location.pathname).toBe("/kuitit");
+  expect(await screen.findByRole("table", { name: "Kuittilista" })).toBeInTheDocument();
+});
+
+it("AC22: a reload at /kuitit/<id> shows the receipt", async () => {
+  receiptAnswers();
+  window.history.replaceState(null, "", "/kuitit/3");
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
+  expect(await screen.findByText("Testikauppa")).toBeInTheDocument();
 });

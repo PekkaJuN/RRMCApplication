@@ -1,15 +1,15 @@
 # Data Model
 
-- **Status:** In Progress (catalog, receipts with their read data, and receipt lines with
-  their categories implemented)
-- **Updated:** 2026-10-30
+- **Status:** In Progress (catalog, receipts with their read data and review state, and
+  receipt lines with their categories implemented)
+- **Updated:** 2026-10-31
 
 ## Overview
 
 The app keeps all its data in one SQLite database. This document describes the schema and
 how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
-categories and products), the imported receipts with what was read from them, and their
-lines with their categories.
+categories and products), the imported receipts with what was read from them and their
+review state, and their lines with their categories.
 
 ## Where the database is
 
@@ -86,6 +86,7 @@ One row per imported receipt image ([import](subsystems/import/README.md)), with
 | `purchase_date` | `TEXT`, `CHECK` shape `YYYY-MM-DD` | Purchase date; `NULL` when the model's date was not a real date (the user fixes it in review) |
 | `total_cents` | `INTEGER` | Receipt total in integer cents (NFR-6) |
 | `ocr_text` | `TEXT` | The raw Tesseract output, so the receipt can be re-parsed without OCR (FR-10) |
+| `reviewed` | `INTEGER NOT NULL DEFAULT 0`, `0` or `1` | Review state (FR-21): 0 unreviewed, 1 confirmed by the user. Receipts stored before migration `0005` are unreviewed ([review](subsystems/review/README.md)) |
 
 A failed import stores no row, so the image can be retried (FR-4).
 
@@ -129,9 +130,9 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are four, `0001_catalog.sql`,
-  `0002_receipts.sql`, `0003_receipt_reading.sql` and `0004_line_categories.sql`, so the
-  schema version is 4.
+  (four digits, then a short name). Today there are five, `0001_catalog.sql`,
+  `0002_receipts.sql`, `0003_receipt_reading.sql`, `0004_line_categories.sql` and
+  `0005_receipt_review.sql`, so the schema version is 5.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
@@ -149,6 +150,8 @@ erDiagram
 - [categorization](subsystems/categorization/README.md) — the rules on top of the catalog
   tables, and the line categories
 - [import](subsystems/import/README.md) — creates the receipt and line rows
+- [review](subsystems/review/README.md) — reads receipts and lines for the review UI and
+  sets the review state
 - [receipt-reading](subsystems/receipt-reading/README.md) — produces the read data
 
 ## Related Documents
@@ -160,4 +163,5 @@ erDiagram
 - [Receipt reading spec](../specs/features/receipt-reading.md): the read columns and
   `receipt_lines`
 - [Categorization spec](../specs/features/categorization.md): the line category columns
+- [Receipt review spec](../specs/features/receipt-review.md): the `reviewed` column
 - [development.md](development.md#running-the-app): where the data lives when the app runs

@@ -39,7 +39,7 @@ def test_ac13_migration_3_adds_read_fields_and_lines(db: sqlite3.Connection) -> 
     receipt_columns = [row["name"] for row in db.execute("PRAGMA table_info(receipts)")]
     line_columns = [row["name"] for row in db.execute("PRAGMA table_info(receipt_lines)")]
 
-    assert receipt_columns == [
+    assert receipt_columns[:8] == [
         "id",
         "image_hash",
         "file_name",
@@ -195,7 +195,7 @@ def test_ac22_existing_lines_have_no_category(tmp_path: Path) -> None:
     add_line(connection, receipt_id, position=2, name="Limu", amount=224)
 
     # When migration 4 runs
-    assert migrate(connection, MIGRATIONS_DIR) == [4]
+    assert migrate(connection, MIGRATIONS_DIR)[0] == 4
 
     # Then both lines keep their data and have no category, source or product
     rows = connection.execute(

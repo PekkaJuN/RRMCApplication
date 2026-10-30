@@ -23,6 +23,11 @@ gives the Finnish word the user sees.
 | Category source | — | Where a line's category came from: `remembered` (the line's product), `model` (the model's suggestion) or `user` (the user chose it); none when the line has no category (FR-15, [categorization](subsystems/categorization/README.md#line-categorization)) |
 | Linked line | — | A line that follows a product: its category came from the product or from the user's correction. When the product's category changes, the line moves with it (FR-36). A model suggestion never links a line |
 | Suggestion | — | The category the model chose for a line whose name matches no product; it is not remembered as a product |
+| Line sum | rivien summa | The sum of a receipt's line amounts, deposit refunds included; compared with the receipt total (FR-20, [calculation](subsystems/calculation/README.md#rules)) |
+| Difference | erotus | The receipt total minus the line sum; unknown without a total |
+| Sum warning | summavaroitus | Shown when the difference is not 0 or the receipt has no total (FR-20) |
+| Category subtotal | välisumma | The sum of a receipt's lines in one category; deposit refunds are in none, lines without a category form their own subtotal (FR-19, FR-44) |
+| Review state | tarkistustila | `unreviewed` (tarkistamaton) or `confirmed` (vahvistettu); the user confirms a receipt after checking it and can cancel the confirmation (FR-21) |
 | OCR text | — | The raw text Tesseract read from the image; stored with the receipt so it can be re-parsed (FR-10) |
 | Import run | tuonti, tuontiajo | One press of "Tuo kuitit": the files in the import folder at that moment are processed in the background ([import](subsystems/import/README.md)) |
 | Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |

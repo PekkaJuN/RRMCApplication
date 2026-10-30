@@ -78,3 +78,59 @@ test("receipt-reading AC24b, AC27: a receipt that cannot be read is reported", a
   await expect(report.getByText("Tuotu: 0")).toBeVisible();
   await expect(report.getByText("Epäonnistui: 1")).toBeVisible();
 });
+
+// Receipt review AC31. The fake reader gives every image Testikauppa, 5.10.2026, Maito 1,25 €
+// and Limu 2,24 €, total 3,49 €. The database lives as long as backend-e2e, so an earlier run
+// may already have remembered Maito.
+test("receipt-review AC31: review, correct and confirm an imported receipt", async ({ page }) => {
+  await writeFile(
+    join(importDir, `kuitti-${RUN}_tarkistus.jpg`),
+    Buffer.concat([SYNTHETIC_JPEG, Buffer.from(" review")]),
+  );
+  const navigation = page.getByRole("navigation", { name: "Päävalikko" });
+  await page.goto("/tuonti");
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+  const report = page.getByRole("region", { name: "Edellinen tuonti" });
+  await expect(report.getByText("Tuotu: 1")).toBeVisible();
+
+  await navigation.getByRole("link", { name: "Kuitit" }).click();
+  // Same-date receipts list the newest import first, so the first one is this run's.
+  await page
+    .getByRole("table", { name: "Kuittilista" })
+    .getByRole("link", { name: "5.10.2026" })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Kuitti", exact: true })).toBeVisible();
+
+  const milk = page.getByRole("combobox", { name: "Kategoria: Maito" });
+  await expect(milk).toBeEnabled();
+  const current = await milk.locator("option:checked").textContent();
+  const chosen = current === "Maitotuotteet" ? "Juomat" : "Maitotuotteet";
+  await milk.selectOption({ label: chosen });
+
+  await expect(milk.locator("option:checked")).toHaveText(chosen);
+  const milkRow = page
+    .getByRole("table", { name: "Kuittirivit" })
+    .getByRole("row")
+    .filter({ has: page.getByText("Maito", { exact: true }) });
+  await expect(milkRow.getByText("ehdotus")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Vahvista" }).click();
+  await expect(page.getByText("Vahvistettu")).toBeVisible();
+
+  await page.getByRole("link", { name: "Takaisin kuittilistaan" }).click();
+  const firstRow = page
+    .getByRole("table", { name: "Kuittilista" })
+    .getByRole("row")
+    .filter({ has: page.getByRole("link", { name: "5.10.2026" }) })
+    .first();
+  await expect(firstRow).toContainText("Vahvistettu");
+
+  await navigation.getByRole("link", { name: "Tuotteet" }).click();
+  const productRow = page
+    .getByRole("table", { name: "Tuotelista" })
+    .getByRole("row")
+    .filter({ has: page.getByText("Maito", { exact: true }) });
+  await expect(productRow).toContainText(chosen);
+});

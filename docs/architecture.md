@@ -1,8 +1,8 @@
 # System Architecture
 
-- **Status:** In Progress (foundation, the catalog part of categorization and import without
-  reading implemented; the other feature subsystems are target design)
-- **Updated:** 2026-10-28
+- **Status:** In Progress (foundation, categorization, import with reading, and receipt
+  review with the receipt check implemented; totals and export are target design)
+- **Updated:** 2026-10-31
 
 ## Overview
 
@@ -18,8 +18,9 @@ them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature i
 [api-reference.md](api-reference.md).
 
 The foundation (containers, settings, storage, engine interfaces, health, app shell) exists,
-and so do the catalog part of categorization with the Tuotteet page and import (without the
-reading step) with the Tuonti page. The other feature subsystems are still the target design (see the greenfield rule in
+and so do categorization with the Tuotteet page, import with reading and categorization with
+the Tuonti page, and receipt review with the Kuitit and receipt pages. Totals, export and
+line editing are still the target design (see the greenfield rule in
 [AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
@@ -55,6 +56,8 @@ backend/                 FastAPI app and all processing
     receipt_import/      import runs: file rules, moves, background run, routes
     engines/             OcrEngine and ReceiptModel: real implementations and fakes
     health/              GET /api/health and loading the model at start
+    calculation/         sums in integer cents: the receipt check and category subtotals
+    review/              receipt endpoints: list, receipt view, image, category choice, review state
     <subsystem>/         one package per feature subsystem (see Component map)
   evaluation/            development tool, not part of the app: compares reading variants
                          on the user's receipts (python -m evaluation)
@@ -93,6 +96,11 @@ flowchart LR
   API --> IMP[import]
   API --> CAT[categorization]
   API --> CALC[calculation]
+  API --> REV[review]
+  REV --> CAT
+  REV --> CALC
+  REV --> ST
+  REV --> FS
   API --> EXP[export]
   IMP --> RR[receipt-reading]
   IMP --> CAT
@@ -115,6 +123,7 @@ flowchart LR
 | **receipt-reading** | Preprocess the image, run OCR, turn the OCR text into a validated structured receipt (store, date, lines, total) with Finnish receipt rules; re-parse stored OCR text | Assign categories or write to the database | FR-6–FR-10 |
 | **categorization** | The catalog (groups, categories, products, name normalization, default list) and the assignment of a category to each line: remembered product first, then the model; record the category source; learn from user corrections | Calculate totals | FR-11–FR-15, FR-33–FR-39, FR-43 |
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
+| **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, the review state | Calculate sums or remember categories itself | FR-16–FR-21 (backend) |
 | **export** | Exporter interface and the CSV exporter; later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
 | **ui** | Pages: receipts list, receipt review (image beside an editable table), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, NFR-15 |
 
@@ -131,7 +140,9 @@ The `health` package reports the state of the database, the image folders, OCR a
 - Only **storage** runs SQL. Other subsystems use its repositories.
 - Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`;
   `categorization` → `storage` and the read line type of `receipt-reading`;
-  `export` → `calculation` → `storage`. No subsystem depends on `import` or `export`.
+  `export` → `calculation` → `storage`; `review` → `calculation`, `categorization`,
+  `storage`. `calculation` does no I/O and depends on nothing. No subsystem depends on
+  `import`, `export` or `review`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
   the interfaces below. The exception is **health**, which calls only the interfaces'
   availability checks (`check()`) and the model's `load()`.
@@ -191,12 +202,16 @@ sequenceDiagram
 
 ### Review and correction
 
+Implemented for the category choice and the review state
+([review](subsystems/review/README.md)); line editing (FR-18, FR-43) comes with its spec.
+
 1. The UI loads a receipt with its lines, categories and subtotals, and the image through an
-   API endpoint (images are not served from the import folders directly).
-2. An edit is sent to the API. Categorization stores a changed category as the product's
-   remembered category and moves the product's other lines with it (FR-13, FR-36;
-   `LineCategoryService`, implemented), and links renamed lines to products (FR-43).
-3. Calculation returns updated subtotals and the sum check (FR-19, FR-20). The UI shows them.
+   API endpoint, which finds the file by its stored name in the done folder only.
+2. A category choice is sent to the API. Categorization stores it as the product's
+   remembered category and moves the product's other lines with it (FR-13, FR-36). Renamed
+   lines will be linked to products (FR-43) by the line editing spec.
+3. The answer is the whole receipt with the subtotals and the sum check from calculation
+   (FR-19, FR-20). The UI shows it.
 
 ### Totals and export
 
@@ -276,10 +291,12 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
   preprocessing, OCR and parsing
 - [categorization](subsystems/categorization/README.md) — the catalog (groups, categories,
   products, names, default list), line categories at import, user corrections and FR-36
-- calculation: `docs/subsystems/calculation/README.md` (not written yet)
+- [calculation](subsystems/calculation/README.md) — the receipt check and category
+  subtotals; weekly and monthly totals come with the totals spec
+- [review](subsystems/review/README.md) — the receipt endpoints of the review UI
 - export: `docs/subsystems/export/README.md` (not written yet)
 - [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
-  Tuotteet and Tuonti pages
+  Tuotteet, Tuonti, Kuitit and receipt pages
 
 ## Related Documents
 
@@ -291,6 +308,7 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [ADR 0003: Receipt reading model](adr/0003-receipt-reading-model.md)
 - [ADR 0004: Line categorization](adr/0004-line-categorization.md)
 - [Categorization spec](../specs/features/categorization.md)
+- [Receipt review spec](../specs/features/receipt-review.md)
 - [Foundation spec](../specs/features/foundation.md)
 - [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),
   [development.md](development.md)

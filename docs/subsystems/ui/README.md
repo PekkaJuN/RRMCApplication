@@ -1,6 +1,6 @@
 # UI
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
 
 ## Overview
 
@@ -8,14 +8,19 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and two pages: **Tuotteet** for groups, categories and
-products, and **Tuonti** for importing receipt images. The app opens on Tuotteet.
+reports the backend's health) and four pages: **Tuotteet** for groups, categories and
+products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, and the
+**receipt page** for one receipt. The app opens on Tuotteet.
 
-Two pages do not justify a router library. @frontend/src/navigation.ts maps the address to a
-page (`/tuonti` → Tuonti, any other path → Tuotteet) and switches pages with the History API.
-The navigation links are real links (`/` and `/tuonti`); a plain left click is handled in the
-page without reloading, the current link has `aria-current="page"`, the back button works,
-and a reload keeps the page because Vite answers every path with `index.html`.
+A few pages do not justify a router library. @frontend/src/navigation.ts maps the address to
+a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` → Kuitit,
+`/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
+`/kuitit/...` → Kuitit, any other path → Tuotteet. `usePage()` returns the page, `go(page,
+receiptId?)` and the open receipt's id. The navigation links are real links (`/`, `/tuonti`,
+`/kuitit`), and so are the date links of the list and the back link of a receipt; a plain
+left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
+has `aria-current="page"` (Kuitit also on a receipt), the back button works, and a reload
+keeps the page because Vite answers every path with `index.html`.
 
 ## Key Files and Entry Points
 
@@ -25,6 +30,9 @@ and a reload keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/navigation.ts — `usePage()`, `pageFromPath()`, `PAGE_PATHS`
 - @frontend/src/components/ImportPage.tsx — the Tuonti page: the "Tuo kuitit" button,
   progress, and the report of the latest run
+- @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the receipt list
+- @frontend/src/components/ReceiptPage.tsx — one receipt: header, review state, warning,
+  image beside the line table with category dropdowns, line sum and subtotals
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -40,6 +48,11 @@ and a reload keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/catalog.ts — typed catalog client and the `CatalogItem` and `Product`
   types
 - @frontend/src/api/imports.ts — `getImport()`, `startImport()` and the `ImportState` type
+- @frontend/src/api/receipts.ts — `listReceipts()`, `getReceipt()`, `setLineCategory()`,
+  `setReviewed()`, `receiptImageUrl()` and the receipt types
+- @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator) and
+  `formatDate()` (`2026-10-05` → `5.10.2026`), with integer arithmetic and string splitting
+  only
 - @frontend/src/i18n/fi.ts — every Finnish UI text
 - @frontend/index.html — `lang="fi"`, title `Kuittisovellus`
 
@@ -75,6 +88,23 @@ backend's message, so new reasons need no UI change. The texts are in the
 [receipt import spec](../../../specs/features/receipt-import.md#ui-texts-tuonti-page) and the
 [receipt-reading spec](../../../specs/features/receipt-reading.md#ui-texts-tuonti-page-added).
 
+On the Kuitit page the list is loaded when the page opens; missing date, store and total
+show `–`. A list that cannot be loaded shows the error with `role="alert"`.
+
+The receipt page loads the receipt and the categories in parallel. The backend computes the
+line sum, warning and subtotals; the page only shows them. A category choice and the
+confirmation each send one `PATCH`, and the page shows the receipt from the answer, so
+subtotals, marks and other lines of the same product update without a reload (FR-19).
+While a change waits, every dropdown and the confirmation button are disabled, so answers
+cannot arrive out of order. A refused choice shows its message next to its line, a refused
+confirmation next to the button (`role="alert"`), and the old values stay. A model
+suggestion shows the mark `ehdotus`; a deposit refund shows `Pantinpalautus` and no
+dropdown. An image that cannot be loaded (the `img` gets an error, for example the 404
+`image_missing`) is replaced by `Kuvaa ei löydy valmiiden kansiosta.`; the image and the
+table sit side by side through inline flex styles that wrap on a narrow window, since the
+app has no stylesheet. The texts are in the
+[receipt review spec](../../../specs/features/receipt-review.md#ui-texts).
+
 ## Data Flow
 
 The browser loads the UI from Vite and calls `/api/...` on the same origin. Vite forwards
@@ -91,6 +121,9 @@ the UI never needs the backend's port.
 None yet.
 
 ## Known Issues and Gotchas
+
+- Receipt fixtures (@frontend/src/test/receipts.ts) use the ids of `defaultItems()`, so a
+  receipt page test answers `GET /api/categories` with `ITEMS` from the same file.
 
 - Component tests mock the API with MSW at the network level (@frontend/src/test/); a request
   without a handler fails the test. MSW 3 calls this option `onUnhandledFrame`.
@@ -115,4 +148,5 @@ None yet.
 - [Product management spec](../../../specs/features/product-management.md) PC9
 - [Receipt import spec](../../../specs/features/receipt-import.md) PC11
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
+- [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
 - [development.md](../../development.md#code-standards): TypeScript and React rules

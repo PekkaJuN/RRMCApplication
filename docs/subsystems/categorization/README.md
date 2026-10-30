@@ -123,9 +123,10 @@ The model request (`ModelSuggester`) uses `ReceiptModel.generate`:
 - With `RRMC_ENGINES=fake`, `FakeSuggester` suggests the first option (`Auto > Autohuolto`
   with the default list) for every name.
 
-A user correction (`LineCategoryService.set_category`), in one transaction. The two
-repositories must share one connection, because the transaction is opened on the
-catalog's:
+A user correction (`LineCategoryService.set_category`), in one transaction. The UI reaches
+it through `PATCH /api/receipts/{id}/lines/{line_id}`
+([review](../review/README.md)). The two repositories must share one connection, because
+the transaction is opened on the catalog's:
 
 1. The line must exist, the category must be a category, and the line must not be a deposit
    refund.

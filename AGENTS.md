@@ -61,6 +61,7 @@ project root; every command runs in a container and needs `.env` (see
 | Backend tests | `docker compose run --rm backend pytest` | verified |
 | Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
 | Backend type check | `docker compose run --rm backend pyright` | verified |
+| Backend dependency audit | `docker compose run --rm backend pip-audit` | verified |
 | Frontend tests | `docker compose run --rm frontend npm test` | verified |
 | Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
 | Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |

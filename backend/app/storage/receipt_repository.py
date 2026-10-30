@@ -10,8 +10,8 @@ from app.storage.db import transaction
 type CategorySource = Literal["remembered", "model", "user"]
 
 _RECEIPT_SELECT = (
-    "SELECT id, image_hash, file_name, imported_at, store, purchase_date, total_cents, ocr_text"
-    " FROM receipts"
+    "SELECT id, image_hash, file_name, imported_at, store, purchase_date, total_cents, ocr_text,"
+    " reviewed FROM receipts"
 )
 
 
@@ -30,6 +30,19 @@ class ReceiptRow:
     purchase_date: str | None = None
     total_cents: int | None = None
     ocr_text: str | None = None
+    reviewed: bool = False
+
+
+@dataclass(frozen=True)
+class ReceiptSummaryRow:
+    """A receipt as listed, with the sum of its line amounts (0 without lines)."""
+
+    id: int
+    store: str | None
+    purchase_date: str | None
+    total_cents: int | None
+    reviewed: bool
+    line_sum_cents: int
 
 
 @dataclass(frozen=True)
@@ -45,6 +58,7 @@ class LineCategory:
 class LineRow:
     """A line as listed with its receipt; the category fields are None without a category."""
 
+    id: int
     position: int
     name: str
     amount_cents: int
@@ -81,6 +95,7 @@ def _receipt(row: sqlite3.Row) -> ReceiptRow:
         purchase_date=row["purchase_date"],
         total_cents=row["total_cents"],
         ocr_text=row["ocr_text"],
+        reviewed=bool(row["reviewed"]),
     )
 
 
@@ -133,8 +148,9 @@ class ReceiptRepository:
         *,
         is_deposit_refund: bool,
         category: LineCategory | None = None,
-    ) -> None:
-        self._connection.execute(
+    ) -> int:
+        """Store a line and return its id."""
+        cursor = self._connection.execute(
             "INSERT INTO receipt_lines (receipt_id, position, name, amount_cents,"
             " is_deposit_refund, category_id, category_source, product_id)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -147,6 +163,8 @@ class ReceiptRepository:
                 *_category_values(category),
             ),
         )
+        assert cursor.lastrowid is not None  # noqa: S101 - set by every successful INSERT
+        return cursor.lastrowid
 
     def get_line(self, line_id: int) -> StoredLine | None:
         row = self._connection.execute(
@@ -176,6 +194,39 @@ class ReceiptRepository:
             (*_category_values(category), line_id),
         )
 
+    def get(self, receipt_id: int) -> ReceiptRow | None:
+        row = self._connection.execute(_RECEIPT_SELECT + " WHERE id = ?", (receipt_id,)).fetchone()
+        return _receipt(row) if row else None
+
+    def set_reviewed(self, receipt_id: int, *, reviewed: bool) -> bool:
+        """Set the review state (FR-21). False when the receipt does not exist."""
+        cursor = self._connection.execute(
+            "UPDATE receipts SET reviewed = ? WHERE id = ?", (int(reviewed), receipt_id)
+        )
+        return cursor.rowcount == 1
+
+    def summaries(self) -> list[ReceiptSummaryRow]:
+        """Every receipt with its line sum: receipts without a purchase date first, then the
+        newest date first; the newest import first within a date (receipt-review PC1)."""
+        rows = self._connection.execute(
+            "SELECT receipts.id, store, purchase_date, total_cents, reviewed,"
+            " COALESCE(SUM(receipt_lines.amount_cents), 0) AS line_sum_cents"
+            " FROM receipts LEFT JOIN receipt_lines ON receipt_lines.receipt_id = receipts.id"
+            " GROUP BY receipts.id"
+            " ORDER BY purchase_date IS NOT NULL, purchase_date DESC, receipts.id DESC"
+        )
+        return [
+            ReceiptSummaryRow(
+                id=row["id"],
+                store=row["store"],
+                purchase_date=row["purchase_date"],
+                total_cents=row["total_cents"],
+                reviewed=bool(row["reviewed"]),
+                line_sum_cents=row["line_sum_cents"],
+            )
+            for row in rows
+        ]
+
     def get_by_hash(self, image_hash: str) -> ReceiptRow | None:
         row = self._connection.execute(
             _RECEIPT_SELECT + " WHERE image_hash = ?", (image_hash,)
@@ -185,13 +236,14 @@ class ReceiptRepository:
     def lines(self, receipt_id: int) -> list[LineRow]:
         """The receipt's lines in printed order."""
         rows = self._connection.execute(
-            "SELECT position, name, amount_cents, is_deposit_refund, category_id,"
+            "SELECT id, position, name, amount_cents, is_deposit_refund, category_id,"
             " category_source, product_id FROM receipt_lines"
             " WHERE receipt_id = ? ORDER BY position",
             (receipt_id,),
         )
         return [
             LineRow(
+                id=row["id"],
                 position=row["position"],
                 name=row["name"],
                 amount_cents=row["amount_cents"],

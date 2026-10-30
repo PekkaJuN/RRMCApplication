@@ -18,6 +18,7 @@ from app.logging_setup import add_request_logging, configure_logging
 from app.receipt_import.routes import create_import_router
 from app.receipt_import.service import ImportService
 from app.receipt_reading.factory import create_reader
+from app.review.routes import create_review_router
 from app.settings import Settings, load_settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
@@ -64,6 +65,7 @@ def create_app(
         settings, engines=engines, reader=create_reader(settings, engines)
     )
     app.include_router(create_import_router(import_service))
+    app.include_router(create_review_router(settings))
     for router in extra_routers:
         app.include_router(router)
     return app

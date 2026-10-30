@@ -1,25 +1,43 @@
 import type { MouseEvent } from "react";
 import { ImportPage } from "./components/ImportPage";
 import { ProductsPage } from "./components/ProductsPage";
+import { ReceiptPage } from "./components/ReceiptPage";
+import { ReceiptsPage } from "./components/ReceiptsPage";
 import { StatusLine } from "./components/StatusLine";
 import { fi } from "./i18n/fi";
-import { PAGE_PATHS, usePage, type Page } from "./navigation";
+import { isPlainLeftClick, PAGE_PATHS, usePage, type Page } from "./navigation";
 
-const LINKS: { page: Page; text: string }[] = [
+const LINKS: { page: Exclude<Page, "receipt">; text: string }[] = [
   { page: "products", text: fi.products.heading },
   { page: "import", text: fi.import.heading },
+  { page: "receipts", text: fi.receipts.heading },
 ];
 
 export function App() {
-  const [page, go] = usePage();
+  const [page, go, receiptId] = usePage();
+  // A receipt belongs to the Kuitit section of the navigation.
+  const section = page === "receipt" ? "receipts" : page;
 
   function open(event: MouseEvent<HTMLAnchorElement>, target: Page) {
-    // Let the browser handle a click that opens a new tab or window.
-    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) {
+    if (!isPlainLeftClick(event)) {
       return;
     }
     event.preventDefault();
     go(target);
+  }
+
+  function content() {
+    switch (page) {
+      case "import":
+        return <ImportPage />;
+      case "receipts":
+        return <ReceiptsPage onOpen={(id) => go("receipt", id)} />;
+      case "receipt":
+        // `receiptId` is set whenever the page is `receipt`; the key reloads on another id.
+        return <ReceiptPage key={receiptId} id={receiptId ?? 0} onBack={() => go("receipts")} />;
+      default:
+        return <ProductsPage />;
+    }
   }
 
   return (
@@ -31,7 +49,7 @@ export function App() {
             <a
               key={link.page}
               href={PAGE_PATHS[link.page]}
-              aria-current={link.page === page ? "page" : undefined}
+              aria-current={link.page === section ? "page" : undefined}
               onClick={(event) => open(event, link.page)}
             >
               {link.text}
@@ -40,7 +58,7 @@ export function App() {
         </nav>
         <StatusLine />
       </header>
-      <main>{page === "import" ? <ImportPage /> : <ProductsPage />}</main>
+      <main>{content()}</main>
     </>
   );
 }

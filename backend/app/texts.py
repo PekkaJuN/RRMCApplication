@@ -46,3 +46,4 @@ OCR_UNAVAILABLE = "Tekstintunnistus ei ole käytettävissä."
 MODEL_LOST = (
     "Kielimalli ei vastaa. Tuonti pysäytettiin; jäljellä olevat kuvat jäivät tuontikansioon."
 )
+IMAGE_MISSING = "Kuvaa ei löydy valmiiden kansiosta."

@@ -104,10 +104,10 @@ class FailingRepository(ReceiptRepository):
         *,
         is_deposit_refund: bool,
         category: LineCategory | None = None,
-    ) -> None:
+    ) -> int:
         if position == self._line_fails_at:
             raise sqlite3.OperationalError("simulated")
-        super().add_line(
+        return super().add_line(
             receipt_id,
             position,
             name,
