@@ -1,6 +1,6 @@
 # API Reference
 
-- **Status:** In Progress (health, catalog and import endpoints; receipt, totals and export
+- **Status:** In Progress (health, catalog and import endpoints, the import with reading; receipt, totals and export
   endpoints are added by their specs)
 - **Updated:** 2026-10-28
 
@@ -54,7 +54,7 @@ Response `200`:
 ```json
 {
   "status": "ok",
-  "model_name": "qwen2.5:7b",
+  "model_name": "qwen3:30b-a3b-instruct-2507-q4_K_M",
   "checks": {"database": "ok", "folders": "ok", "ocr": "ok", "model": "ok"}
 }
 ```
@@ -134,7 +134,7 @@ returns at once, and the UI polls `GET` while the state is `running`.
 | Method and path | Success | Errors |
 |---|---|---|
 | `GET /api/import` | 200, the state of the current or latest run | |
-| `POST /api/import` | 202, the state of the new run (`running`, `total` set, `processed` 0) | 409 `import_running`; 503 `folders_unavailable` |
+| `POST /api/import` | 202, the state of the new run (`running`, `total` set, `processed` 0) | 409 `import_running`; 503 `folders_unavailable`, `ocr_unavailable`, `model_unavailable` |
 
 The **run state**:
 
@@ -149,7 +149,8 @@ The **run state**:
     {"file_name": "notes.txt", "reason": "unsupported_format", "message": "Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa."}
   ],
   "started_at": "2026-10-28T10:00:00Z",
-  "finished_at": "2026-10-28T10:00:02Z"
+  "finished_at": "2026-10-28T10:00:02Z",
+  "stopped": null
 }
 ```
 
@@ -162,8 +163,9 @@ The **run state**:
 | `duplicates` | Names of files whose image was imported before; they stay in the import folder |
 | `failures` | One item per failed file, in processing order: its name in the import folder, the reason and the Finnish message |
 | `started_at`, `finished_at` | UTC ISO 8601, or `null` when not reached |
+| `stopped` | `null` when the run went through all its files; `{"reason": "model_unavailable", "message": "Kielimalli ei vastaa. Tuonti pysäytettiin; jäljellä olevat kuvat jäivät tuontikansioon."}` when Ollama or the model was lost during the run. Then `processed` is less than `total`, and the files not handled stay in the import folder |
 
-In state `idle` the counts are 0, the lists empty and both times `null`. The state is kept in
+In state `idle` the counts are 0, the lists empty and both times and `stopped` `null`. The state is kept in
 memory, so it is `idle` again after a backend restart.
 
 #### Import error codes
@@ -172,6 +174,11 @@ memory, so it is `idle` again after a backend restart.
 |---|---|---|---|
 | 409 | `import_running` | `Tuonti on jo käynnissä.` | A run is active |
 | 503 | `folders_unavailable` | `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | The import, done or failed folder is missing, cannot be written to, or cannot be listed |
+| 503 | `ocr_unavailable` | `Tekstintunnistus ei ole käytettävissä.` | Tesseract with `fin` and `eng` cannot run |
+| 503 | `model_unavailable` | `Kielimalli ei ole käytettävissä. Käynnistä Ollama ja tarkista mallin nimi.` | Ollama does not answer, does not have `RRMC_MODEL`, or `RRMC_MODEL` is a cloud model |
+
+The checks run in that order: folders, OCR, model. A start refused by any of them processes
+nothing.
 
 #### Failure reasons
 
@@ -179,7 +186,11 @@ memory, so it is `idle` again after a backend restart.
 |---|---|---|
 | `unsupported_format` | `Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa.` | Not `.jpg`, `.jpeg` or `.png` with the matching signature, or an empty file |
 | `read_failed` | `Tiedostoa ei voitu lukea.` | The file cannot be read |
-| `save_failed` | `Kuitin tallennus epäonnistui.` | Writing the receipt row fails |
+| `unreadable_image` | `Kuvaa ei voitu avata.` | The file has an image signature but cannot be decoded |
+| `ocr_failed` | `Tekstin tunnistus epäonnistui.` | Tesseract fails or exceeds its time limit |
+| `no_text` | `Kuvasta ei löytynyt tekstiä.` | The OCR text is empty or only whitespace |
+| `parse_failed` | `Kuittia ei voitu tulkita.` | The model's answer is not a valid receipt, or does not arrive within 300 s |
+| `save_failed` | `Kuitin tallennus epäonnistui.` | Writing the receipt or its lines fails |
 | `move_failed` | `Tiedostoa ei voitu siirtää valmiiden kansioon.` | The file cannot be moved to the done folder; it stays in the import folder |
 | `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Any other error |
 
@@ -196,4 +207,6 @@ memory, so it is `idle` again after a backend restart.
 - [Foundation spec](../specs/features/foundation.md) PC5 and PC8
 - [Product management spec](../specs/features/product-management.md): the catalog endpoints
 - [Receipt import spec](../specs/features/receipt-import.md): the import endpoints
+- [Receipt reading spec](../specs/features/receipt-reading.md): the reading step, its
+  failure reasons and the start checks
 - [development.md](development.md#troubleshooting): what the health results mean for the user

@@ -109,6 +109,8 @@ def test_ac22_idle_before_the_first_run(open_client: Client) -> None:
         "failures": [],
         "started_at": None,
         "finished_at": None,
+        # Added by the receipt-reading spec (PC7).
+        "stopped": None,
     }
 
 

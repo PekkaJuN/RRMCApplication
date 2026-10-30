@@ -6,7 +6,8 @@ import pytest
 
 from app.receipt_import.files import LocalFileStore, image_identifier
 from app.receipt_import.run import FileResult, ImportFolders, process_file
-from app.storage.receipt_repository import ReceiptRepository, ReceiptRow
+from app.receipt_reading.fake import FakeReceiptReader
+from app.storage.receipt_repository import ReceiptRepository
 from tests.receipt_import_data import FailingRepository, FailingStore, jpeg
 
 NOW = datetime(2026, 10, 28, 10, 0, 1, tzinfo=UTC)
@@ -31,7 +32,12 @@ def run_file(
     store: LocalFileStore | None = None,
 ) -> FileResult:
     return process_file(
-        path, store=store or LocalFileStore(), repository=repository, folders=folders, now=NOW
+        path,
+        store=store or LocalFileStore(),
+        repository=repository,
+        reader=FakeReceiptReader(),
+        folders=folders,
+        now=NOW,
     )
 
 
@@ -49,7 +55,12 @@ def test_ac1_new_image_is_stored_and_moved(db: sqlite3.Connection, folders: Impo
     assert result == FileResult("a.jpg", "imported")
     row = repository.get_by_hash(image_identifier(jpeg("a")))
     assert row is not None
-    assert row == ReceiptRow(row.id, image_identifier(jpeg("a")), "a.jpg", "2026-10-28T10:00:01Z")
+    # The read fields are the receipt-reading spec's (AC13); this AC is about the image record.
+    assert (row.image_hash, row.file_name, row.imported_at) == (
+        image_identifier(jpeg("a")),
+        "a.jpg",
+        "2026-10-28T10:00:01Z",
+    )
     assert (folders.done_dir / "a.jpg").read_bytes() == jpeg("a")
     assert names(folders.import_dir) == []
 

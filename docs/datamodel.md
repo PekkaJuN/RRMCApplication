@@ -1,15 +1,15 @@
 # Data Model
 
-- **Status:** In Progress (catalog and receipt entities implemented; receipt lines and the
-  read receipt data come with their specs)
-- **Updated:** 2026-10-28
+- **Status:** In Progress (catalog, receipts with their read data, and receipt lines
+  implemented; line categories come with the categorization spec)
+- **Updated:** 2026-10-30
 
 ## Overview
 
 The app keeps all its data in one SQLite database. This document describes the schema and
 how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
-categories and products) and the imported receipts. The read receipt data and receipt lines
-are added by their feature specs as new migrations.
+categories and products), the imported receipts with what was read from them, and their
+lines. Line categories are added by the categorization spec as a new migration.
 
 ## Where the database is
 
@@ -72,8 +72,9 @@ One-time facts about the database, as key and value text.
 
 ### receipts
 
-One row per imported receipt image ([import](subsystems/import/README.md)). The read data
-(store, date, total, OCR text) and receipt lines are added by the receipt-reading spec.
+One row per imported receipt image ([import](subsystems/import/README.md)), with what
+[receipt reading](subsystems/receipt-reading/README.md) read from it. The read columns are
+`NULL` for receipts imported before reading existed (migration `0003`).
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -81,8 +82,27 @@ One row per imported receipt image ([import](subsystems/import/README.md)). The 
 | `image_hash` | `TEXT NOT NULL UNIQUE`, `CHECK (length = 64)` | The image identifier: SHA-256 of the file's bytes, lowercase hex. The `UNIQUE` index is the duplicate lookup (FR-3) |
 | `file_name` | `TEXT NOT NULL` | The file's name in the done folder, after any numbered suffix |
 | `imported_at` | `TEXT NOT NULL` | When the receipt was stored, UTC ISO 8601 with seconds (`2026-10-28T10:00:01Z`) |
+| `store` | `TEXT` | Store name as read, trimmed; `''` when the model found none |
+| `purchase_date` | `TEXT`, `CHECK` shape `YYYY-MM-DD` | Purchase date; `NULL` when the model's date was not a real date (the user fixes it in review) |
+| `total_cents` | `INTEGER` | Receipt total in integer cents (NFR-6) |
+| `ocr_text` | `TEXT` | The raw Tesseract output, so the receipt can be re-parsed without OCR (FR-10) |
 
 A failed import stores no row, so the image can be retried (FR-4).
+
+### receipt_lines
+
+One row per item line of a receipt, in printed order (receipt-reading spec).
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INTEGER PRIMARY KEY` | Stable id |
+| `receipt_id` | `INTEGER NOT NULL`, `REFERENCES receipts ON DELETE CASCADE` | The receipt; deleting the receipt deletes its lines |
+| `position` | `INTEGER NOT NULL`, `CHECK (≥ 1)`, `UNIQUE` with `receipt_id` | Printed order, from 1 |
+| `name` | `TEXT NOT NULL`, `CHECK` not blank | Product name as read |
+| `amount_cents` | `INTEGER NOT NULL` | Amount after any discount and including any deposit (FR-9); negative for a deposit refund |
+| `is_deposit_refund` | `INTEGER NOT NULL`, `0` or `1` | 1 for a deposit refund (panttipalautus); `CHECK` that such a line is negative |
+
+Lines have no category yet; categorization adds it.
 
 ### Relationships and rules
 
@@ -90,6 +110,7 @@ A failed import stores no row, so the image can be retried (FR-4).
 erDiagram
   categories ||--o{ categories : "group holds"
   categories ||--o{ products : "category holds"
+  receipts ||--o{ receipt_lines : "has"
 ```
 
 - `UNIQUE`, `CHECK` and `RESTRICT` are a safety net. "A parent is a group" and "a product's
@@ -101,8 +122,8 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are two, `0001_catalog.sql` and
-  `0002_receipts.sql`, so the schema version is 2.
+  (four digits, then a short name). Today there are three, `0001_catalog.sql`,
+  `0002_receipts.sql` and `0003_receipt_reading.sql`, so the schema version is 3.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
@@ -119,7 +140,8 @@ erDiagram
   all SQL
 - [categorization](subsystems/categorization/README.md) — the rules on top of the catalog
   tables
-- [import](subsystems/import/README.md) — creates the receipt rows
+- [import](subsystems/import/README.md) — creates the receipt and line rows
+- [receipt-reading](subsystems/receipt-reading/README.md) — produces the read data
 
 ## Related Documents
 
@@ -127,4 +149,6 @@ erDiagram
 - [Foundation spec](../specs/features/foundation.md) PC4: database requirements
 - [Product management spec](../specs/features/product-management.md): the catalog tables
 - [Receipt import spec](../specs/features/receipt-import.md): the `receipts` table
+- [Receipt reading spec](../specs/features/receipt-reading.md): the read columns and
+  `receipt_lines`
 - [development.md](development.md#running-the-app): where the data lives when the app runs

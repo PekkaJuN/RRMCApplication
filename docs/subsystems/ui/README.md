@@ -67,9 +67,13 @@ foundation spec, PC10.
 On the Tuonti page, the state of the latest run is loaded when the page opens. While it is
 `running`, the page asks for it again 1 second after each answer, so requests never overlap,
 and stops when the page closes. A start that is refused (409, 503) or cannot reach the
-backend shows the message next to the button with `role="alert"`; the shown report stays. A
-failed poll shows the same alert and polling goes on. The texts are in the
-[receipt import spec](../../../specs/features/receipt-import.md#ui-texts-tuonti-page).
+backend shows the message next to the button with `role="alert"`; the shown report stays.
+That includes a start refused because OCR or the model is unavailable. A failed poll shows
+the same alert and polling goes on. A run that stopped because the model was lost shows the
+backend's `stopped.message` in the report with `role="status"`. Failure items show the
+backend's message, so new reasons need no UI change. The texts are in the
+[receipt import spec](../../../specs/features/receipt-import.md#ui-texts-tuonti-page) and the
+[receipt-reading spec](../../../specs/features/receipt-reading.md#ui-texts-tuonti-page-added).
 
 ## Data Flow
 
@@ -110,4 +114,5 @@ None yet.
 - [Foundation spec](../../../specs/features/foundation.md) PC10
 - [Product management spec](../../../specs/features/product-management.md) PC9
 - [Receipt import spec](../../../specs/features/receipt-import.md) PC11
+- [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
 - [development.md](../../development.md#code-standards): TypeScript and React rules

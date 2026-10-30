@@ -53,3 +53,28 @@ test("AC1, AC4, AC6, AC26, AC27: import receipts from the Tuonti page", async ({
   await expect(report.getByText("Epäonnistui: 1")).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
+
+// The fake reader fails exactly these bytes (backend FAKE_PARSE_FAILED_IMAGE, receipt-reading AC24b).
+const FAKE_PARSE_FAILED_IMAGE = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from("rrmc fake reader: parse_failed"),
+]);
+
+test("receipt-reading AC24b, AC27: a receipt that cannot be read is reported", async ({ page }) => {
+  const unreadable = `parse-failed-${RUN}.png`;
+  await writeFile(join(importDir, unreadable), FAKE_PARSE_FAILED_IMAGE);
+
+  await page.goto("/");
+  await page
+    .getByRole("navigation", { name: "Päävalikko" })
+    .getByRole("link", { name: "Tuonti" })
+    .click();
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+
+  const report = page.getByRole("region", { name: "Edellinen tuonti" });
+  await expect(
+    report.getByRole("list", { name: "Epäonnistuneet (siirretty epäonnistuneiden kansioon)" }),
+  ).toHaveText(`${unreadable}: Kuittia ei voitu tulkita.`);
+  await expect(report.getByText("Tuotu: 0")).toBeVisible();
+  await expect(report.getByText("Epäonnistui: 1")).toBeVisible();
+});

@@ -50,7 +50,7 @@ def test_ac12_health_with_fakes(ready_settings: Settings) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "model_name": "qwen2.5:7b",
+        "model_name": "qwen3:30b-a3b-instruct-2507-q4_K_M",
         "checks": {"database": "ok", "folders": "ok", "ocr": "ok", "model": "ok"},
     }
 

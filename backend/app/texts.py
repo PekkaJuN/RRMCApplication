@@ -31,3 +31,12 @@ UNSUPPORTED_FORMAT = "Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa."
 READ_FAILED = "Tiedostoa ei voitu lukea."
 SAVE_FAILED = "Kuitin tallennus epäonnistui."
 MOVE_FAILED = "Tiedostoa ei voitu siirtää valmiiden kansioon."
+UNREADABLE_IMAGE = "Kuvaa ei voitu avata."
+OCR_FAILED = "Tekstin tunnistus epäonnistui."
+NO_TEXT = "Kuvasta ei löytynyt tekstiä."
+PARSE_FAILED = "Kuittia ei voitu tulkita."
+MODEL_UNAVAILABLE = "Kielimalli ei ole käytettävissä. Käynnistä Ollama ja tarkista mallin nimi."
+OCR_UNAVAILABLE = "Tekstintunnistus ei ole käytettävissä."
+MODEL_LOST = (
+    "Kielimalli ei vastaa. Tuonti pysäytettiin; jäljellä olevat kuvat jäivät tuontikansioon."
+)

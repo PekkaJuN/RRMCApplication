@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from app.engines.factory import Engines
-from app.engines.model import ModelLoadError, ReceiptModel
+from app.engines.model import LoadableModel, ModelLoadError
 from app.health.schemas import Availability, HealthChecks, HealthResponse
 from app.settings import Settings
 from app.storage.db import is_available
@@ -46,7 +46,7 @@ class ModelLoader:
     """
 
     def __init__(
-        self, model: ReceiptModel, run_in_background: RunInBackground = _run_in_thread
+        self, model: LoadableModel, run_in_background: RunInBackground = _run_in_thread
     ) -> None:
         self._model = model
         self._run_in_background = run_in_background

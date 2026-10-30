@@ -16,7 +16,11 @@ gives the Finnish word the user sees.
 | Default list | oletuskategoriat | The groups and categories created once on the first start ([PRD 6.9](../specs/PRD.md#69-default-categories)) |
 | Display name | — | A name as shown: Unicode NFC, trimmed, inner whitespace collapsed to one space |
 | Normalized name | — | The display name, case-folded; stored as `name_key` and used for every comparison ([names](subsystems/categorization/README.md#names)) |
-| Receipt | kuitti | One purchase, recorded from one image. Today it holds the image identifier, the file name and the import time ([datamodel](datamodel.md#receipts)) |
+| Receipt | kuitti | One purchase, recorded from one image: the image identifier, the file name, the import time and the read data with its lines ([datamodel](datamodel.md#receipts)) |
+| Read receipt | — | What reading one image gives: store, purchase date, total in cents, lines and the raw OCR text ([receipt-reading](subsystems/receipt-reading/README.md)) |
+| Receipt reader | — | The one interface import uses to read an image; today the OCR reader (Tesseract, then the text model) |
+| Receipt line | kuittirivi | One item of a receipt in printed order: name as read, amount in cents after any discount and including any deposit, and whether it is a deposit refund ([datamodel](datamodel.md#receipt_lines)) |
+| OCR text | — | The raw text Tesseract read from the image; stored with the receipt so it can be re-parsed (FR-10) |
 | Import run | tuonti, tuontiajo | One press of "Tuo kuitit": the files in the import folder at that moment are processed in the background ([import](subsystems/import/README.md)) |
 | Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |
 | Image identifier | — | SHA-256 of an image file's bytes, 64 lowercase hex characters; stored as `image_hash` |

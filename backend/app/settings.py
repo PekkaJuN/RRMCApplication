@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     engines: Literal["real", "fake"] = "real"
     ollama_url: HttpUrl = HttpUrl("http://host.docker.internal:11434")
-    model: str = Field(default="qwen2.5:7b", min_length=1)
+    model: str = Field(default="qwen3:30b-a3b-instruct-2507-q4_K_M", min_length=1)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     ui_port: int = 5173
     data_dir: Path = Path("/data")

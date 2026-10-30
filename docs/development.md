@@ -23,11 +23,14 @@ Python, Node.js and Tesseract run in the containers; do not install them for thi
    [Environment]::SetEnvironmentVariable("OLLAMA_NO_CLOUD", "1", "User")
    ```
 
-2. Pull the model named in `RRMC_MODEL` (default `qwen2.5:7b`):
+2. Pull the model named in `RRMC_MODEL` (default `qwen3:30b-a3b-instruct-2507-q4_K_M`, chosen in
+   [ADR 0003](adr/0003-receipt-reading-model.md)):
 
    ```powershell
-   ollama pull qwen2.5:7b
+   ollama pull qwen3:30b-a3b-instruct-2507-q4_K_M
    ```
+
+   An existing `.env` keeps its own `RRMC_MODEL`; change it there to use the new default.
 
 3. Create the settings file from the example. Change values in `.env` only; it is not
    committed. Every setting is explained in [.env.example](../.env.example).

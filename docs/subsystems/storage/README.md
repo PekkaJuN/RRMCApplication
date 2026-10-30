@@ -18,11 +18,12 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
   can be read, for the health check
 - @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
   categories, products and `app_state`
-- @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts
+- @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
+  their lines (`add` with the read fields, `add_line`, `lines`, `get_by_hash`, `delete`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
-  (`0001_catalog.sql`, `0002_receipts.sql`)
+  (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`)
 
 ## Interfaces
 
@@ -91,3 +92,4 @@ None yet.
 - [Foundation spec](../../../specs/features/foundation.md) PC4
 - [Product management spec](../../../specs/features/product-management.md)
 - [Receipt import spec](../../../specs/features/receipt-import.md)
+- [Receipt-reading spec](../../../specs/features/receipt-reading.md)

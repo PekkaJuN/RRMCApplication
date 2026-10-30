@@ -17,6 +17,7 @@ from app.health.service import HealthService, ModelLoader
 from app.logging_setup import add_request_logging, configure_logging
 from app.receipt_import.routes import create_import_router
 from app.receipt_import.service import ImportService
+from app.receipt_reading.factory import create_reader
 from app.settings import Settings, load_settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
@@ -59,7 +60,10 @@ def create_app(
     )
     app.include_router(create_health_router(HealthService(settings, engines, model_loader)))
     app.include_router(create_catalog_router(settings))
-    app.include_router(create_import_router(import_service or ImportService(settings)))
+    import_service = import_service or ImportService(
+        settings, engines=engines, reader=create_reader(settings, engines)
+    )
+    app.include_router(create_import_router(import_service))
     for router in extra_routers:
         app.include_router(router)
     return app
