@@ -90,6 +90,7 @@ function Report({ state }: { state: ImportState }) {
           <p>{fi.import.imported(state.imported)}</p>
           <p>{fi.import.duplicates(state.duplicates.length)}</p>
           <p>{fi.import.failed(state.failures.length)}</p>
+          {state.stopped && <p role="status">{state.stopped.message}</p>}
           {state.duplicates.length > 0 && (
             <>
               <h4 id="import-duplicates-heading">{fi.import.duplicatesHeading}</h4>

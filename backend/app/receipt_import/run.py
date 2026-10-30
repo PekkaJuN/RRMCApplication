@@ -8,14 +8,25 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from app.engines.model import ModelUnavailableError
 from app.receipt_import.files import FileStore, check_format, free_target_name, image_identifier
+from app.receipt_reading.reader import ReceiptReader
+from app.receipt_reading.receipt import ReadFailedError, ReadReceipt
 from app.storage.receipt_repository import ReceiptRepository
 
 logger = logging.getLogger(__name__)
 
 type Outcome = Literal["imported", "duplicate", "failed"]
 type FailureReason = Literal[
-    "unsupported_format", "read_failed", "save_failed", "move_failed", "internal_error"
+    "unsupported_format",
+    "read_failed",
+    "unreadable_image",
+    "ocr_failed",
+    "no_text",
+    "parse_failed",
+    "save_failed",
+    "move_failed",
+    "internal_error",
 ]
 
 
@@ -59,16 +70,23 @@ def process_file(
     *,
     store: FileStore,
     repository: ReceiptRepository,
+    reader: ReceiptReader,
     folders: ImportFolders,
     now: datetime,
 ) -> FileResult:
-    """Import one file: store a new receipt, then move the file to the done folder.
+    """Import one file: read it, store a new receipt, then move the file to the done folder.
 
     A failed file stores nothing and moves to the failed folder, except when the done folder
     cannot be used: then it stays in the import folder for a later run.
+
+    Raises:
+        ModelUnavailableError: the model cannot be used; the file stays in the import folder
+            and the run must stop (FR-31).
     """
     try:
-        return _import(path, store, repository, folders, now)
+        return _import(path, store, repository, reader, folders, now)
+    except ModelUnavailableError:
+        raise
     except _FileFailedError as failure:
         reason, move_to_failed = failure.reason, failure.move_to_failed
     except Exception as error:
@@ -83,6 +101,7 @@ def _import(
     path: Path,
     store: FileStore,
     repository: ReceiptRepository,
+    reader: ReceiptReader,
     folders: ImportFolders,
     now: datetime,
 ) -> FileResult:
@@ -95,6 +114,10 @@ def _import(
     image_hash = image_identifier(data)
     if repository.get_by_hash(image_hash) is not None:
         return FileResult(path.name, "duplicate")
+    try:
+        read = reader.read(data)
+    except ReadFailedError as error:
+        raise _FileFailedError(error.reason) from None
     # The row stores the final name, so the name is chosen before the commit.
     try:
         target = free_target_name(path.name, store.names_in(folders.done_dir))
@@ -102,19 +125,44 @@ def _import(
         raise _FileFailedError("move_failed", move_to_failed=False) from None
     try:
         with repository.transaction():
-            receipt = repository.add(image_hash, target, utc_text(now))
+            receipt_id = _save(repository, image_hash, target, utc_text(now), read)
     except sqlite3.Error:
         raise _FileFailedError("save_failed") from None
     try:
         store.move(path, folders.done_dir / target)
     except OSError:
-        _delete_receipt(repository, receipt.id)
+        _delete_receipt(repository, receipt_id)
         raise _FileFailedError("move_failed", move_to_failed=False) from None
     except Exception:
         # The file is not in the done folder, so its row must not stay either.
-        _delete_receipt(repository, receipt.id)
+        _delete_receipt(repository, receipt_id)
         raise
     return FileResult(path.name, "imported")
+
+
+def _save(
+    repository: ReceiptRepository, image_hash: str, file_name: str, now: str, read: ReadReceipt
+) -> int:
+    """Store the receipt and its lines; the caller's transaction makes it all or nothing."""
+    purchase_date = read.purchase_date.isoformat() if read.purchase_date else None
+    receipt = repository.add(
+        image_hash,
+        file_name,
+        now,
+        store=read.store,
+        purchase_date=purchase_date,
+        total_cents=read.total_cents,
+        ocr_text=read.ocr_text,
+    )
+    for position, line in enumerate(read.lines, start=1):
+        repository.add_line(
+            receipt.id,
+            position,
+            line.name,
+            line.amount_cents,
+            is_deposit_refund=line.is_deposit_refund,
+        )
+    return receipt.id
 
 
 def _delete_receipt(repository: ReceiptRepository, receipt_id: int) -> None:

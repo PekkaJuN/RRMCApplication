@@ -14,7 +14,7 @@ def test_ac6_defaults(clean_env: pytest.MonkeyPatch) -> None:
     # Then every value is the PC3 default
     assert settings.engines == "real"
     assert settings.ollama_url == HttpUrl("http://host.docker.internal:11434")
-    assert settings.model == "qwen2.5:7b"
+    assert settings.model == "qwen3:30b-a3b-instruct-2507-q4_K_M"
     assert settings.log_level == "INFO"
     assert settings.ui_port == 5173
     assert settings.import_dir == Path("/data/import")

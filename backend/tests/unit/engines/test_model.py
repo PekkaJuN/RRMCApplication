@@ -6,7 +6,15 @@ from collections.abc import Callable, Iterator
 import httpx2
 import pytest
 
-from app.engines.model import FakeReceiptModel, ModelLoadError, OllamaReceiptModel
+from app.engines.model import (
+    FakeReceiptModel,
+    ModelAnswerError,
+    ModelLoadError,
+    ModelTimeoutError,
+    ModelUnavailableError,
+    OllamaReceiptModel,
+    is_cloud_model,
+)
 
 BASE_URL = "http://ollama.test:11434"
 TAGS = {"models": [{"name": "qwen2.5:7b"}, {"name": "llama3:latest"}]}
@@ -104,3 +112,116 @@ def test_ac12_fake_model_is_ok_without_http(monkeypatch: pytest.MonkeyPatch) -> 
     model = FakeReceiptModel()
     model.load()
     assert model.check() == "ok"
+
+
+SCHEMA = {"type": "object"}
+
+
+class Recorder:
+    """Records each request and answers it with `answer`, or raises it."""
+
+    def __init__(self, answer: httpx2.Response | Exception | None = None) -> None:
+        self.answer = (
+            answer if answer is not None else httpx2.Response(200, json={"response": "{}"})
+        )
+        self.requests: list[httpx2.Request] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        if isinstance(self.answer, Exception):
+            raise self.answer
+        return self.answer
+
+
+def test_ac7_generate_sends_the_reading_request() -> None:
+    # Given the model `m`
+    recorder = Recorder(httpx2.Response(200, json={"response": '{"s": "x"}', "done": True}))
+
+    # When a prompt is sent
+    raw = ollama(recorder, "m").generate("PROMPT", SCHEMA)
+
+    # Then one generate request carries the prompt, the schema and the reading options
+    assert raw == '{"s": "x"}'
+    assert len(recorder.requests) == 1
+    request = recorder.requests[0]
+    assert (request.method, str(request.url)) == ("POST", f"{BASE_URL}/api/generate")
+    assert json.loads(request.content) == {
+        "model": "m",
+        "prompt": "PROMPT",
+        "format": SCHEMA,
+        "stream": False,
+        "options": {"temperature": 0, "num_ctx": 8192},
+        "keep_alive": -1,
+    }
+
+
+@pytest.mark.parametrize(
+    "error",
+    [httpx2.ReadTimeout("slow"), httpx2.WriteTimeout("slow"), httpx2.PoolTimeout("slow")],
+    ids=["read", "write", "pool"],
+)
+def test_ac11b_timeout_is_model_timeout(error: Exception) -> None:
+    with pytest.raises(ModelTimeoutError):
+        ollama(Recorder(error)).generate("PROMPT", SCHEMA)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx2.ConnectError("Connection refused"),
+        httpx2.ConnectTimeout("no answer"),
+        httpx2.RemoteProtocolError("closed"),
+        httpx2.Response(404, json={"error": "model 'm' not found"}),
+    ],
+    ids=["refused", "connect timeout", "connection lost", "model not pulled"],
+)
+def test_ac20_lost_connection_or_missing_model_is_model_unavailable(
+    answer: httpx2.Response | Exception,
+) -> None:
+    with pytest.raises(ModelUnavailableError):
+        ollama(Recorder(answer)).generate("PROMPT", SCHEMA)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [httpx2.Response(500), httpx2.Response(200, text="not json"), httpx2.Response(200, json={})],
+    ids=["server error", "not json", "no response field"],
+)
+def test_http_500_or_bad_body_is_model_answer_error(response: httpx2.Response) -> None:
+    with pytest.raises(ModelAnswerError):
+        ollama(Recorder(response)).generate("PROMPT", SCHEMA)
+
+
+@pytest.mark.parametrize("model", ["qwen3:cloud", "gpt-oss:120b-cloud", "X:CLOUD"])
+def test_ac21_cloud_model_is_refused_without_a_request(model: str) -> None:
+    recorder = Recorder()
+
+    assert is_cloud_model(model)
+    with pytest.raises(ModelUnavailableError):
+        ollama(recorder, model).generate("PROMPT", SCHEMA)
+    assert recorder.requests == []
+
+
+def test_local_model_is_not_a_cloud_model() -> None:
+    assert not is_cloud_model("qwen3:30b-a3b-instruct-2507-q4_K_M")
+
+
+def test_ac23_proxy_settings_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given proxy variables that point to another host
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "all_proxy"):
+        monkeypatch.setenv(name, "http://proxy.invalid:3128")
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    # When the model builds its own client
+    model = OllamaReceiptModel(BASE_URL, "m")
+
+    # Then the client does not read them. A mock transport cannot show this: httpx2 sends to
+    # a given transport even with trust_env=True, so the client's setting is checked.
+    client = model._client  # pyright: ignore[reportPrivateUsage]
+    assert client.trust_env is False
+    assert str(client.base_url) == f"{BASE_URL}"
+
+
+def test_fake_model_answers_without_http() -> None:
+    assert FakeReceiptModel().generate("PROMPT", SCHEMA) == FakeReceiptModel().generate("", {})

@@ -63,7 +63,7 @@ design in [architecture.md](../../docs/architecture.md).
   | `RRMC_FAILED_DIR` | Folder on the computer for failed images | `./source/import_failed` |
   | `RRMC_ENGINES` | `real` (Tesseract and Ollama) or `fake` (deterministic fakes) | `real` |
   | `RRMC_OLLAMA_URL` | Ollama address seen from the container | `http://host.docker.internal:11434` |
-  | `RRMC_MODEL` | Ollama model name (FR-29) | `qwen2.5:7b` (example; the model is chosen in the receipt-reading spec) |
+  | `RRMC_MODEL` | Ollama model name (FR-29) | `qwen3:30b-a3b-instruct-2507-q4_K_M` (chosen in the [receipt-reading spec](receipt-reading.md) PC10; was `qwen2.5:7b` until 2026-10-30) |
   | `RRMC_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING` or `ERROR` | `INFO` |
   | `RRMC_BACKEND_PORT` | Backend port on `127.0.0.1` | `8000` |
   | `RRMC_UI_PORT` | UI port on `127.0.0.1` | `5173` |
@@ -83,7 +83,7 @@ design in [architecture.md](../../docs/architecture.md).
   ```json
   {
     "status": "ok",
-    "model_name": "qwen2.5:7b",
+    "model_name": "qwen3:30b-a3b-instruct-2507-q4_K_M",
     "checks": {"database": "ok", "folders": "ok", "ocr": "ok", "model": "ok"}
   }
   ```
@@ -199,7 +199,7 @@ changed UI, without `docker compose` commands
 **Given** a `.env` that contains no `RRMC_*` settings
 **When** the backend starts
 **Then** the effective settings equal the defaults in PC3, and `model_name` in
-`GET /api/health` is `qwen2.5:7b`
+`GET /api/health` is `qwen3:30b-a3b-instruct-2507-q4_K_M` (changed from `qwen2.5:7b` by the [receipt-reading spec](receipt-reading.md) PC10)
 
 #### AC7: Invalid settings stop the backend
 **Given** `.env` with `RRMC_ENGINES=both`, or with `RRMC_LOG_LEVEL=LOUD`, or with

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ImportState } from "../api/imports";
-import { FINISHED, IDLE, running } from "../test/imports";
+import { FINISHED, IDLE, READ_FAILURES, running, STOPPED } from "../test/imports";
 import { server } from "../test/server";
 import { ImportPage } from "./ImportPage";
 
@@ -199,4 +199,60 @@ it("AC27: a late answer to the first request does not hide a started run", async
 
   expect(screen.getByText("Tuonti käynnissä: 0/2")).toBeInTheDocument();
   expect(screen.queryByText("Tuontia ei ole vielä ajettu.")).not.toBeInTheDocument();
+});
+
+it("receipt-reading AC25: a start refused for the model is shown and the button is enabled again", async () => {
+  importStates(IDLE);
+  const message = "Kielimalli ei ole käytettävissä. Käynnistä Ollama ja tarkista mallin nimi.";
+  server.use(
+    http.post("/api/import", () =>
+      HttpResponse.json({ error: "model_unavailable", message }, { status: 503 }),
+    ),
+  );
+  const user = setupUser();
+  render(<ImportPage />);
+  await screen.findByText("Tuontia ei ole vielä ajettu.");
+
+  await user.click(screen.getByRole("button", { name: "Tuo kuitit" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  expect(screen.getByRole("button", { name: "Tuo kuitit" })).toBeEnabled();
+});
+
+it("receipt-reading AC26: a stopped run shows its counts and why it stopped", async () => {
+  importStates(STOPPED);
+  render(<ImportPage />);
+
+  const report = await screen.findByRole("region", { name: "Edellinen tuonti" });
+  expect(within(report).getByText("Tuotu: 1")).toBeInTheDocument();
+  expect(within(report).getByRole("status")).toHaveTextContent(
+    "Kielimalli ei vastaa. Tuonti pysäytettiin; jäljellä olevat kuvat jäivät tuontikansioon.",
+  );
+});
+
+it("receipt-reading AC26: a run that went through all files shows no stop message", async () => {
+  importStates(FINISHED);
+  render(<ImportPage />);
+
+  const report = await screen.findByRole("region", { name: "Edellinen tuonti" });
+  expect(within(report).queryByRole("status")).not.toBeInTheDocument();
+});
+
+it("receipt-reading AC27: the new failure reasons show their messages", async () => {
+  importStates(READ_FAILURES);
+  render(<ImportPage />);
+
+  const failures = await screen.findByRole("list", {
+    name: "Epäonnistuneet (siirretty epäonnistuneiden kansioon)",
+  });
+  expect(
+    within(failures)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual([
+    "a.jpg: Kuvaa ei voitu avata.",
+    "b.jpg: Tekstin tunnistus epäonnistui.",
+    "c.jpg: Kuvasta ei löytynyt tekstiä.",
+    "d.jpg: Kuittia ei voitu tulkita.",
+  ]);
 });

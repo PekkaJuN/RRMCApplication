@@ -76,7 +76,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 |---|---|
 | FR-6 | Images are preprocessed for OCR (for example grayscale, deskew, contrast, scaling). |
 | FR-7 | Text is read with Tesseract using the Finnish and English language packs (`fin+eng`). |
-| FR-8 | A local language model through Ollama turns the OCR text into structured data: store, purchase date (and time if present), line items (name, quantity, unit price, amount) and receipt total. The output is validated against a schema; invalid output is a failure, not silent data. |
+| FR-8 | A local language model through Ollama turns the OCR text into structured data: store, purchase date (and time if present), line items (name, quantity, unit price, amount) and receipt total. The output is validated against a schema; invalid output is a failure, not silent data. *Note (2026-10-30):* the first release reads store, date, line names and amounts, and the total; quantity, unit price and time are not read, because each extra field costs output time on the CPU ([receipt-reading spec](features/receipt-reading.md)). |
 | FR-9 | Parsing handles Finnish receipt conventions: decimal comma, deposit lines (pantti), weighed items spread over two lines, bonus lines, the VAT summary, and the card payment slip after the total, which is ignored. A discount line printed under an item is merged into that item: the line's amount is the net price after the discount, and no separate discount line is created. A deposit line (pantti) printed under an item is merged into that item the same way: the line's amount includes the deposit (e.g. 1,89 € + 0,40 € = 2,29 €), so the deposit counts as spending in the item's category, and no separate deposit line is created. A deposit refund (panttipalautus) stays its own line with a negative amount and is marked as a deposit refund (see FR-44). |
 | FR-10 | The raw OCR text is stored with the receipt, so a receipt can be re-parsed without re-running OCR. |
 
@@ -124,7 +124,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 
 | ID | Requirement |
 |---|---|
-| FR-29 | The model name is one setting. The default starts in the 7–9B class; switching to a 14B model only needs that setting changed. |
+| FR-29 | The model name is one setting. The default is `qwen3:30b-a3b-instruct-2507-q4_K_M`, chosen by the model evaluation ([ADR 0003](../docs/adr/0003-receipt-reading-model.md)); switching model only needs that setting changed. |
 | FR-30 | The model is loaded when the app starts and kept loaded while the app runs. |
 | FR-31 | If Ollama or the model is not available, the app says so clearly, and import waits instead of failing images. |
 | FR-32 | Settings (import, done and failed folders, Ollama address, model name, ports) are kept in one `.env` file outside version control, with a committed `.env.example`. |
@@ -271,7 +271,8 @@ A suggested order of feature specs for the MVP:
 2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? (HEIC is not supported,
    see FR-2.)
 3. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
-4. [NEEDS CLARIFICATION] Model choice: compare Tesseract + text model against a vision model
+4. Resolved (2026-10-30): Tesseract + text model, `qwen3:30b-a3b-instruct-2507-q4_K_M`
+   ([ADR 0003](../docs/adr/0003-receipt-reading-model.md)). Was: compare Tesseract + text model against a vision model
    on 20–30 real receipts before the parsing spec is approved.
 5. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
 6. [NEEDS CLARIFICATION] Is a receipt categorized per line only, or can a whole receipt get

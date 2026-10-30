@@ -57,16 +57,55 @@ class FailingStore(LocalFileStore):
 
 class FailingRepository(ReceiptRepository):
     def __init__(
-        self, connection: sqlite3.Connection, *, add_fails: bool = False, delete_fails: bool = False
+        self,
+        connection: sqlite3.Connection,
+        *,
+        add_fails: bool = False,
+        delete_fails: bool = False,
+        line_fails_at: int | None = None,
     ) -> None:
         super().__init__(connection)
         self._add_fails = add_fails
         self._delete_fails = delete_fails
+        self._line_fails_at = line_fails_at
 
-    def add(self, image_hash: str, file_name: str, imported_at: str) -> ReceiptRow:
+    def add(
+        self,
+        image_hash: str,
+        file_name: str,
+        imported_at: str,
+        *,
+        store: str | None = None,
+        purchase_date: str | None = None,
+        total_cents: int | None = None,
+        ocr_text: str | None = None,
+    ) -> ReceiptRow:
         if self._add_fails:
             raise sqlite3.OperationalError("simulated")
-        return super().add(image_hash, file_name, imported_at)
+        return super().add(
+            image_hash,
+            file_name,
+            imported_at,
+            store=store,
+            purchase_date=purchase_date,
+            total_cents=total_cents,
+            ocr_text=ocr_text,
+        )
+
+    def add_line(
+        self,
+        receipt_id: int,
+        position: int,
+        name: str,
+        amount_cents: int,
+        *,
+        is_deposit_refund: bool,
+    ) -> None:
+        if position == self._line_fails_at:
+            raise sqlite3.OperationalError("simulated")
+        super().add_line(
+            receipt_id, position, name, amount_cents, is_deposit_refund=is_deposit_refund
+        )
 
     def delete(self, receipt_id: int) -> None:
         if self._delete_fails:

@@ -2,6 +2,20 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-10-30: A proxy test could not fail
+
+- **Context:** Audit of the receipt-reading spec (AC23).
+- **Symptom:** none seen; found in review. `test_ac23_proxy_settings_are_ignored` passed a
+  `httpx2.MockTransport` and checked that the request reached it.
+- **Root cause:** `httpx2` sends to a given transport even with `trust_env=True`, so the test
+  passed whatever the client's setting was. Checked in the backend container.
+- **Solution:** the test builds `OllamaReceiptModel` without a transport and checks that its
+  client has `trust_env` off; a mutation (`trust_env=True`) makes it fail
+  (@backend/tests/unit/engines/test_model.py).
+- **Prevention:** a test of a safety setting must be seen failing once with the setting
+  wrong. The evaluation tool's `test_ac19_proxy_settings_are_ignored` has the same
+  weakness and is still open.
+
 ## 2026-10-29: Phone photos were read on their side
 
 - **Context:** The first real model evaluation, 25 phone photos of receipts.

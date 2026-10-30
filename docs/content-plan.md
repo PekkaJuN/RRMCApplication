@@ -12,7 +12,7 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-28
+Last reviewed: 2026-10-30
 
 ## Summary
 
@@ -33,7 +33,7 @@ Last reviewed: 2026-10-28
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers; catalog terms so far | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md) | 3 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 
 ### Optional Tier 1 docs (not yet planned)
@@ -78,9 +78,12 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The model evaluation spec is Done (audited 2026-10-28; image orientation change audited
   2026-10-29): the tool `backend/evaluation/` and how to run it are in
   [development.md](development.md#model-evaluation). It is a development tool, not a
-  subsystem. The receipt-reading spec needs the same orientation step
-  ([learnings](learnings.md)).
-- Storage, categorization, import and UI docs describe what is implemented; receipt-reading describes only the engine interfaces. Their feature specs complete them.
+  subsystem; it uses the app's reading code.
+- The receipt-reading spec is Done (audited 2026-10-30): the reading step in
+  the import run, the read data and `receipt_lines`, the start checks and the stopped run.
+  The receipt-reading, import, storage and UI docs describe it.
+- Storage, categorization, import, receipt-reading and UI docs describe what is implemented;
+  their later feature specs complete them.
 - `docs/README.md` is not written yet. The glossary has the catalog and import terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).

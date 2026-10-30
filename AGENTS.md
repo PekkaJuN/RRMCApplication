@@ -20,7 +20,7 @@ This file holds the rules that apply to every task. Detailed workflows live in s
 | Area | Choice |
 |---|---|
 | OCR | Tesseract 5.x, language packs `fin` + `eng` |
-| Parsing and categorization | Local model through Ollama. Model name is one setting (start: Qwen 7–9B class, option 14B). Loaded at app start. |
+| Parsing and categorization | Local model through Ollama. Model name is one setting (default `qwen3:30b-a3b-instruct-2507-q4_K_M`, [ADR 0003](docs/adr/0003-receipt-reading-model.md)). Loaded at app start. |
 | Backend | Python + FastAPI: preprocessing, OCR, model calls, totals |
 | Frontend | React + Vite + TypeScript: receipt image and editable table side by side |
 | Storage | SQLite |

@@ -10,11 +10,13 @@ button; the folder is not watched. A run moves every file out of the import fold
 duplicates: new images go to the done folder after their receipt is committed, and files that
 fail go to the failed folder.
 
-Today a run does not read the image. The reading step (OCR and parsing) and the model check
-before a run (FR-31) are added by the receipt-reading spec, between the duplicate check and
-the commit. Import does not choose categories.
+Every new image is read by [receipt reading](../receipt-reading/README.md) between the
+duplicate check and the commit, and the receipt is stored with its read data and lines. A run
+starts only when OCR and the model are available, and stops if the model is lost during the
+run (FR-31). Import does not choose categories.
 
-The behavior is specified in the [receipt import spec](../../../specs/features/receipt-import.md).
+The behavior is specified in the [receipt import spec](../../../specs/features/receipt-import.md)
+and the [receipt-reading spec](../../../specs/features/receipt-reading.md).
 
 ## Key Files and Entry Points
 
@@ -67,12 +69,15 @@ Steps of one file (`process_file`):
 | 1. Read the bytes | `OSError` | `read_failed` | failed folder |
 | 2. Check the format | not supported | `unsupported_format` | failed folder |
 | 3. Hash; a receipt with that hash exists | (not an error) | duplicate | import folder |
-| 4. Choose the free name in the done folder | `OSError` | `move_failed` | import folder |
-| 5. Commit the receipt row | `sqlite3.Error` | `save_failed` | failed folder |
-| 6. Move to the done folder | `OSError` | `move_failed`; the row is deleted again | import folder |
+| 4. Read the image (`ReceiptReader.read`) | `ReadFailedError` | its reason: `unreadable_image`, `ocr_failed`, `no_text`, `parse_failed` | failed folder |
+| | `ModelUnavailableError` | none: the run stops | import folder |
+| 5. Choose the free name in the done folder | `OSError` | `move_failed` | import folder |
+| 6. Commit the receipt row and its lines in one transaction | `sqlite3.Error` | `save_failed` | failed folder |
+| 7. Move to the done folder | `OSError` | `move_failed`; the row is deleted again, its lines with it | import folder |
 | any step | other exception | `internal_error` | failed folder |
 
-- The row stores the file's final name, so the name is chosen before the commit (step 4).
+- Duplicates are found before reading, so they cost no OCR or model time.
+- The row stores the file's final name, so the name is chosen before the commit (step 5).
 - The file moves only after the commit (NFR-7). If the move fails, the row is deleted, so a
   later run imports the file instead of calling it a duplicate.
 - A failed file stores nothing, so the user can move it back from the failed folder and
@@ -82,14 +87,24 @@ Steps of one file (`process_file`):
   cannot be opened), the files not yet handled are reported as `internal_error` and are not
   moved.
 
-`ImportService` keeps one state behind a lock. `start()` lists the files under the lock, so
-two starts cannot both run; `_run` opens its own database connection in a daemon thread and
+`ImportService` keeps one state behind a lock. `start()` checks the folders under the lock,
+then OCR and the model outside it (so `GET /api/import` never waits for Ollama), then checks
+again that no run started meanwhile and lists the files under the lock, so two starts cannot
+both run. A cloud model (`RRMC_MODEL` ending in `-cloud` or `:cloud`) is refused like an
+unavailable one (NFR-1).
+
+When `process_file` raises `ModelUnavailableError`, `_run` stops: the current file and the
+ones after it are not counted and stay in the import folder, and the state gets
+`stopped` (`model_unavailable`). No file moves to the failed folder for that reason.
+
+`_run` opens its own database connection in a daemon thread and
 updates the state after each file. The UI polls `GET /api/import` while the state is
 `running`. The state lives in memory: after a backend restart it is `idle`.
 
 ## Dependencies
 
-- Uses: [storage](../storage/README.md) (`ReceiptRepository`, `connect`),
+- Uses: [receipt reading](../receipt-reading/README.md) (`ReceiptReader`, the engines'
+  `check()`), [storage](../storage/README.md) (`ReceiptRepository`, `connect`),
   `check_folders` from @backend/app/health/service.py, and the folder settings
   (@backend/app/settings.py).
 - Used by: the API ([api-reference.md](../../api-reference.md#import)) and the Tuonti page
@@ -111,10 +126,13 @@ None yet.
 - **Duplicates stay in the import folder** and are reported again on every run until the
   user removes them.
 - **Logging.** A run logs `Import started: files=N` and
-  `Import finished: imported=N duplicates=N failed=N`. Unexpected errors log the exception
+  `Import finished: imported=N duplicates=N failed=N`, or
+  `Import stopped: model unavailable, imported=N duplicates=N failed=N`. Unexpected errors log the exception
   type and traceback frames only, because exception messages contain file paths and file
   names stay out of the log (NFR-3).
-- **Testing seams.** `ImportService` takes the `FileStore`, a repository factory, `can_write`,
+- **Testing seams.** `ImportService` takes the engines and the reader (by default built
+  from the settings, so `RRMC_ENGINES=fake` gives the fake reader), the `FileStore`, a
+  repository factory, `can_write`,
   the clock, `RunHooks` and `run_in_background`; `create_app(import_service=...)` passes a
   configured service to integration tests. Production code uses the defaults.
 
@@ -123,5 +141,5 @@ None yet.
 - [Receipt import spec](../../../specs/features/receipt-import.md)
 - [architecture.md](../../architecture.md#import-fr-45-started-with-a-button): where import
   sits in the flow
-- [datamodel.md](../../datamodel.md#receipts): the `receipts` table
+- [datamodel.md](../../datamodel.md#receipts): the `receipts` and `receipt_lines` tables
 - [glossary.md](../../glossary.md): import run, image identifier, duplicate

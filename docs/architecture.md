@@ -141,9 +141,9 @@ The `health` package reports the state of the database, the image folders, OCR a
 
 ### Import (FR-45: started with a button)
 
-Implemented without the reading and categorization steps and without the model check; the
-receipt-reading and categorization specs add them. Details are in
-[import](subsystems/import/README.md).
+Implemented with the reading step and the model check; the categorization spec adds the
+categorization step. Details are in [import](subsystems/import/README.md) and
+[receipt-reading](subsystems/receipt-reading/README.md).
 
 ```mermaid
 sequenceDiagram
@@ -206,19 +206,20 @@ Exports are generated from the same calculation, so an export always matches the
 
 | Interface | Owner | Real implementation | Purpose |
 |---|---|---|---|
-| `OcrEngine` | receipt-reading | Tesseract | Image in, text (and line data) out; `check()` tells whether Tesseract with `fin` and `eng` can run |
-| `ReceiptModel` | receipt-reading, categorization | Ollama client | OCR text to structured receipt; line names to category suggestions. Output is validated against a schema; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
+| `ReceiptReader` | receipt-reading | `OcrReceiptReader` (Tesseract, then the text model) | Image in, read receipt out (store, date, total, lines, OCR text); the one interface import calls, so a vision reader can be added later |
+| `OcrEngine` | receipt-reading | Tesseract | `orient()` turns the image upright, `read()` returns its text; `check()` tells whether Tesseract with `fin` and `eng` can run |
+| `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization will suggest categories. Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
 | `Exporter` | export | CSV writer; later Google Sheets | Write lines and totals to a target (FR-27) |
 
 Both interfaces live in the shared `engines` package (see
-[receipt-reading](subsystems/receipt-reading/README.md#interfaces)); the reading and parsing
-methods are added by the receipt-reading spec. The model is loaded at backend start and kept
+[receipt-reading](subsystems/receipt-reading/README.md#interfaces)). The model is loaded at backend start and kept
 loaded while Ollama runs (FR-30); if Ollama is not available then, it is loaded on the first
 health check that finds it. The model name is read from settings, so switching model size
 needs no code change (FR-29).
 
-Whether parsing uses a text model on OCR output or a vision model on the image is still open
-(PRD open question 4). The `ReceiptModel` interface keeps that choice inside receipt-reading.
+Parsing uses a text model on the OCR output, not a vision model on the image
+([ADR 0003](adr/0003-receipt-reading-model.md), PRD open question 4). The `ReceiptReader`
+interface keeps that choice inside receipt-reading.
 
 ## Runtime and deployment
 
