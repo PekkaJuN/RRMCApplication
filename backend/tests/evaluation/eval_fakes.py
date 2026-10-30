@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from evaluation.ocr import OcrError
+from evaluation.ocr import OcrError, Oriented
 from evaluation.ollama import ReadResult
 from evaluation.truth import Receipt, Truth, TruthLine
 
@@ -35,10 +35,27 @@ def make_receipts(folder: Path, count: int, full: Sequence[int] = ()) -> list[Re
 
 
 class FakeOcr:
-    def __init__(self, text: str = "MAITO 1,25", fail: bool = False) -> None:
+    # What `orient` hands on when it turns an image, so tests can see OCR got the turned one.
+    TURNED = b"turned image"
+
+    def __init__(
+        self,
+        text: str = "MAITO 1,25",
+        fail: bool = False,
+        osd_rotation: int = 0,
+        osd_confidence: float | None = None,
+    ) -> None:
         self.text = text
         self.fail = fail
+        self.osd_rotation = osd_rotation
+        self.osd_confidence = osd_confidence
+        self.oriented: list[bytes] = []
         self.images: list[bytes] = []
+
+    def orient(self, image: bytes) -> Oriented:
+        self.oriented.append(image)
+        turned = self.TURNED if self.osd_rotation else image
+        return Oriented(turned, self.osd_rotation, self.osd_confidence)
 
     def read(self, image: bytes) -> str:
         self.images.append(image)

@@ -13,6 +13,8 @@ from evaluation.truth import Receipt
 from evaluation.variants import Variant, parse_variant
 from tests.evaluation.eval_fakes import FakeClock, FakeOcr, FakeReader, make_receipts
 
+EXIF_ORIENTATION = 0x0112
+
 
 class Output:
     def __init__(self) -> None:
@@ -220,6 +222,107 @@ def test_ac12_image_too_large_for_pillow_is_an_ocr_error(
     results, _ = run(tmp_path, receipts, [Variant("ocr", "m")])
 
     assert detail(results, "ocr-m", 1)["error"] == "ocr_error"
+
+
+def jpeg_on_its_side(orientation: int | None) -> bytes:
+    """600 x 100 as stored; with tag 6 it is 100 x 600 upright."""
+    exif = Image.Exif()
+    if orientation is not None:
+        exif[EXIF_ORIENTATION] = orientation
+    buffer = io.BytesIO()
+    Image.new("RGB", (600, 100), (200, 100, 50)).save(buffer, format="JPEG", exif=exif)
+    return buffer.getvalue()
+
+
+def test_ac22_ac24_ocr_detail_records_the_orientation(tmp_path: Path) -> None:
+    receipts = make_receipts(tmp_path, 1)
+    receipts[0].image.write_bytes(jpeg_on_its_side(6))
+    ocr = FakeOcr(osd_rotation=90, osd_confidence=5.0)
+
+    results, _ = run(tmp_path, receipts, [Variant("ocr", "m")], ocr)
+
+    [oriented] = ocr.oriented
+    with Image.open(io.BytesIO(oriented)) as image:
+        assert (image.mode, image.width) == ("L", 1500)
+        assert image.height > image.width
+    assert ocr.images == [FakeOcr.TURNED]
+    assert detail(results, "ocr-m", 1)["orientation"] == {
+        "exif": 6,
+        "osd_rotation": 90,
+        "osd_confidence": 5.0,
+    }
+
+
+def test_ac23_ac25_ocr_detail_without_any_turn(tmp_path: Path) -> None:
+    receipts = make_receipts(tmp_path, 1)
+
+    results, _ = run(tmp_path, receipts, [Variant("ocr", "m")])
+
+    assert detail(results, "ocr-m", 1)["orientation"] == {
+        "exif": None,
+        "osd_rotation": 0,
+        "osd_confidence": None,
+    }
+
+
+def test_ac26_vision_image_is_turned_upright_from_exif(tmp_path: Path) -> None:
+    receipts = make_receipts(tmp_path, 1)
+    receipts[0].image.write_bytes(jpeg_on_its_side(6))
+    reader = FakeReader()
+
+    results, _ = run(tmp_path, receipts, [Variant("vision", "v")], reader=reader)
+
+    [(_, _, sent)] = reader.reads
+    assert sent is not None
+    with Image.open(io.BytesIO(sent)) as image:
+        assert (image.format, image.size) == ("JPEG", (100, 600))
+    assert detail(results, "vision-v", 1)["orientation"] == {"exif": 6}
+
+
+def test_ac26_vision_image_without_the_tag_is_sent_unchanged(tmp_path: Path) -> None:
+    receipts = make_receipts(tmp_path, 1)
+    reader = FakeReader()
+
+    results, _ = run(tmp_path, receipts, [Variant("vision", "v")], reader=reader)
+
+    assert reader.reads[0][2] == receipts[0].image.read_bytes()
+    assert detail(results, "vision-v", 1)["orientation"] == {"exif": None}
+
+
+def test_ac12_vision_image_that_cannot_be_opened_is_an_image_error(tmp_path: Path) -> None:
+    receipts = make_receipts(tmp_path, 1)
+    receipts[0].image.write_bytes(b"not an image")
+    reader = FakeReader()
+
+    results, _ = run(tmp_path, receipts, [Variant("vision", "v")], reader=reader)
+
+    assert reader.reads == []
+    assert detail(results, "vision-v", 1)["error"] == "image_error"
+
+
+def jpeg_with_broken_exif(exif_body: bytes) -> bytes:
+    """A valid JPEG with an Exif APP1 segment whose TIFF data is broken."""
+    payload = b"Exif\x00\x00" + exif_body
+    segment = b"\xff\xe1" + (len(payload) + 2).to_bytes(2, "big") + payload
+    good = jpeg_on_its_side(None)
+    return good[:2] + segment + good[2:]
+
+
+@pytest.mark.parametrize("variant", [Variant("ocr", "m"), Variant("vision", "v")])
+@pytest.mark.parametrize(
+    "exif_body", [b"garbage-not-a-tiff-header", b"MM", b"MM\x00\x2a\xff\xff\xff\xff"]
+)
+def test_ac23_broken_exif_counts_as_no_tag(
+    tmp_path: Path, variant: Variant, exif_body: bytes
+) -> None:
+    receipts = make_receipts(tmp_path, 1)
+    receipts[0].image.write_bytes(jpeg_with_broken_exif(exif_body))
+
+    results, _ = run(tmp_path, receipts, [variant])
+
+    saved = detail(results, variant.folder, 1)
+    assert saved["error"] is None
+    assert saved["orientation"]["exif"] is None
 
 
 def test_ac11_answer_with_a_lone_surrogate_is_still_written(tmp_path: Path) -> None:

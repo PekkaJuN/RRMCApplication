@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from PIL import Image
 
-from evaluation.ocr import Ocr, OcrError, preprocess
+from evaluation.ocr import Ocr, OcrError, exif_orientation, preprocess, upright_original
 from evaluation.ollama import Reader, ReadError
 from evaluation.prompt import image_prompt, parse_answer, text_prompt
 from evaluation.scoring import Row, Score, aggregate, score_receipt
@@ -26,6 +26,7 @@ class _Reading:
     raw: str | None = None
     error: ReceiptError | None = None
     stats: dict[str, int] = field(default_factory=dict[str, int])
+    orientation: dict[str, Any] | None = None
 
 
 def run_evaluation(
@@ -78,6 +79,7 @@ def _score_receipt(
         "scores": asdict(score),
         "seconds": seconds,
         "ollama": reading.stats,
+        "orientation": reading.orientation,
     }
 
 
@@ -88,15 +90,35 @@ def _read(variant: Variant, receipt: Receipt, ocr: Ocr, reader: Reader) -> _Read
     except OSError:
         return _Reading(error="image_error")
     if variant.kind == "vision":
-        result = reader.read(variant.model, image_prompt(), image=image)
-        return _Reading(raw=result.text, error=result.error, stats=result.stats)
+        try:
+            exif = exif_orientation(image)
+            upright = upright_original(image)
+        except (OSError, Image.DecompressionBombError):
+            return _Reading(error="image_error")
+        result = reader.read(variant.model, image_prompt(), image=upright)
+        return _Reading(
+            raw=result.text, error=result.error, stats=result.stats, orientation={"exif": exif}
+        )
     try:
-        ocr_text = ocr.read(preprocess(image))
+        exif = exif_orientation(image)
+        oriented = ocr.orient(preprocess(image))
+        ocr_text = ocr.read(oriented.image)
     except (OcrError, OSError, Image.DecompressionBombError):
         # Pillow raises an OSError subclass for an image it cannot open.
         return _Reading(error="ocr_error")
     result = reader.read(variant.model, text_prompt(ocr_text), image=None)
-    return _Reading(ocr_text=ocr_text, raw=result.text, error=result.error, stats=result.stats)
+    orientation = {
+        "exif": exif,
+        "osd_rotation": oriented.osd_rotation,
+        "osd_confidence": oriented.osd_confidence,
+    }
+    return _Reading(
+        ocr_text=ocr_text,
+        raw=result.text,
+        error=result.error,
+        stats=result.stats,
+        orientation=orientation,
+    )
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:

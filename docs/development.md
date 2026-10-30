@@ -171,8 +171,12 @@ service. The evaluation folder is `RRMC_EVAL_DIR` (default `./source/eval`), mou
 The run prints one progress line per receipt and a summary table at the end, and writes it
 under `results/<run id>/` in the evaluation folder: `summary.md`, one folder per variant
 with a detail file per receipt (`ocr-qwen2.5-7b/1.json`), and `receipts.json`, which maps
-the numbers to file names. Exit code 1 means Ollama or a model is not available; 2 means
-invalid input (a variant, a repeated variant, a truth file or an option); 3 means an
+the numbers to file names. Images are turned upright before reading: `ocr:` variants
+from the EXIF orientation tag and then from Tesseract's orientation detection, which needs
+about 20 lines of text to be sure enough; `vision:` variants from the EXIF tag only. Each
+detail file records what was applied under `orientation`.
+
+Exit code 1 means Ollama or a model is not available; 2 means invalid input (a variant, a repeated variant, a truth file or an option); 3 means an
 unexpected error, printed only as `Evaluation failed: <error type>` so that no receipt
 content reaches the screen. A receipt whose image cannot be read, whose OCR fails or whose
 model call fails is recorded in its detail file (`image_error`, `ocr_error`, `model_error`,

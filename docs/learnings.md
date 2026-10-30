@@ -2,6 +2,23 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-10-29: Phone photos were read on their side
+
+- **Context:** The first real model evaluation, 25 phone photos of receipts.
+- **Symptom:** every `ocr:` variant had 0 % `total` and `date`, while the `vision:` variant
+  had 100 % `total`. Nine OCR texts were empty and most others had only a few digits.
+- **Root cause:** phones store the photo on its side (4000 × 3000) and record the turn in
+  the EXIF orientation tag (6 on all 25). `preprocess` converted the image to grayscale,
+  which dropped the tag, so Tesseract got the receipt sideways.
+- **Solution:** `preprocess` turns the image with `ImageOps.exif_transpose` first; then
+  Tesseract's orientation detection (`--psm 0`) turns it when the tag is missing or wrong
+  and the confidence is at least 2.0; `vision:` images are turned from EXIF too. The detail
+  file records what was applied (@backend/evaluation/ocr.py, @backend/evaluation/runner.py).
+- **Prevention:** `test_ac22_exif_orientation_turns_the_image_upright`,
+  `test_ac24_real_osd_turns_a_receipt_on_its_side_upright`. Synthetic test images must
+  include photos with an EXIF orientation tag, not only upright images. The receipt-reading
+  spec needs the same step.
+
 ## 2026-10-28: The evaluation tool could leak a file name or lose a long run
 
 - **Context:** Audit of the model evaluation tool.
