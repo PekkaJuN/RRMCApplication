@@ -5,6 +5,7 @@ from enum import Enum
 from app.categorization.errors import (
     CategoryHasProductsError,
     CategoryInUseError,
+    DepositRefundLineError,
     DuplicateNameError,
     GroupNotEmptyError,
     InvalidParentError,
@@ -19,6 +20,7 @@ from app.categorization.names import (
     validate_product_name,
 )
 from app.storage.catalog_repository import CatalogRepository, CategoryRow, Kind, ProductRow
+from app.storage.receipt_repository import LineCategory, ReceiptRepository, StoredLine
 
 
 class Keep(Enum):
@@ -83,7 +85,7 @@ class CategoryService:
                 raise DuplicateNameError.for_category()
             new_kind = kind or item.kind
             if new_kind != item.kind:
-                if item.product_count:
+                if item.product_count or item.line_count:
                     raise CategoryHasProductsError()
                 if item.category_count:
                     raise GroupNotEmptyError(item.category_count)
@@ -100,8 +102,8 @@ class CategoryService:
         """Raises: NotFoundError, CategoryInUseError, GroupNotEmptyError."""
         with self._repository.transaction():
             item = self._get(item_id)
-            if item.product_count:
-                raise CategoryInUseError(item.product_count)
+            if item.product_count or item.line_count:
+                raise CategoryInUseError(item.product_count, item.line_count)
             if item.category_count:
                 raise GroupNotEmptyError(item.category_count)
             self._repository.delete_category(item.id)
@@ -155,7 +157,7 @@ class ProductService:
     def update(
         self, product_id: int, *, name: str | None = None, category_id: int | None = None
     ) -> ProductRow:
-        """Rename and/or recategorize.
+        """Rename and/or recategorize. A new category moves the product's lines (FR-36).
 
         Raises: NotFoundError, InvalidNameError, UnknownCategoryError, NotACategoryError,
         DuplicateNameError.
@@ -169,12 +171,9 @@ class ProductService:
             same_name = self._repository.get_product_by_key(key)
             if same_name is not None and same_name.id != product.id:
                 raise DuplicateNameError.for_product()
-            self._repository.update_product(
-                product.id,
-                display,
-                key,
-                product.category_id if category_id is None else category_id,
-            )
+            self._repository.update_product(product.id, display, key, product.category_id)
+            if category_id is not None and category_id != product.category_id:
+                _change_product_category(self._repository, self._get(product.id), category_id)
             return self._get(product.id)
 
     def delete(self, product_id: int) -> None:
@@ -189,8 +188,67 @@ class ProductService:
         return product
 
     def _check_category(self, category_id: int) -> None:
-        category = self._repository.get_category(category_id)
-        if category is None:
-            raise UnknownCategoryError()
-        if category.kind != "category":
-            raise NotACategoryError()
+        _check_category(self._repository, category_id)
+
+
+class LineCategoryService:
+    """A category the user chooses for a receipt line, remembered for its product (FR-13).
+
+    Both repositories must be on one connection: the transaction is opened on the catalog's.
+    """
+
+    def __init__(self, catalog: CatalogRepository, receipts: ReceiptRepository) -> None:
+        self._catalog = catalog
+        self._receipts = receipts
+
+    def set_category(self, line_id: int, category_id: int) -> StoredLine:
+        """Give the line the category with source `user`, and store it as the category of
+        the line's product, creating the product when none matches (PC6).
+
+        Raises: NotFoundError, UnknownCategoryError, NotACategoryError,
+        DepositRefundLineError, InvalidNameError.
+        """
+        with self._catalog.transaction():
+            line = self._receipts.get_line(line_id)
+            if line is None:
+                raise NotFoundError()
+            _check_category(self._catalog, category_id)
+            if line.is_deposit_refund:
+                raise DepositRefundLineError()
+            product = self._product_of(line)
+            if product is None:
+                display = validate_product_name(line.name)
+                product_id = self._catalog.add_product(display, normalize_key(display), category_id)
+            else:
+                product_id = product.id
+                if product.category_id != category_id:
+                    _change_product_category(self._catalog, product, category_id)
+            # After the product's lines moved, so this line keeps the source `user`.
+            self._receipts.set_line_category(line.id, LineCategory(category_id, "user", product_id))
+            stored = self._receipts.get_line(line.id)
+            assert stored is not None  # noqa: S101 - read back in the same transaction
+            return stored
+
+    def _product_of(self, line: StoredLine) -> ProductRow | None:
+        """The line's product: the linked one, else the one with the line's name. A link
+        always names an existing product: deleting a product clears it (`ON DELETE SET NULL`).
+        """
+        if line.category is not None and line.category.product_id is not None:
+            return self._catalog.get_product(line.category.product_id)
+        return self._catalog.get_product_by_key(normalize_key(line.name))
+
+
+def _check_category(repository: CatalogRepository, category_id: int) -> None:
+    category = repository.get_category(category_id)
+    if category is None:
+        raise UnknownCategoryError()
+    if category.kind != "category":
+        raise NotACategoryError()
+
+
+def _change_product_category(
+    repository: CatalogRepository, product: ProductRow, category_id: int
+) -> None:
+    """Recategorize the product and every line that follows it (FR-36)."""
+    repository.update_product(product.id, product.name, product.name_key, category_id)
+    repository.move_product_lines(product.id, category_id)

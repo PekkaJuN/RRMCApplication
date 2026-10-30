@@ -10,6 +10,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app import texts
+from app.categorization.factory import create_suggester
+from app.categorization.line_categorizer import LineCategorizer
+from app.categorization.suggester import CategorySuggester
 from app.engines.factory import Engines, create_engines
 from app.engines.model import ModelUnavailableError, is_cloud_model
 from app.health.service import CanWrite, RunInBackground, check_folders
@@ -32,6 +35,7 @@ from app.receipt_import.schemas import FailureOut, ImportStateOut, StoppedOut
 from app.receipt_reading.factory import create_reader
 from app.receipt_reading.reader import ReceiptReader
 from app.settings import Settings
+from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.receipt_repository import ReceiptRepository
 
@@ -102,6 +106,7 @@ class ImportService:
         *,
         engines: Engines | None = None,
         reader: ReceiptReader | None = None,
+        suggester: CategorySuggester | None = None,
         store: FileStore | None = None,
         repository: Callable[[sqlite3.Connection], ReceiptRepository] = ReceiptRepository,
         can_write: CanWrite = _can_write,
@@ -112,6 +117,7 @@ class ImportService:
         self._settings = settings
         self._engines = engines or create_engines(settings)
         self._reader = reader or create_reader(settings, self._engines)
+        self._suggester = suggester or create_suggester(settings, self._engines)
         self._folders = ImportFolders(settings.import_dir, settings.done_dir, settings.failed_dir)
         self._store = store or LocalFileStore()
         self._repository = repository
@@ -175,6 +181,7 @@ class ImportService:
             connection = connect(self._settings.db_path)
             try:
                 repository = self._repository(connection)
+                categorizer = LineCategorizer(CatalogRepository(connection), self._suggester)
                 self._hooks.after_listing()
                 while remaining:
                     path = remaining.pop(0)
@@ -183,6 +190,7 @@ class ImportService:
                         store=self._store,
                         repository=repository,
                         reader=self._reader,
+                        categorizer=categorizer,
                         folders=self._folders,
                         now=self._clock(),
                     )

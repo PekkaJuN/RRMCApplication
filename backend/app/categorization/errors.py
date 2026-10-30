@@ -43,12 +43,13 @@ class CategoryHasProductsError(AppError):
 
 
 class CategoryInUseError(AppError):
-    def __init__(self, product_count: int) -> None:
+    def __init__(self, product_count: int, line_count: int = 0) -> None:
+        # `line_count` is left out at 0, so the body of the product-management spec stays.
+        extra = {"product_count": product_count}
+        if line_count:
+            extra["line_count"] = line_count
         super().__init__(
-            "category_in_use",
-            texts.category_in_use(product_count),
-            409,
-            extra={"product_count": product_count},
+            "category_in_use", texts.category_in_use(product_count, line_count), 409, extra=extra
         )
 
 
@@ -65,3 +66,8 @@ class GroupNotEmptyError(AppError):
 class NotFoundError(AppError):
     def __init__(self) -> None:
         super().__init__("not_found", texts.NOT_FOUND, 404)
+
+
+class DepositRefundLineError(AppError):
+    def __init__(self) -> None:
+        super().__init__("deposit_refund_line", texts.DEPOSIT_REFUND_LINE, 422)

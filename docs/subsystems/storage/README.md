@@ -17,13 +17,15 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
   wraps a block in one transaction; `is_available(path)` tells whether an existing database
   can be read, for the health check
 - @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
-  categories, products and `app_state`
+  categories, products and `app_state`, and `move_product_lines` (FR-36)
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
-  their lines (`add` with the read fields, `add_line`, `lines`, `get_by_hash`, `delete`)
+  their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
+  `lines`, `get_line`, `set_line_category`, `get_by_hash`, `delete`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
-  (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`)
+  (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`,
+  `0004_line_categories.sql`)
 
 ## Interfaces
 
@@ -37,17 +39,22 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
 | `current_version(connection)` | the newest applied version, 0 for a new database | `sqlite3.Error` |
 
 `CatalogRepository(connection)` returns frozen dataclasses: `CategoryRow` (with
-`product_count` and `category_count`) and `ProductRow` (with `category_name` and
+`product_count`, `category_count` and `line_count`) and `ProductRow` (with `category_name` and
 `group_name`). It has add, get, get by key, list, update and delete for categories and
 products, `get_app_state` and `set_app_state`, and `transaction()` on its own connection. It
 holds no rules: `list_products(query_key, category_or_group_id)` filters but does not sort,
-and callers own the transaction. The rules are in
+and callers own the transaction. `move_product_lines(product_id, category_id)` gives every
+line linked to the product the category and source `remembered`. The rules are in
 [categorization](../categorization/README.md#rules).
 
 `ReceiptRepository(connection)` returns the frozen dataclass `ReceiptRow` (`id`,
 `image_hash`, `file_name`, `imported_at`). It has `add` (raises `sqlite3.IntegrityError` for
-an existing hash), `get_by_hash`, `delete` and `transaction()`. The rules are in
-[import](../import/README.md).
+an existing hash), `get_by_hash`, `delete` and `transaction()`. Lines come back as `LineRow`
+(position, name, amount, refund flag and the three category fields) from `lines`, or as
+`StoredLine` (with its id and a `LineCategory` or `None`) from `get_line`;
+`set_line_category` writes the three category columns. `LineCategory` and `CategorySource`
+are defined here. The rules are in [import](../import/README.md) and
+[categorization](../categorization/README.md#line-categorization).
 
 ## Data Flow
 
@@ -93,3 +100,4 @@ None yet.
 - [Product management spec](../../../specs/features/product-management.md)
 - [Receipt import spec](../../../specs/features/receipt-import.md)
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md)
+- [Categorization spec](../../../specs/features/categorization.md): migration 0004

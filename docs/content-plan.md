@@ -32,8 +32,8 @@ Last reviewed: 2026-10-30
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
-| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers; catalog terms so far | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md) | 3 | In Progress |
+| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading and line categorization terms | 2 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 
 ### Optional Tier 1 docs (not yet planned)
@@ -56,7 +56,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 9 | Storage | [docs/subsystems/storage/README.md](subsystems/storage/README.md) | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | In Progress |
 | 10 | Import | [docs/subsystems/import/README.md](subsystems/import/README.md) | Import runs: read images from the import folder, detect duplicates by image hash, move files to the done or failed folder; the reading step comes with its spec | 4, 9 | In Progress |
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
-| 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); later: map line items to categories, remembered products first, then the model | 4, 9 | In Progress |
+| 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | In Progress |
 | 13 | Calculation | `docs/subsystems/calculation/README.md` | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check | 4, 12 | Not Started |
 | 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
@@ -82,9 +82,13 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The receipt-reading spec is Done (audited 2026-10-30): the reading step in
   the import run, the read data and `receipt_lines`, the start checks and the stopped run.
   The receipt-reading, import, storage and UI docs describe it.
+- The categorization spec is Done (audited 2026-10-30): line
+  categories at import, the correction service, FR-36 and the catalog rules with lines. The
+  categorization, import, storage, receipt-reading and data model docs and ADR 0004
+  describe it.
 - Storage, categorization, import, receipt-reading and UI docs describe what is implemented;
   their later feature specs complete them.
-- `docs/README.md` is not written yet. The glossary has the catalog and import terms.
+- `docs/README.md` is not written yet. The glossary has the catalog, import, reading and line categorization terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 

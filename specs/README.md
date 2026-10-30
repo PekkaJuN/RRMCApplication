@@ -10,3 +10,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 3 | [Receipt import](features/receipt-import.md) | Done | FR-1–FR-5, FR-45; receipt record with image identifier |
 | 4 | [Model evaluation](features/model-evaluation.md) | Done | PRD open question 4; NFR-8 (development tool) |
 | 5 | [Receipt reading](features/receipt-reading.md) | Done | FR-6–FR-10, FR-31; PRD open question 4 |
+| 6 | [Line categorization](features/categorization.md) | Done | FR-12–FR-15 (backend), FR-36, FR-44; PRD open question 6 |

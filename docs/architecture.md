@@ -129,7 +129,8 @@ The `health` package reports the state of the database, the image folders, OCR a
 - API routes are thin: they validate input, call a subsystem service and map errors to HTTP
   responses. Services hold the rules.
 - Only **storage** runs SQL. Other subsystems use its repositories.
-- Dependencies point one way: `import` → `receipt-reading`, `categorization` → `storage`;
+- Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`;
+  `categorization` → `storage` and the read line type of `receipt-reading`;
   `export` → `calculation` → `storage`. No subsystem depends on `import` or `export`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
   the interfaces below. The exception is **health**, which calls only the interfaces'
@@ -141,9 +142,9 @@ The `health` package reports the state of the database, the image folders, OCR a
 
 ### Import (FR-45: started with a button)
 
-Implemented with the reading step and the model check; the categorization spec adds the
-categorization step. Details are in [import](subsystems/import/README.md) and
-[receipt-reading](subsystems/receipt-reading/README.md).
+Implemented with the reading and categorization steps and the model check. Details are in
+[import](subsystems/import/README.md), [receipt-reading](subsystems/receipt-reading/README.md)
+and [categorization](subsystems/categorization/README.md#line-categorization).
 
 ```mermaid
 sequenceDiagram
@@ -165,9 +166,9 @@ sequenceDiagram
     else new image
       I->>R: read(image)
       R-->>I: structured receipt + raw OCR text
-      I->>C: categorize(lines)
-      C-->>I: category + source per line
-      I->>S: save receipt and lines (one transaction)
+      I->>C: suggest(lines): one model call for unknown names, none if all are known
+      C-->>I: suggestions
+      I->>S: in one transaction: resolve each line (product first, then suggestion), save receipt and lines
       I->>I: move file to import_done
     end
   end
@@ -193,7 +194,8 @@ sequenceDiagram
 1. The UI loads a receipt with its lines, categories and subtotals, and the image through an
    API endpoint (images are not served from the import folders directly).
 2. An edit is sent to the API. Categorization stores a changed category as the product's
-   remembered category (FR-13) and links renamed lines to products (FR-43).
+   remembered category and moves the product's other lines with it (FR-13, FR-36;
+   `LineCategoryService`, implemented), and links renamed lines to products (FR-43).
 3. Calculation returns updated subtotals and the sum check (FR-19, FR-20). The UI shows them.
 
 ### Totals and export
@@ -208,7 +210,7 @@ Exports are generated from the same calculation, so an export always matches the
 |---|---|---|---|
 | `ReceiptReader` | receipt-reading | `OcrReceiptReader` (Tesseract, then the text model) | Image in, read receipt out (store, date, total, lines, OCR text); the one interface import calls, so a vision reader can be added later |
 | `OcrEngine` | receipt-reading | Tesseract | `orient()` turns the image upright, `read()` returns its text; `check()` tells whether Tesseract with `fin` and `eng` can run |
-| `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization will suggest categories. Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
+| `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization suggests categories for unknown names ([ADR 0004](adr/0004-line-categorization.md)). Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
 | `Exporter` | export | CSV writer; later Google Sheets | Write lines and totals to a target (FR-27) |
 
 Both interfaces live in the shared `engines` package (see
@@ -268,12 +270,12 @@ interface keeps that choice inside receipt-reading.
 Each Tier 2 doc is created with the first spec that touches its subsystem.
 
 - [storage](subsystems/storage/README.md) — SQLite connection and migrations
-- [import](subsystems/import/README.md) — import runs, duplicates, moving files; reading
-  comes with its spec
-- [receipt-reading](subsystems/receipt-reading/README.md) — engine interfaces; reading and
-  parsing come with their spec
+- [import](subsystems/import/README.md) — import runs, duplicates, moving files, and the
+  reading and categorization steps of each image
+- [receipt-reading](subsystems/receipt-reading/README.md) — engine interfaces,
+  preprocessing, OCR and parsing
 - [categorization](subsystems/categorization/README.md) — the catalog (groups, categories,
-  products, names, default list); line categorization comes with the receipt specs
+  products, names, default list), line categories at import, user corrections and FR-36
 - calculation: `docs/subsystems/calculation/README.md` (not written yet)
 - export: `docs/subsystems/export/README.md` (not written yet)
 - [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
@@ -286,6 +288,9 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [Receipt import spec](../specs/features/receipt-import.md)
 - [ADR 0001: Technology stack](adr/0001-tech-stack.md)
 - [ADR 0002: Docker](adr/0002-docker.md)
+- [ADR 0003: Receipt reading model](adr/0003-receipt-reading-model.md)
+- [ADR 0004: Line categorization](adr/0004-line-categorization.md)
+- [Categorization spec](../specs/features/categorization.md)
 - [Foundation spec](../specs/features/foundation.md)
 - [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),
   [development.md](development.md)

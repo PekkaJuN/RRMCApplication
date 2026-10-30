@@ -1,7 +1,7 @@
 # Data Model
 
-- **Status:** In Progress (catalog, receipts with their read data, and receipt lines
-  implemented; line categories come with the categorization spec)
+- **Status:** In Progress (catalog, receipts with their read data, and receipt lines with
+  their categories implemented)
 - **Updated:** 2026-10-30
 
 ## Overview
@@ -9,7 +9,7 @@
 The app keeps all its data in one SQLite database. This document describes the schema and
 how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
 categories and products), the imported receipts with what was read from them, and their
-lines. Line categories are added by the categorization spec as a new migration.
+lines with their categories.
 
 ## Where the database is
 
@@ -57,7 +57,7 @@ one group or to none. The hierarchy has at most two levels.
 
 | Column | Type | Meaning |
 |---|---|---|
-| `id` | `INTEGER PRIMARY KEY` | Stable id; receipt lines will reference it (FR-36) |
+| `id` | `INTEGER PRIMARY KEY` | Stable id; linked receipt lines reference it (FR-36) |
 | `name` | `TEXT NOT NULL` | Display name |
 | `name_key` | `TEXT NOT NULL UNIQUE` | Normalized name; two products cannot share it |
 | `category_id` | `INTEGER NOT NULL`, references `categories (id)`, `ON DELETE RESTRICT` | The product's category, never a group |
@@ -78,7 +78,7 @@ One row per imported receipt image ([import](subsystems/import/README.md)), with
 
 | Column | Type | Meaning |
 |---|---|---|
-| `id` | `INTEGER PRIMARY KEY` | Stable id; receipt lines will reference it |
+| `id` | `INTEGER PRIMARY KEY` | Stable id; its receipt lines reference it |
 | `image_hash` | `TEXT NOT NULL UNIQUE`, `CHECK (length = 64)` | The image identifier: SHA-256 of the file's bytes, lowercase hex. The `UNIQUE` index is the duplicate lookup (FR-3) |
 | `file_name` | `TEXT NOT NULL` | The file's name in the done folder, after any numbered suffix |
 | `imported_at` | `TEXT NOT NULL` | When the receipt was stored, UTC ISO 8601 with seconds (`2026-10-28T10:00:01Z`) |
@@ -101,8 +101,13 @@ One row per item line of a receipt, in printed order (receipt-reading spec).
 | `name` | `TEXT NOT NULL`, `CHECK` not blank | Product name as read |
 | `amount_cents` | `INTEGER NOT NULL` | Amount after any discount and including any deposit (FR-9); negative for a deposit refund |
 | `is_deposit_refund` | `INTEGER NOT NULL`, `0` or `1` | 1 for a deposit refund (panttipalautus); `CHECK` that such a line is negative |
+| `category_id` | `INTEGER`, references `categories (id)`, `ON DELETE RESTRICT` | The line's category; `NULL` when it has none. Always `NULL` for a deposit refund (FR-44) |
+| `category_source` | `TEXT`, `remembered`, `model` or `user` | Where the category came from (FR-15); `NULL` exactly when `category_id` is `NULL` |
+| `product_id` | `INTEGER`, references `products (id)`, `ON DELETE SET NULL` | The product the line follows (a linked line); only with a category. Deleting the product keeps the category and the source |
 
-Lines have no category yet; categorization adds it.
+Lines stored before migration `0004` have no category. The rules that set these columns are in
+[categorization](subsystems/categorization/README.md#line-categorization). Indexes on
+`category_id` and `product_id` keep the category delete check and FR-36 updates fast.
 
 ### Relationships and rules
 
@@ -111,6 +116,8 @@ erDiagram
   categories ||--o{ categories : "group holds"
   categories ||--o{ products : "category holds"
   receipts ||--o{ receipt_lines : "has"
+  categories ||--o{ receipt_lines : "categorizes"
+  products ||--o{ receipt_lines : "is followed by"
 ```
 
 - `UNIQUE`, `CHECK` and `RESTRICT` are a safety net. "A parent is a group" and "a product's
@@ -122,8 +129,9 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are three, `0001_catalog.sql`,
-  `0002_receipts.sql` and `0003_receipt_reading.sql`, so the schema version is 3.
+  (four digits, then a short name). Today there are four, `0001_catalog.sql`,
+  `0002_receipts.sql`, `0003_receipt_reading.sql` and `0004_line_categories.sql`, so the
+  schema version is 4.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
@@ -139,7 +147,7 @@ erDiagram
 - [storage](subsystems/storage/README.md) — owns the connection, the migration runner and
   all SQL
 - [categorization](subsystems/categorization/README.md) — the rules on top of the catalog
-  tables
+  tables, and the line categories
 - [import](subsystems/import/README.md) — creates the receipt and line rows
 - [receipt-reading](subsystems/receipt-reading/README.md) — produces the read data
 
@@ -151,4 +159,5 @@ erDiagram
 - [Receipt import spec](../specs/features/receipt-import.md): the `receipts` table
 - [Receipt reading spec](../specs/features/receipt-reading.md): the read columns and
   `receipt_lines`
+- [Categorization spec](../specs/features/categorization.md): the line category columns
 - [development.md](development.md#running-the-app): where the data lives when the app runs

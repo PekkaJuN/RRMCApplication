@@ -2,7 +2,14 @@ import sqlite3
 
 import pytest
 
-from app.storage.receipt_repository import LineRow, ReceiptRepository, ReceiptRow
+from app.storage.catalog_repository import CatalogRepository
+from app.storage.receipt_repository import (
+    LineCategory,
+    LineRow,
+    ReceiptRepository,
+    ReceiptRow,
+    StoredLine,
+)
 
 HASH = "b" * 64
 TIME = "2026-10-28T10:00:00Z"
@@ -107,3 +114,64 @@ def test_ac17_delete_removes_the_lines_too(db: sqlite3.Connection) -> None:
         repository.delete(row.id)
 
     assert repository.lines(row.id) == []
+
+
+# Categorization spec P2: the category, its source and the product link of a line.
+
+
+def category_and_product(db: sqlite3.Connection) -> tuple[int, int]:
+    catalog = CatalogRepository(db)
+    category_id = catalog.add_category("Leivät", "leivät", "category", None)
+    return category_id, catalog.add_product("Ruisleipä", "ruisleipä", category_id)
+
+
+def test_add_line_stores_the_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+
+    repository.add_line(
+        receipt.id,
+        1,
+        "Ruisleipä",
+        189,
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "remembered", product_id),
+    )
+    repository.add_line(receipt.id, 2, "Banaani", 99, is_deposit_refund=False)
+
+    assert repository.lines(receipt.id) == [
+        LineRow(1, "Ruisleipä", 189, False, category_id, "remembered", product_id),
+        LineRow(2, "Banaani", 99, False),
+    ]
+
+
+def test_get_line_and_set_its_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    repository.add_line(receipt.id, 1, "Ruisleipä", 189, is_deposit_refund=False)
+    line_id = db.execute("SELECT id FROM receipt_lines").fetchone()[0]
+
+    repository.set_line_category(line_id, LineCategory(category_id, "user", product_id))
+
+    assert repository.get_line(line_id) == StoredLine(
+        id=line_id,
+        receipt_id=receipt.id,
+        name="Ruisleipä",
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "user", product_id),
+    )
+    assert repository.get_line(line_id + 1) is None
+
+
+def test_get_line_without_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    repository.add_line(receipt.id, 1, "Panttipalautus", -40, is_deposit_refund=True)
+    line_id = db.execute("SELECT id FROM receipt_lines").fetchone()[0]
+
+    line = repository.get_line(line_id)
+
+    assert line is not None
+    assert (line.is_deposit_refund, line.category) == (True, None)

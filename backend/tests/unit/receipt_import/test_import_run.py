@@ -4,11 +4,13 @@ from pathlib import Path
 
 import pytest
 
+from app.engines.model import ModelUnavailableError
 from app.receipt_import.files import LocalFileStore, image_identifier
 from app.receipt_import.run import FileResult, ImportFolders, process_file
 from app.receipt_reading.fake import FakeReceiptReader
-from app.storage.receipt_repository import ReceiptRepository
-from tests.receipt_import_data import FailingRepository, FailingStore, jpeg
+from app.storage.catalog_repository import CatalogRepository
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
+from tests.receipt_import_data import FailingRepository, FailingStore, StubCategorizer, jpeg
 
 NOW = datetime(2026, 10, 28, 10, 0, 1, tzinfo=UTC)
 
@@ -30,12 +32,14 @@ def run_file(
     folders: ImportFolders,
     repository: ReceiptRepository,
     store: LocalFileStore | None = None,
+    categorizer: StubCategorizer | None = None,
 ) -> FileResult:
     return process_file(
         path,
         store=store or LocalFileStore(),
         repository=repository,
         reader=FakeReceiptReader(),
+        categorizer=categorizer or StubCategorizer(),
         folders=folders,
         now=NOW,
     )
@@ -247,3 +251,65 @@ def test_ac17_unexpected_error_in_move_to_done_deletes_the_row(
     assert result == FileResult("a.jpg", "failed", "internal_error")
     assert receipt_count(db) == 0
     assert names(folders.failed_dir) == ["a.jpg"]
+
+
+# Categorization spec: the run categorizes the lines and stores them in the commit.
+
+
+def test_categories_are_stored_with_the_lines(
+    db: sqlite3.Connection, folders: ImportFolders
+) -> None:
+    repository = ReceiptRepository(db)
+    category_id = CatalogRepository(db).add_category(
+        "Maitotuotteet", "maitotuotteet", "category", None
+    )
+    path = folders.import_dir / "a.jpg"
+    path.write_bytes(jpeg("a"))
+
+    run_file(
+        path,
+        folders,
+        repository,
+        categorizer=StubCategorizer([LineCategory(category_id, "model", None)]),
+    )
+
+    receipt = repository.get_by_hash(image_identifier(jpeg("a")))
+    assert receipt is not None
+    lines = repository.lines(receipt.id)
+    assert [(line.category_id, line.category_source) for line in lines] == [
+        (category_id, "model"),
+        (None, None),
+    ]
+
+
+def test_ac10_unavailable_model_in_categorization_stores_nothing(
+    db: sqlite3.Connection, folders: ImportFolders
+) -> None:
+    path = folders.import_dir / "a.jpg"
+    path.write_bytes(jpeg("a"))
+
+    with pytest.raises(ModelUnavailableError):
+        run_file(
+            path,
+            folders,
+            ReceiptRepository(db),
+            categorizer=StubCategorizer(error=ModelUnavailableError("gone")),
+        )
+
+    assert names(folders.import_dir) == ["a.jpg"]
+    assert db.execute("SELECT count(*) FROM receipts").fetchone()[0] == 0
+
+
+def test_unexpected_error_in_categorization_is_internal_error(
+    db: sqlite3.Connection, folders: ImportFolders
+) -> None:
+    path = folders.import_dir / "a.jpg"
+    path.write_bytes(jpeg("a"))
+
+    result = run_file(
+        path, folders, ReceiptRepository(db), categorizer=StubCategorizer(error=RuntimeError())
+    )
+
+    assert result == FileResult("a.jpg", "failed", "internal_error")
+    assert names(folders.failed_dir) == ["a.jpg"]
+    assert db.execute("SELECT count(*) FROM receipts").fetchone()[0] == 0

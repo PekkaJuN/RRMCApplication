@@ -4,6 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.settings import Settings
+from app.storage.db import connect
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
 from tests.integration.conftest import make_client
 
 INVALID_REQUEST = {"error": "invalid_request", "message": "Pyyntö on virheellinen."}
@@ -284,3 +286,37 @@ def test_ac10_item_cannot_be_its_own_parent(api: TestClient) -> None:
 
     assert (response.status_code, response.json()["error"]) == (422, "invalid_parent")
     assert item(api, "Koti")["kind"] == "group"
+
+
+def test_ac20b_delete_category_used_by_products_and_lines(
+    api: TestClient, settings: Settings
+) -> None:
+    for name in ("Suklaa", "Karkki"):
+        add_product(api, name, "Herkut")
+    herkut = item_id(api, "Herkut")
+    connection = connect(settings.db_path)
+    try:
+        receipts = ReceiptRepository(connection)
+        with receipts.transaction():
+            receipt = receipts.add("c" * 64, "a.jpg", "2026-10-30T10:00:00Z")
+            for position in (1, 2, 3):
+                receipts.add_line(
+                    receipt.id,
+                    position,
+                    "Sipsit",
+                    299,
+                    is_deposit_refund=False,
+                    category=LineCategory(herkut, "model", None),
+                )
+    finally:
+        connection.close()
+
+    response = api.delete(f"/api/categories/{herkut}")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": "category_in_use",
+        "message": "Kategoriaa käyttää 2 tuotetta ja 3 kuittiriviä.",
+        "product_count": 2,
+        "line_count": 3,
+    }

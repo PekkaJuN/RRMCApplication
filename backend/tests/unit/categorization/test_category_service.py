@@ -15,6 +15,7 @@ from app.categorization.errors import (
 )
 from app.categorization.service import CategoryService
 from app.storage.catalog_repository import CatalogRepository, CategoryRow
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
 
 
 @pytest.fixture
@@ -308,3 +309,49 @@ def test_ac10_group_cannot_become_a_category_inside_itself(service: CategoryServ
         service.update(koti.id, kind="category", parent_id=koti.id)
 
     assert find(service, "Koti").kind == "group"
+
+
+# Categorization spec AC20, AC20b: a category used by receipt lines.
+
+
+def add_lines(db: sqlite3.Connection, category: CategoryRow, count: int) -> None:
+    receipts = ReceiptRepository(db)
+    receipt = receipts.add("d" * 64, "a.jpg", "2026-10-30T10:00:00Z")
+    for position in range(1, count + 1):
+        receipts.add_line(
+            receipt.id,
+            position,
+            "Suklaa",
+            199,
+            is_deposit_refund=False,
+            category=LineCategory(category.id, "model", None),
+        )
+
+
+def test_ac20_category_used_by_line_cannot_be_deleted_or_grouped(
+    db: sqlite3.Connection, service: CategoryService
+) -> None:
+    herkut = find(service, "Herkut")
+    add_lines(db, herkut, 1)
+
+    with pytest.raises(CategoryInUseError) as error:
+        service.delete(herkut.id)
+    with pytest.raises(CategoryHasProductsError):
+        service.update(herkut.id, kind="group")
+
+    assert error.value.extra == {"product_count": 0, "line_count": 1}
+    after = find(service, "Herkut")
+    assert (after.kind, after.line_count) == ("category", 1)
+
+
+def test_ac20b_counts_products_and_lines(
+    db: sqlite3.Connection, service: CategoryService, repo: CatalogRepository
+) -> None:
+    herkut = find(service, "Herkut")
+    add_products(repo, herkut, 2)
+    add_lines(db, herkut, 3)
+
+    with pytest.raises(CategoryInUseError) as error:
+        service.delete(herkut.id)
+
+    assert error.value.extra == {"product_count": 2, "line_count": 3}
