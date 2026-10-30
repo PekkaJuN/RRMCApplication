@@ -4,10 +4,13 @@ The images have a valid signature but are not real images.
 """
 
 import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
 
+from app.categorization.line_categorizer import Suggestions
 from app.receipt_import.files import LocalFileStore
-from app.storage.receipt_repository import ReceiptRepository, ReceiptRow
+from app.receipt_reading.receipt import ReadLine
+from app.storage.receipt_repository import LineCategory, ReceiptRepository, ReceiptRow
 
 JPEG_SIGNATURE = b"\xff\xd8\xff"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -100,14 +103,46 @@ class FailingRepository(ReceiptRepository):
         amount_cents: int,
         *,
         is_deposit_refund: bool,
+        category: LineCategory | None = None,
     ) -> None:
         if position == self._line_fails_at:
             raise sqlite3.OperationalError("simulated")
         super().add_line(
-            receipt_id, position, name, amount_cents, is_deposit_refund=is_deposit_refund
+            receipt_id,
+            position,
+            name,
+            amount_cents,
+            is_deposit_refund=is_deposit_refund,
+            category=category,
         )
 
     def delete(self, receipt_id: int) -> None:
         if self._delete_fails:
             raise sqlite3.OperationalError("simulated")
         super().delete(receipt_id)
+
+
+class StubCategorizer:
+    """Gives each line the category in `categories` by position (None by default), or raises
+    `error` in `suggest`, where the model would be asked."""
+
+    def __init__(
+        self,
+        categories: Sequence[LineCategory | None] = (),
+        error: Exception | None = None,
+    ) -> None:
+        self._categories = categories
+        self._error = error
+
+    def suggest(self, lines: Sequence[ReadLine]) -> Suggestions:
+        if self._error is not None:
+            raise self._error
+        return {}
+
+    def resolve(
+        self, lines: Sequence[ReadLine], suggestions: Suggestions
+    ) -> list[LineCategory | None]:
+        return [
+            self._categories[index] if index < len(self._categories) else None
+            for index in range(len(lines))
+        ]

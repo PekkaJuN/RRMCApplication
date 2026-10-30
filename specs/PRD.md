@@ -87,7 +87,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-11 | The user manages categories and groups (add, rename, move, remove when unused). Categories are organized in at most two levels: a **group** holds categories; a category either belongs to one group or stands alone. The app ships with the default list in [section 6.9](#69-default-categories). |
 | FR-12 | Each line gets a category. A product name the user has corrected before gets the remembered category first. Otherwise the model suggests one from the category list. The model sees each category with its group (e.g. "Ruoka > Maitotuotteet") and can only choose a category, never a group. |
 | FR-13 | When the user changes a line's category, the mapping from that product name to the category is stored and reused for future receipts. |
-| FR-14 | Product names are normalized before matching, so small OCR differences (case, spacing, common character mix-ups) still match a remembered product. |
+| FR-14 | Product names are normalized before matching, so small OCR differences (case, spacing, common character mix-ups) still match a remembered product. *Note (2026-10-30):* case and spacing are handled; character mix-ups and fuzzy matching move to a later spec, decided from real corrections, because looser matching changes the uniqueness of existing product names (FR-35) ([categorization spec](features/categorization.md#out-of-scope)). |
 | FR-15 | Each line records where its category came from: remembered mapping, model, or user. |
 
 ### 6.4 Review UI
@@ -140,7 +140,7 @@ which category each product belongs to (FR-12, FR-13). The user can also manage 
 | FR-34 | The user can add a product with a category, rename a product, change its category and delete it. |
 | FR-35 | Product names are unique after normalization (FR-14). Category and group names share one namespace and are unique, ignoring case and surrounding spaces (e.g. only one "Muut"). |
 | FR-36 | When the user changes a product's category, every saved receipt line of that product moves to the new category, and all totals reflect the change. Deleting a product does not change saved lines: they keep their current category. |
-| FR-37 | A category that is used by a product cannot be deleted; the user is told how many products use it. A group that still has categories cannot be deleted; the user is told how many. |
+| FR-37 | A category that is used by a product or by a receipt line cannot be deleted; the user is told how many products and lines use it. A group that still has categories cannot be deleted; the user is told how many. |
 | FR-38 | A product always belongs to a category, never directly to a group. |
 | FR-39 | The user can create a new group and add new or existing categories to it, move a category from one group to another, and take a category out of a group. Groups cannot be nested. A category that has products cannot be turned into a group. |
 
@@ -275,8 +275,8 @@ A suggested order of feature specs for the MVP:
    ([ADR 0003](../docs/adr/0003-receipt-reading-model.md)). Was: compare Tesseract + text model against a vision model
    on 20–30 real receipts before the parsing spec is approved.
 5. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
-6. [NEEDS CLARIFICATION] Is a receipt categorized per line only, or can a whole receipt get
-   one category?
+6. Resolved (2026-10-30): a receipt is categorized per line only; a receipt with one line
+   gets one category through that line ([categorization spec](features/categorization.md)).
 7. [NEEDS CLARIFICATION] CSV format details (FR-26).
 8. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
    be archived too (e.g. after a long break)? Can archived data be viewed or exported
@@ -289,6 +289,7 @@ Resolved:
 - UI language: Finnish, NFR-15 (2026-10-20).
 - Two-level categories with user-created groups: FR-11, FR-38, FR-39 (2026-10-20).
 - Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
+- Categorization is per line; a category used by receipt lines cannot be deleted: open question 6, FR-37 (2026-10-30).
 - Line editing: fields are independent and never recalculated; discounts are merged into the item's net amount; negative amounts are allowed (deposit refunds); a renamed line follows a matching product: FR-9, FR-18, FR-43 (2026-10-21).
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
 - A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).

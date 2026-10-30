@@ -3,16 +3,18 @@
 import logging
 import sqlite3
 import traceback
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
+from app.categorization.line_categorizer import Suggestions
 from app.engines.model import ModelUnavailableError
 from app.receipt_import.files import FileStore, check_format, free_target_name, image_identifier
 from app.receipt_reading.reader import ReceiptReader
-from app.receipt_reading.receipt import ReadFailedError, ReadReceipt
-from app.storage.receipt_repository import ReceiptRepository
+from app.receipt_reading.receipt import ReadFailedError, ReadLine, ReadReceipt
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,16 @@ type FailureReason = Literal[
     "move_failed",
     "internal_error",
 ]
+
+
+class Categorizer(Protocol):
+    """What the run needs of `LineCategorizer`; tests pass a stub."""
+
+    def suggest(self, lines: Sequence[ReadLine]) -> Suggestions: ...
+
+    def resolve(
+        self, lines: Sequence[ReadLine], suggestions: Suggestions
+    ) -> list[LineCategory | None]: ...
 
 
 @dataclass(frozen=True)
@@ -71,6 +83,7 @@ def process_file(
     store: FileStore,
     repository: ReceiptRepository,
     reader: ReceiptReader,
+    categorizer: Categorizer,
     folders: ImportFolders,
     now: datetime,
 ) -> FileResult:
@@ -84,7 +97,7 @@ def process_file(
             and the run must stop (FR-31).
     """
     try:
-        return _import(path, store, repository, reader, folders, now)
+        return _import(path, store, repository, reader, categorizer, folders, now)
     except ModelUnavailableError:
         raise
     except _FileFailedError as failure:
@@ -102,6 +115,7 @@ def _import(
     store: FileStore,
     repository: ReceiptRepository,
     reader: ReceiptReader,
+    categorizer: Categorizer,
     folders: ImportFolders,
     now: datetime,
 ) -> FileResult:
@@ -118,6 +132,8 @@ def _import(
         read = reader.read(data)
     except ReadFailedError as error:
         raise _FileFailedError(error.reason) from None
+    # The model is asked outside the commit's transaction: it takes seconds.
+    suggestions = categorizer.suggest(read.lines)
     # The row stores the final name, so the name is chosen before the commit.
     try:
         target = free_target_name(path.name, store.names_in(folders.done_dir))
@@ -125,7 +141,8 @@ def _import(
         raise _FileFailedError("move_failed", move_to_failed=False) from None
     try:
         with repository.transaction():
-            receipt_id = _save(repository, image_hash, target, utc_text(now), read)
+            categories = categorizer.resolve(read.lines, suggestions)
+            receipt_id = _save(repository, image_hash, target, utc_text(now), read, categories)
     except sqlite3.Error:
         raise _FileFailedError("save_failed") from None
     try:
@@ -141,7 +158,12 @@ def _import(
 
 
 def _save(
-    repository: ReceiptRepository, image_hash: str, file_name: str, now: str, read: ReadReceipt
+    repository: ReceiptRepository,
+    image_hash: str,
+    file_name: str,
+    now: str,
+    read: ReadReceipt,
+    categories: Sequence[LineCategory | None],
 ) -> int:
     """Store the receipt and its lines; the caller's transaction makes it all or nothing."""
     purchase_date = read.purchase_date.isoformat() if read.purchase_date else None
@@ -154,13 +176,14 @@ def _save(
         total_cents=read.total_cents,
         ocr_text=read.ocr_text,
     )
-    for position, line in enumerate(read.lines, start=1):
+    for position, (line, category) in enumerate(zip(read.lines, categories, strict=True), 1):
         repository.add_line(
             receipt.id,
             position,
             line.name,
             line.amount_cents,
             is_deposit_refund=line.is_deposit_refund,
+            category=category,
         )
     return receipt.id
 

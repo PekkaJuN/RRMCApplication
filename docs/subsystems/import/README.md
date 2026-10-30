@@ -11,9 +11,11 @@ duplicates: new images go to the done folder after their receipt is committed, a
 fail go to the failed folder.
 
 Every new image is read by [receipt reading](../receipt-reading/README.md) between the
-duplicate check and the commit, and the receipt is stored with its read data and lines. A run
+duplicate check and the commit, its lines get categories from
+[categorization](../categorization/README.md#line-categorization), and the receipt is stored
+with its read data and categorized lines. A run
 starts only when OCR and the model are available, and stops if the model is lost during the
-run (FR-31). Import does not choose categories.
+run (FR-31). Import does not choose categories itself.
 
 The behavior is specified in the [receipt import spec](../../../specs/features/receipt-import.md)
 and the [receipt-reading spec](../../../specs/features/receipt-reading.md).
@@ -71,12 +73,15 @@ Steps of one file (`process_file`):
 | 3. Hash; a receipt with that hash exists | (not an error) | duplicate | import folder |
 | 4. Read the image (`ReceiptReader.read`) | `ReadFailedError` | its reason: `unreadable_image`, `ocr_failed`, `no_text`, `parse_failed` | failed folder |
 | | `ModelUnavailableError` | none: the run stops | import folder |
+| 4b. Ask for category suggestions (`LineCategorizer.suggest`); at most one model call | `ModelUnavailableError` | none: the run stops | import folder |
 | 5. Choose the free name in the done folder | `OSError` | `move_failed` | import folder |
-| 6. Commit the receipt row and its lines in one transaction | `sqlite3.Error` | `save_failed` | failed folder |
+| 6. Commit the receipt row and its lines in one transaction; each line gets its category from `LineCategorizer.resolve` inside it | `sqlite3.Error` | `save_failed` | failed folder |
 | 7. Move to the done folder | `OSError` | `move_failed`; the row is deleted again, its lines with it | import folder |
 | any step | other exception | `internal_error` | failed folder |
 
 - Duplicates are found before reading, so they cost no OCR or model time.
+- A bad categorization answer does not fail the image: those lines are stored without a
+  category. The model is asked outside the commit's transaction, because it takes seconds.
 - The row stores the file's final name, so the name is chosen before the commit (step 5).
 - The file moves only after the commit (NFR-7). If the move fails, the row is deleted, so a
   later run imports the file instead of calling it a duplicate.
@@ -104,7 +109,9 @@ updates the state after each file. The UI polls `GET /api/import` while the stat
 ## Dependencies
 
 - Uses: [receipt reading](../receipt-reading/README.md) (`ReceiptReader`, the engines'
-  `check()`), [storage](../storage/README.md) (`ReceiptRepository`, `connect`),
+  `check()`), [categorization](../categorization/README.md) (`LineCategorizer`,
+  `create_suggester`), [storage](../storage/README.md) (`ReceiptRepository`,
+  `CatalogRepository`, `connect`),
   `check_folders` from @backend/app/health/service.py, and the folder settings
   (@backend/app/settings.py).
 - Used by: the API ([api-reference.md](../../api-reference.md#import)) and the Tuonti page
@@ -133,12 +140,14 @@ None yet.
 - **Testing seams.** `ImportService` takes the engines and the reader (by default built
   from the settings, so `RRMC_ENGINES=fake` gives the fake reader), the `FileStore`, a
   repository factory, `can_write`,
-  the clock, `RunHooks` and `run_in_background`; `create_app(import_service=...)` passes a
+  the clock, `RunHooks`, `run_in_background` and the category suggester (by default
+  `create_suggester`, so `RRMC_ENGINES=fake` gives `FakeSuggester`); `create_app(import_service=...)` passes a
   configured service to integration tests. Production code uses the defaults.
 
 ## Related Documents
 
 - [Receipt import spec](../../../specs/features/receipt-import.md)
+- [Categorization spec](../../../specs/features/categorization.md): the categorization step
 - [architecture.md](../../architecture.md#import-fr-45-started-with-a-button): where import
   sits in the flow
 - [datamodel.md](../../datamodel.md#receipts): the `receipts` and `receipt_lines` tables

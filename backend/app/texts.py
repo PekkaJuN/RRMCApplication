@@ -8,12 +8,18 @@ DUPLICATE_CATEGORY_NAME = "Samanniminen ryhmä tai kategoria on jo olemassa."
 INVALID_PARENT = "Kategorian voi lisätä vain ryhmään, eikä ryhmä voi kuulua toiseen ryhmään."
 UNKNOWN_CATEGORY = "Kategoriaa ei löydy."
 NOT_A_CATEGORY = "Tuotteen voi lisätä vain kategoriaan, ei ryhmään."
-CATEGORY_HAS_PRODUCTS = "Kategoriaa, jossa on tuotteita, ei voi muuttaa ryhmäksi."
+CATEGORY_HAS_PRODUCTS = "Kategoriaa, jossa on tuotteita tai kuittirivejä, ei voi muuttaa ryhmäksi."
+DEPOSIT_REFUND_LINE = "Pantinpalautusriville ei voi valita kategoriaa."
 
 
-def category_in_use(product_count: int) -> str:
-    products = "tuote" if product_count == 1 else "tuotetta"
-    return f"Kategoriaa käyttää {product_count} {products}."
+def category_in_use(product_count: int, line_count: int = 0) -> str:
+    """Names only the counts above 0, e.g. "Kategoriaa käyttää 1 kuittirivi."."""
+    parts: list[str] = []
+    if product_count or not line_count:
+        parts.append(f"{product_count} {'tuote' if product_count == 1 else 'tuotetta'}")
+    if line_count:
+        parts.append(f"{line_count} {'kuittirivi' if line_count == 1 else 'kuittiriviä'}")
+    return f"Kategoriaa käyttää {' ja '.join(parts)}."
 
 
 def group_not_empty(category_count: int) -> str:

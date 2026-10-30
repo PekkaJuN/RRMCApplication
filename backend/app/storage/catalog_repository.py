@@ -12,7 +12,8 @@ type Kind = Literal["group", "category"]
 _CATEGORY_SELECT = """
     SELECT c.id, c.name, c.name_key, c.kind, c.parent_id,
            (SELECT count(*) FROM products p WHERE p.category_id = c.id) AS product_count,
-           (SELECT count(*) FROM categories k WHERE k.parent_id = c.id) AS category_count
+           (SELECT count(*) FROM categories k WHERE k.parent_id = c.id) AS category_count,
+           (SELECT count(*) FROM receipt_lines l WHERE l.category_id = c.id) AS line_count
     FROM categories c
 """
 
@@ -36,6 +37,7 @@ class CategoryRow:
     parent_id: int | None
     product_count: int
     category_count: int
+    line_count: int = 0
 
 
 def _category(row: sqlite3.Row) -> CategoryRow:
@@ -47,6 +49,7 @@ def _category(row: sqlite3.Row) -> CategoryRow:
         parent_id=row["parent_id"],
         product_count=row["product_count"],
         category_count=row["category_count"],
+        line_count=row["line_count"],
     )
 
 
@@ -155,6 +158,14 @@ class CatalogRepository:
         self._connection.execute(
             "UPDATE products SET name = ?, name_key = ?, category_id = ? WHERE id = ?",
             (name, name_key, category_id, product_id),
+        )
+
+    def move_product_lines(self, product_id: int, category_id: int) -> None:
+        """Give every line that follows the product its new category (FR-36)."""
+        self._connection.execute(
+            "UPDATE receipt_lines SET category_id = ?, category_source = 'remembered'"
+            " WHERE product_id = ?",
+            (category_id, product_id),
         )
 
     def delete_product(self, product_id: int) -> None:

@@ -121,8 +121,9 @@ about it (FR-20). The OCR text is kept as Tesseract returned it (FR-10).
 - Uses: Tesseract in the backend container; Ollama on Windows at `RRMC_OLLAMA_URL`, through
   `httpx2`; Pillow.
 - Used by: [import](../import/README.md) (the reader), health (`check()` and `load()`), the
-  evaluation tool (preprocessing, Tesseract, prompt, schema); later categorization
-  (`generate()`).
+  evaluation tool (preprocessing, Tesseract, prompt, schema), and
+  [categorization](../categorization/README.md#line-categorization) (`generate()` with its
+  own prompt and schema, through `ModelSuggester`).
 
 ## Modules
 

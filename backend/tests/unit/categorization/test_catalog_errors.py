@@ -3,6 +3,7 @@ import pytest
 from app.categorization.errors import (
     CategoryHasProductsError,
     CategoryInUseError,
+    DepositRefundLineError,
     DuplicateNameError,
     GroupNotEmptyError,
     InvalidParentError,
@@ -57,3 +58,36 @@ def test_ac14_group_not_empty_tells_the_category_count() -> None:
 
 def test_ac14_group_with_one_category_is_singular() -> None:
     assert GroupNotEmptyError(1).message == "Ryhmässä on 1 kategoria."
+
+
+# Categorization spec AC20, AC20b, AC16
+
+
+@pytest.mark.parametrize(
+    ("products", "lines", "message", "extra"),
+    [
+        (2, 3, "Kategoriaa käyttää 2 tuotetta ja 3 kuittiriviä.", {"line_count": 3}),
+        (0, 1, "Kategoriaa käyttää 1 kuittirivi.", {"line_count": 1}),
+        (1, 0, "Kategoriaa käyttää 1 tuote.", {}),
+    ],
+)
+def test_ac20_category_in_use_tells_products_and_lines(
+    products: int, lines: int, message: str, extra: dict[str, int]
+) -> None:
+    error = CategoryInUseError(products, lines)
+
+    assert error.message == message
+    assert error.extra == {"product_count": products, **extra}
+
+
+def test_ac16_deposit_refund_line_error() -> None:
+    error = DepositRefundLineError()
+
+    assert (error.code, error.status, error.extra) == ("deposit_refund_line", 422, {})
+    assert error.message == "Pantinpalautusriville ei voi valita kategoriaa."
+
+
+def test_ac20_category_with_lines_cannot_become_a_group_text() -> None:
+    assert CategoryHasProductsError().message == (
+        "Kategoriaa, jossa on tuotteita tai kuittirivejä, ei voi muuttaa ryhmäksi."
+    )

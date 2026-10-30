@@ -13,6 +13,7 @@ from app.categorization.errors import (
 )
 from app.categorization.service import CategoryService, ProductService
 from app.storage.catalog_repository import CatalogRepository
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
 
 
 @pytest.fixture
@@ -182,3 +183,67 @@ def test_ac24_filter_by_category_group_and_query(
 def test_ac33_unknown_filter(service: ProductService) -> None:
     with pytest.raises(UnknownCategoryError):
         service.list(category_id=9999)
+
+
+# Categorization spec AC17-AC19: saved lines follow their product (FR-36).
+
+
+def add_lines(db: sqlite3.Connection, *categories: LineCategory | None) -> list[int]:
+    receipts = ReceiptRepository(db)
+    receipt = receipts.add("f" * 64, "a.jpg", "2026-10-30T10:00:00Z")
+    for position, category in enumerate(categories, 1):
+        receipts.add_line(
+            receipt.id, position, "Ruisleipä", 189, is_deposit_refund=False, category=category
+        )
+    return [row["id"] for row in db.execute("SELECT id FROM receipt_lines ORDER BY position")]
+
+
+def line_categories(db: sqlite3.Connection, line_ids: list[int]) -> list[LineCategory | None]:
+    receipts = ReceiptRepository(db)
+    lines = [receipts.get_line(line_id) for line_id in line_ids]
+    return [line.category if line else None for line in lines]
+
+
+def test_ac17_category_change_moves_linked_lines(
+    db: sqlite3.Connection, service: ProductService, ids: dict[str, int]
+) -> None:
+    bread, dry = ids["Leivät"], ids["Kuivatuotteet"]
+    product = service.create("Ruisleipä", bread)
+    line_ids = add_lines(
+        db,
+        LineCategory(bread, "remembered", product.id),
+        LineCategory(bread, "user", product.id),
+        LineCategory(bread, "model", None),
+    )
+
+    service.update(product.id, category_id=dry)
+
+    assert line_categories(db, line_ids) == [
+        LineCategory(dry, "remembered", product.id),
+        LineCategory(dry, "remembered", product.id),
+        LineCategory(bread, "model", None),
+    ]
+
+
+def test_ac18_rename_keeps_lines(
+    db: sqlite3.Connection, service: ProductService, ids: dict[str, int]
+) -> None:
+    bread = ids["Leivät"]
+    product = service.create("Ruisleipä", bread)
+    line_ids = add_lines(db, LineCategory(bread, "user", product.id))
+
+    service.update(product.id, name="Ruisleipä 500 g", category_id=bread)
+
+    assert line_categories(db, line_ids) == [LineCategory(bread, "user", product.id)]
+
+
+def test_ac19_delete_keeps_line_categories(
+    db: sqlite3.Connection, service: ProductService, ids: dict[str, int]
+) -> None:
+    bread = ids["Leivät"]
+    product = service.create("Ruisleipä", bread)
+    line_ids = add_lines(db, LineCategory(bread, "remembered", product.id))
+
+    service.delete(product.id)
+
+    assert line_categories(db, line_ids) == [LineCategory(bread, "remembered", None)]

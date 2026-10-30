@@ -8,14 +8,28 @@ Categorization owns the **catalog**: groups, categories and products, the rules 
 name normalization and the default category list. It is the app's memory of which category
 each product belongs to (PRD 6.8).
 
-Today it has the catalog only. Assigning a category to each receipt line (remembered product
-first, then the model) comes with the receipt specs. It does not calculate totals and runs no
-SQL; storage does that.
+It also gives each receipt line its category when a receipt is imported: the remembered
+category of a known product first, otherwise a suggestion from the local model
+([line categorization](#line-categorization)). A user's correction of a line is stored as
+the product's category, and a product's new category moves its lines (FR-13, FR-36). It
+does not calculate totals and runs no SQL; storage does that.
+
+The behavior is specified in the
+[product management spec](../../../specs/features/product-management.md) and the
+[categorization spec](../../../specs/features/categorization.md).
 
 ## Key Files and Entry Points
 
 - @backend/app/categorization/names.py — normalization, name validation, Finnish sort key
-- @backend/app/categorization/service.py — `CategoryService`, `ProductService`: every rule
+- @backend/app/categorization/service.py — `CategoryService`, `ProductService`,
+  `LineCategoryService`: every rule
+- @backend/app/categorization/line_categorizer.py — `LineCategorizer`: a category for each
+  line of a read receipt
+- @backend/app/categorization/prompt.py — `category_options`, `category_prompt`,
+  `answer_schema`, `parse_answer`
+- @backend/app/categorization/suggester.py — `CategorySuggester` (the interface),
+  `ModelSuggester`, `FakeSuggester`
+- @backend/app/categorization/factory.py — `create_suggester(settings, engines)`
 - @backend/app/categorization/defaults.py — `DEFAULT_CATEGORIES` (PRD 6.9), `seed_defaults`
 - @backend/app/categorization/errors.py — one `AppError` subclass per error code
 - @backend/app/categorization/schemas.py, @backend/app/categorization/routes.py — the
@@ -24,7 +38,7 @@ SQL; storage does that.
 ## Interfaces
 
 The services are plain classes that take a `CatalogRepository`, so other subsystems can call
-them without the API (FR-36 and FR-43 will). Each write runs in one transaction.
+them without the API (import does; the review UI will). Each write runs in one transaction.
 
 | Call | Returns | Raises |
 |---|---|---|
@@ -34,8 +48,11 @@ them without the API (FR-36 and FR-43 will). Each write runs in one transaction.
 | `CategoryService.delete(id)` | | `NotFoundError`, `CategoryInUseError`, `GroupNotEmptyError` |
 | `ProductService.list(query, category_id)` | products sorted by name | `UnknownCategoryError` |
 | `ProductService.create(name, category_id)` | the new product | `InvalidNameError`, `UnknownCategoryError`, `NotACategoryError`, `DuplicateNameError` |
-| `ProductService.update(id, *, name, category_id)` | the product | `NotFoundError` and the errors of `create` |
+| `ProductService.update(id, *, name, category_id)` | the product; a new category moves its linked lines | `NotFoundError` and the errors of `create` |
 | `ProductService.delete(id)` | | `NotFoundError` |
+| `LineCategoryService(catalog, receipts).set_category(line_id, category_id)` | the line (`StoredLine`) | `NotFoundError`, `UnknownCategoryError`, `NotACategoryError`, `DepositRefundLineError`, `InvalidNameError` |
+| `LineCategorizer(repository, suggester).suggest(lines)` | `Suggestions`: normalized name → category id | `ModelUnavailableError` |
+| `LineCategorizer.resolve(lines, suggestions)` | one `LineCategory` or `None` per line | |
 | `seed_defaults(repository, now)` | | |
 
 `parent_id=KEEP` (the default) leaves the group as it is; `None` takes a category out of its
@@ -54,7 +71,8 @@ measured on the display name: 1–50 characters for groups and categories, 1–1
 products. Lists are sorted by the key in Finnish order (å, ä, ö after z), done in Python
 because SQLite has no Finnish collation. Product search matches any part of the key.
 
-OCR mix-ups and fuzzy matching (the rest of FR-14) are not handled yet.
+OCR mix-ups and fuzzy matching (the rest of FR-14) are not handled; a later spec decides
+them from real corrections (categorization spec, Out of Scope).
 
 ### Rules
 
@@ -67,10 +85,57 @@ OCR mix-ups and fuzzy matching (the rest of FR-14) are not handled yet.
   a group, but the same request with `"parent_id": null` can.
 - A category with products cannot become a group; a group with categories cannot become a
   category (`group_not_empty` with the count).
-- A category with products cannot be deleted (`category_in_use` with `product_count`); a
+- A category used by products or receipt lines cannot be deleted (`category_in_use` with
+  `product_count`, and `line_count` when lines use it), so no line loses its category; a
   group with categories cannot be deleted (`group_not_empty` with `category_count`).
+- A category used by receipt lines cannot become a group either (`category_has_products`).
 - The default list is created once, on the first start, and marked in `app_state`. Deleting
   defaults later does not bring them back.
+
+## Line categorization
+
+Each line stores a category, its **category source** and its product link
+([datamodel](../../datamodel.md#receipt_lines)). Deposit refunds never get any of them
+(FR-44). Why the model gets a separate call is in
+[ADR 0004](../../adr/0004-line-categorization.md).
+
+At import ([import data flow](../import/README.md#data-flow)):
+
+| Step | Where | What |
+|---|---|---|
+| `suggest` | before the commit | Lines whose normalized name matches no product, each name once in first-seen order, go to `CategorySuggester.suggest(names, options)` in one call. No call when there are none, or when the catalog has no categories |
+| `resolve` | inside the commit | Per line: a refund gets nothing; a matching product gives its category, `remembered`, linked; else a suggested category that still exists as a category gives `model`, not linked; else nothing |
+
+`resolve` reads products and categories again in the commit's transaction, so a product or
+category the user changed during the run cannot fail the image. A suggestion never creates a
+product.
+
+The model request (`ModelSuggester`) uses `ReceiptModel.generate`:
+
+- The prompt is the instructions, the numbered options, then the numbered names. An option
+  is `Ryhmä > Kategoria`, or the category alone without a group; groups are never options.
+  The options come first, so the start of the prompt is the same on every receipt.
+- The answer is `{"c": [n, ...]}`: one option number per name. The schema has `enum` 1…N and
+  `minItems`/`maxItems` equal to the name count; `parse_answer` checks both again.
+- A wrong answer, `ModelTimeoutError` or `ModelAnswerError` gives no suggestion for the
+  call; a number outside the list gives none for its name. `ModelUnavailableError` passes
+  through and stops the run.
+- With `RRMC_ENGINES=fake`, `FakeSuggester` suggests the first option (`Auto > Autohuolto`
+  with the default list) for every name.
+
+A user correction (`LineCategoryService.set_category`), in one transaction. The two
+repositories must share one connection, because the transaction is opened on the
+catalog's:
+
+1. The line must exist, the category must be a category, and the line must not be a deposit
+   refund.
+2. The product is the linked one, else the one with the line's normalized name, else a new
+   product with the line's name (1–100 characters, else `InvalidNameError`).
+3. If the product's category changes, the product and every line linked to it get the new
+   category with source `remembered` (FR-36).
+4. The corrected line gets the category, source `user`, and the link.
+
+Only the corrected line is linked; other unlinked lines with the same name stay as they are.
 
 ## Data Flow
 
@@ -82,9 +147,12 @@ OCR mix-ups and fuzzy matching (the rest of FR-14) are not handled yet.
 
 ## Dependencies
 
-- Uses: [storage](../storage/README.md) (`CatalogRepository`, `transaction`), the shared
-  error format (@backend/app/errors.py) and texts (@backend/app/texts.py).
-- Used by: the API, and later import and receipt editing.
+- Uses: [storage](../storage/README.md) (`CatalogRepository`, `ReceiptRepository`,
+  `transaction`), `ReceiptModel` from the engines package and `ReadLine` from
+  [receipt-reading](../receipt-reading/README.md#interfaces), the shared error format
+  (@backend/app/errors.py) and texts (@backend/app/texts.py).
+- Used by: the API, [import](../import/README.md) (`LineCategorizer`, `create_suggester`),
+  and later the review UI (`LineCategoryService`).
 
 ## Modules
 
@@ -96,11 +164,15 @@ None yet.
   `CHECK` and `RESTRICT`: the schema alone cannot tell a group from a category in another
   row, and it would give a 500 instead of the right code.
 - Product names are personal purchase data. They are not logged; the request log leaves out
-  bodies and query strings.
+  bodies and query strings. The categorization errors name no line, product or category.
+- `DepositRefundLineError` (`deposit_refund_line`, 422) has no endpoint yet; the review UI
+  spec will expose it.
 
 ## Related Documents
 
 - [Product management spec](../../../specs/features/product-management.md)
+- [Categorization spec](../../../specs/features/categorization.md)
+- [ADR 0004](../../adr/0004-line-categorization.md): remembered first, separate model call
 - [datamodel.md](../../datamodel.md#categories): the catalog tables
 - [api-reference.md](../../api-reference.md#catalog-groups-categories-and-products)
 - [glossary.md](../../glossary.md)

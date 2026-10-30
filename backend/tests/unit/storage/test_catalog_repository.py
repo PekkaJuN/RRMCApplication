@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 
 from app.storage.catalog_repository import CatalogRepository, CategoryRow, ProductRow
+from app.storage.receipt_repository import LineCategory, ReceiptRepository
 
 
 @pytest.fixture
@@ -216,3 +217,50 @@ def test_repository_transaction_rolls_back_on_error(repo: CatalogRepository) -> 
         raise ValueError("stop")
 
     assert repo.list_categories() == []
+
+
+# Categorization spec P3: lines that use a category, and lines that follow a product.
+
+
+def add_line(
+    db: sqlite3.Connection, position: int, category: LineCategory | None, image_hash: str = "e"
+) -> None:
+    receipts = ReceiptRepository(db)
+    receipt = receipts.get_by_hash(image_hash * 64) or receipts.add(
+        image_hash * 64, "a.jpg", "2026-10-30T10:00:00Z"
+    )
+    receipts.add_line(
+        receipt.id, position, "Ruisleipä", 189, is_deposit_refund=False, category=category
+    )
+
+
+def test_category_counts_its_lines(db: sqlite3.Connection, repo: CatalogRepository) -> None:
+    used = repo.add_category("Leivät", "leivät", "category", None)
+    unused = repo.add_category("Kala", "kala", "category", None)
+    for position in (1, 2, 3):
+        add_line(db, position, LineCategory(used, "model", None))
+
+    counts = [repo.get_category(item) for item in (used, unused)]
+    assert [row.line_count if row else None for row in counts] == [3, 0]
+
+
+def test_move_product_lines_moves_only_the_products_lines(
+    db: sqlite3.Connection, repo: CatalogRepository
+) -> None:
+    old = repo.add_category("Leivät", "leivät", "category", None)
+    new = repo.add_category("Kuivatuotteet", "kuivatuotteet", "category", None)
+    product = repo.add_product("Ruisleipä", "ruisleipä", old)
+    add_line(db, 1, LineCategory(old, "user", product))
+    add_line(db, 2, LineCategory(old, "remembered", product))
+    add_line(db, 3, LineCategory(old, "model", None))
+
+    repo.move_product_lines(product, new)
+
+    receipt = ReceiptRepository(db).get_by_hash("e" * 64)
+    assert receipt is not None
+    lines = ReceiptRepository(db).lines(receipt.id)
+    assert [(line.category_id, line.category_source, line.product_id) for line in lines] == [
+        (new, "remembered", product),
+        (new, "remembered", product),
+        (old, "model", None),
+    ]

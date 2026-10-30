@@ -104,8 +104,8 @@ A **product**:
 | `DELETE /api/categories/{id}` | | 204, no body | 404 `not_found`; 409 `category_in_use`, `group_not_empty` |
 | `GET /api/products` | `q` (part of the name, any case), `category_id` (a category, or a group for all its categories); both combine | 200, list of products sorted by name | 422 `unknown_category` |
 | `POST /api/products` | `{"name", "category_id"}` | 201, the product | 422 `invalid_name`, `unknown_category`, `not_a_category`; 409 `duplicate_name` |
-| `PATCH /api/products/{id}` | any of `name`, `category_id` | 200, the product | 404 `not_found`; 422 as for `POST`; 409 `duplicate_name` |
-| `DELETE /api/products/{id}` | | 204, no body | 404 `not_found` |
+| `PATCH /api/products/{id}` | any of `name`, `category_id`; a new `category_id` also moves every receipt line linked to the product (FR-36) | 200, the product | 404 `not_found`; 422 as for `POST`; 409 `duplicate_name` |
+| `DELETE /api/products/{id}` | | 204, no body; its receipt lines keep their category and lose the link | 404 `not_found` |
 
 A body with a missing field, a wrong JSON type, or a `kind` other than `group` or `category`
 gives the foundation's `invalid_request` (422).
@@ -119,9 +119,13 @@ gives the foundation's `invalid_request` (422).
 | 422 | `invalid_parent` | | `Kategorian voi lisätä vain ryhmään, eikä ryhmä voi kuulua toiseen ryhmään.` |
 | 422 | `unknown_category` | | `Kategoriaa ei löydy.` |
 | 422 | `not_a_category` | | `Tuotteen voi lisätä vain kategoriaan, ei ryhmään.` |
-| 409 | `category_has_products` | | `Kategoriaa, jossa on tuotteita, ei voi muuttaa ryhmäksi.` |
-| 409 | `category_in_use` | `product_count` | `Kategoriaa käyttää 3 tuotetta.` (`1 tuote` for one) |
+| 409 | `category_has_products` | | `Kategoriaa, jossa on tuotteita tai kuittirivejä, ei voi muuttaa ryhmäksi.` (products or receipt lines use it) |
+| 409 | `category_in_use` | `product_count`; `line_count` when receipt lines use it | `Kategoriaa käyttää 3 tuotetta.`, `Kategoriaa käyttää 2 tuotetta ja 3 kuittiriviä.` or `Kategoriaa käyttää 1 kuittirivi.`: only the counts above 0 (`1 tuote`, `1 kuittirivi` for one) |
 | 409 | `group_not_empty` | `category_count` | `Ryhmässä on 3 kategoriaa.` (`1 kategoria` for one) |
+
+`deposit_refund_line` (422, `Pantinpalautusriville ei voi valita kategoriaa.`) is defined
+for the line correction service but no endpoint returns it yet; the review UI spec adds
+the endpoint ([categorization](subsystems/categorization/README.md#line-categorization)).
 
 The texts live in @backend/app/texts.py.
 

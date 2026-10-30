@@ -1,6 +1,6 @@
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,6 +11,8 @@ from app.receipt_import.files import LocalFileStore
 from app.receipt_import.schemas import FailureOut, ImportStateOut
 from app.receipt_import.service import ImportService, RunHooks
 from app.settings import Settings
+from app.storage.catalog_repository import CatalogRepository
+from app.storage.db import connect
 from app.storage.migrate import migrate_database
 from tests.receipt_import_data import jpeg
 
@@ -259,3 +261,59 @@ def test_ac21_import_folder_that_cannot_be_listed_refuses_the_start(settings: Se
         service.start()
 
     assert service.state() == IDLE
+
+
+# Categorization spec P10: the run categorizes the lines on its own connection.
+
+
+def stored_lines(settings: Settings) -> list[tuple[str, int | None, str | None]]:
+    connection = connect(settings.db_path)
+    try:
+        rows = connection.execute(
+            "SELECT name, category_id, category_source FROM receipt_lines ORDER BY position"
+        )
+        return [(row["name"], row["category_id"], row["category_source"]) for row in rows]
+    finally:
+        connection.close()
+
+
+def add_category(settings: Settings, name: str) -> int:
+    connection = connect(settings.db_path)
+    try:
+        return CatalogRepository(connection).add_category(name, name.casefold(), "category", None)
+    finally:
+        connection.close()
+
+
+def test_ac21_default_suggester_follows_the_fake_setting(settings: Settings) -> None:
+    category_id = add_category(settings, "Muut")
+    (settings.import_dir / "a.jpg").write_bytes(jpeg("a"))
+
+    make_service(settings).start()
+
+    assert stored_lines(settings) == [
+        ("Maito", category_id, "model"),
+        ("Limu", category_id, "model"),
+    ]
+
+
+class RecordingSuggester:
+    def __init__(self) -> None:
+        self.names: list[list[str]] = []
+
+    def suggest(self, names: Sequence[str], options: Sequence[str]) -> list[int | None]:
+        self.names.append(list(names))
+        return [None] * len(names)
+
+
+def test_given_suggester_is_used(settings: Settings) -> None:
+    add_category(settings, "Muut")
+    (settings.import_dir / "a.jpg").write_bytes(jpeg("a"))
+    suggester = RecordingSuggester()
+
+    ImportService(
+        settings, suggester=suggester, clock=lambda: START, run_in_background=run_now
+    ).start()
+
+    assert suggester.names == [["Maito", "Limu"]]
+    assert stored_lines(settings) == [("Maito", None, None), ("Limu", None, None)]
