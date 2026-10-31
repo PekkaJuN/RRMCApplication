@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** In Progress (health, catalog and import endpoints, the import with reading; receipt, totals and export
-  endpoints are added by their specs)
-- **Updated:** 2026-10-28
+- **Status:** In Progress (health, catalog, import and receipt endpoints; line editing, totals
+  and export endpoints are added by their specs)
+- **Updated:** 2026-10-31
 
 ## Overview
 
@@ -38,7 +38,8 @@ Messages come from @backend/app/texts.py and never contain receipt content.
 
 Feature specs add their own codes in the same format, raised as `AppError`
 (@backend/app/errors.py). The catalog codes are listed under
-[Catalog error codes](#catalog-error-codes), the import codes under [Import](#import).
+[Catalog error codes](#catalog-error-codes), the import codes under [Import](#import), the
+receipt codes under [Receipts](#receipts).
 
 ## Endpoints
 
@@ -123,9 +124,10 @@ gives the foundation's `invalid_request` (422).
 | 409 | `category_in_use` | `product_count`; `line_count` when receipt lines use it | `Kategoriaa käyttää 3 tuotetta.`, `Kategoriaa käyttää 2 tuotetta ja 3 kuittiriviä.` or `Kategoriaa käyttää 1 kuittirivi.`: only the counts above 0 (`1 tuote`, `1 kuittirivi` for one) |
 | 409 | `group_not_empty` | `category_count` | `Ryhmässä on 3 kategoriaa.` (`1 kategoria` for one) |
 
-`deposit_refund_line` (422, `Pantinpalautusriville ei voi valita kategoriaa.`) is defined
-for the line correction service but no endpoint returns it yet; the review UI spec adds
-the endpoint ([categorization](subsystems/categorization/README.md#line-categorization)).
+`deposit_refund_line` (422, `Pantinpalautusriville ei voi valita kategoriaa.`) comes from
+the line correction service, through
+[`PATCH /api/receipts/{id}/lines/{line_id}`](#receipts)
+([categorization](subsystems/categorization/README.md#line-categorization)).
 
 The texts live in @backend/app/texts.py.
 
@@ -198,12 +200,78 @@ nothing.
 | `move_failed` | `Tiedostoa ei voitu siirtää valmiiden kansioon.` | The file cannot be moved to the done folder; it stays in the import folder |
 | `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Any other error |
 
+### Receipts
+
+Implemented in @backend/app/review/routes.py. The rules are in
+[review](subsystems/review/README.md) and the sums in
+[calculation](subsystems/calculation/README.md#rules).
+
+| Method and path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /api/receipts` | | 200, list of receipt summaries: receipts without a purchase date first, then the newest date first; the newest import first within a date | |
+| `GET /api/receipts/{id}` | | 200, the receipt | 404 `not_found` |
+| `GET /api/receipts/{id}/image` | | 200, the image bytes as `image/jpeg` or `image/png`, `Cache-Control: no-store` | 404 `not_found`, `image_missing` |
+| `PATCH /api/receipts/{id}` | `{"reviewed": true}` confirms, `false` makes it unreviewed again; always allowed | 200, the receipt | 404 `not_found`; 422 `invalid_request` |
+| `PATCH /api/receipts/{id}/lines/{line_id}` | `{"category_id": n}`: the user's category for the line, remembered for its product (FR-13); other lines of the product move with it (FR-36) | 200, the receipt | 404 `not_found` (also a line on another receipt); 422 `unknown_category`, `not_a_category`, `deposit_refund_line`, `invalid_name`, `invalid_request` |
+
+The bodies are strict: a missing field, `null`, `"12"` or `true` for `category_id`, and
+anything but `true` or `false` for `reviewed` give `invalid_request`. A category choice does
+not change the review state.
+
+A **receipt summary**:
+
+```json
+{"id": 3, "purchase_date": "2026-10-05", "store": "Testikauppa", "total_cents": 349, "warning": false, "reviewed": false}
+```
+
+A **receipt**:
+
+```json
+{
+  "id": 3,
+  "file_name": "kuitti.jpg",
+  "imported_at": "2026-10-28T10:00:01Z",
+  "store": "Testikauppa",
+  "purchase_date": "2026-10-05",
+  "total_cents": 349,
+  "reviewed": false,
+  "lines": [
+    {"id": 10, "position": 1, "name": "Maito", "amount_cents": 125, "is_deposit_refund": false,
+     "category_id": 12, "category_name": "Maitotuotteet", "group_name": "Ruoka", "category_source": "remembered"},
+    {"id": 11, "position": 2, "name": "Panttipalautus", "amount_cents": -40, "is_deposit_refund": true,
+     "category_id": null, "category_name": null, "group_name": null, "category_source": null}
+  ],
+  "line_sum_cents": 85,
+  "difference_cents": 264,
+  "warning": true,
+  "subtotals": [
+    {"category_id": 12, "category_name": "Maitotuotteet", "group_name": "Ruoka", "amount_cents": 125}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `store`, `purchase_date`, `total_cents` | `null` for a receipt imported before reading existed; `store` is `""` when the model found none |
+| `lines` | In printed order. `category_source` is `remembered`, `model`, `user` or `null` (FR-15); `group_name` is `null` for a category without a group |
+| `line_sum_cents` | Sum of every line amount, deposit refunds included |
+| `difference_cents` | `total_cents` minus `line_sum_cents`; `null` without a total |
+| `warning` | `true` when the difference is not 0 or the total is missing (FR-20) |
+| `subtotals` | One item per category with lines, in catalog order, then the lines without a category (`category_id` `null`) last; deposit refunds are in none (FR-44) |
+
+The OCR text is not returned.
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 404 | `image_missing` | `Kuvaa ei löydy valmiiden kansiosta.` | The receipt exists, but its file is missing from the done folder, cannot be read, is not JPEG or PNG, or its stored name points outside the folder |
+
 ## Subsystems
 
 - [ui](subsystems/ui/README.md) — the only client of the API
 - [categorization](subsystems/categorization/README.md) — the rules behind the catalog
   endpoints
 - [import](subsystems/import/README.md) — the rules behind the import endpoints
+- [review](subsystems/review/README.md) — the receipt endpoints
 
 ## Related Documents
 
@@ -213,4 +281,5 @@ nothing.
 - [Receipt import spec](../specs/features/receipt-import.md): the import endpoints
 - [Receipt reading spec](../specs/features/receipt-reading.md): the reading step, its
   failure reasons and the start checks
+- [Receipt review spec](../specs/features/receipt-review.md): the receipt endpoints
 - [development.md](development.md#troubleshooting): what the health results mean for the user

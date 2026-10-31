@@ -8,6 +8,7 @@ from app.storage.receipt_repository import (
     LineRow,
     ReceiptRepository,
     ReceiptRow,
+    ReceiptSummaryRow,
     StoredLine,
 )
 
@@ -73,8 +74,8 @@ def test_ac13_add_stores_the_read_fields_and_lines(db: sqlite3.Connection) -> No
             total_cents=349,
             ocr_text="TESTIKAUPPA\n",
         )
-        repository.add_line(row.id, 1, "Maito", 125, is_deposit_refund=False)
-        repository.add_line(row.id, 2, "Panttipalautus", -40, is_deposit_refund=True)
+        milk = repository.add_line(row.id, 1, "Maito", 125, is_deposit_refund=False)
+        refund = repository.add_line(row.id, 2, "Panttipalautus", -40, is_deposit_refund=True)
 
     assert repository.get_by_hash(HASH) == ReceiptRow(
         id=row.id,
@@ -87,8 +88,10 @@ def test_ac13_add_stores_the_read_fields_and_lines(db: sqlite3.Connection) -> No
         ocr_text="TESTIKAUPPA\n",
     )
     assert repository.lines(row.id) == [
-        LineRow(position=1, name="Maito", amount_cents=125, is_deposit_refund=False),
-        LineRow(position=2, name="Panttipalautus", amount_cents=-40, is_deposit_refund=True),
+        LineRow(id=milk, position=1, name="Maito", amount_cents=125, is_deposit_refund=False),
+        LineRow(
+            id=refund, position=2, name="Panttipalautus", amount_cents=-40, is_deposit_refund=True
+        ),
     ]
 
 
@@ -130,7 +133,7 @@ def test_add_line_stores_the_category(db: sqlite3.Connection) -> None:
     category_id, product_id = category_and_product(db)
     receipt = repository.add(HASH, "a.jpg", TIME)
 
-    repository.add_line(
+    bread = repository.add_line(
         receipt.id,
         1,
         "Ruisleipä",
@@ -138,11 +141,11 @@ def test_add_line_stores_the_category(db: sqlite3.Connection) -> None:
         is_deposit_refund=False,
         category=LineCategory(category_id, "remembered", product_id),
     )
-    repository.add_line(receipt.id, 2, "Banaani", 99, is_deposit_refund=False)
+    banana = repository.add_line(receipt.id, 2, "Banaani", 99, is_deposit_refund=False)
 
     assert repository.lines(receipt.id) == [
-        LineRow(1, "Ruisleipä", 189, False, category_id, "remembered", product_id),
-        LineRow(2, "Banaani", 99, False),
+        LineRow(bread, 1, "Ruisleipä", 189, False, category_id, "remembered", product_id),
+        LineRow(banana, 2, "Banaani", 99, False),
     ]
 
 
@@ -175,3 +178,92 @@ def test_get_line_without_category(db: sqlite3.Connection) -> None:
 
     assert line is not None
     assert (line.is_deposit_refund, line.category) == (True, None)
+
+
+# Receipt review spec P3: line ids and the review state.
+
+
+def test_lines_have_their_ids(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    first = repository.add_line(receipt.id, 1, "Maito", 125, is_deposit_refund=False)
+    second = repository.add_line(receipt.id, 2, "Limu", 224, is_deposit_refund=False)
+
+    assert [line.id for line in repository.lines(receipt.id)] == [first, second]
+
+
+def test_get_returns_the_receipt_unreviewed(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    added = repository.add(HASH, "a.jpg", TIME)
+
+    assert repository.get(added.id) == added
+    assert added.reviewed is False
+    assert repository.get(added.id + 1) is None
+
+
+def test_ac17_set_reviewed_both_ways(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    added = repository.add(HASH, "a.jpg", TIME)
+
+    assert repository.set_reviewed(added.id, reviewed=True) is True
+    reviewed = repository.get(added.id)
+    assert reviewed is not None
+    assert reviewed.reviewed is True
+
+    assert repository.set_reviewed(added.id, reviewed=False) is True
+    unreviewed = repository.get(added.id)
+    assert unreviewed is not None
+    assert unreviewed.reviewed is False
+
+
+def test_set_reviewed_of_a_missing_receipt_changes_nothing(db: sqlite3.Connection) -> None:
+    assert ReceiptRepository(db).set_reviewed(999, reviewed=True) is False
+
+
+def add_dated(repository: ReceiptRepository, number: int, purchase_date: str | None) -> int:
+    return repository.add(f"{number:064d}", "a.jpg", TIME, purchase_date=purchase_date).id
+
+
+def test_ac2_summaries_order(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    r1 = add_dated(repository, 1, "2026-10-05")
+    r2 = add_dated(repository, 2, None)
+    r3 = add_dated(repository, 3, "2026-10-07")
+    r4 = add_dated(repository, 4, "2026-10-05")
+    r5 = add_dated(repository, 5, None)
+
+    assert [row.id for row in repository.summaries()] == [r5, r2, r3, r4, r1]
+
+
+def test_ac3_summaries_of_an_empty_database(db: sqlite3.Connection) -> None:
+    assert ReceiptRepository(db).summaries() == []
+
+
+def test_summaries_sum_the_lines(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    with_lines = repository.add(
+        HASH, "a.jpg", TIME, store="Testikauppa", purchase_date="2026-10-05", total_cents=300
+    )
+    repository.add_line(with_lines.id, 1, "Olut", 340, is_deposit_refund=False)
+    repository.add_line(with_lines.id, 2, "Panttipalautus", -40, is_deposit_refund=True)
+    without_lines = repository.add("c" * 64, "b.jpg", TIME)
+    repository.set_reviewed(with_lines.id, reviewed=True)
+
+    assert repository.summaries() == [
+        ReceiptSummaryRow(
+            id=without_lines.id,
+            store=None,
+            purchase_date=None,
+            total_cents=None,
+            reviewed=False,
+            line_sum_cents=0,
+        ),
+        ReceiptSummaryRow(
+            id=with_lines.id,
+            store="Testikauppa",
+            purchase_date="2026-10-05",
+            total_cents=300,
+            reviewed=True,
+            line_sum_cents=300,
+        ),
+    ]

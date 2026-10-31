@@ -12,14 +12,14 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-10-30
+Last reviewed: 2026-10-31
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
 | 1 Architecture | 9 | 0 | 8 | 0 | 1 |
-| 2 Subsystems | 7 | 0 | 5 | 0 | 2 |
+| 2 Subsystems | 8 | 0 | 7 | 0 | 1 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -32,7 +32,7 @@ Last reviewed: 2026-10-30
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
-| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading and line categorization terms | 2 | In Progress |
+| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization and review terms | 2 | In Progress |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 
@@ -57,9 +57,10 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 10 | Import | [docs/subsystems/import/README.md](subsystems/import/README.md) | Import runs: read images from the import folder, detect duplicates by image hash, move files to the done or failed folder; the reading step comes with its spec | 4, 9 | In Progress |
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | In Progress |
-| 13 | Calculation | `docs/subsystems/calculation/README.md` | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check | 4, 12 | Not Started |
+| 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals (written; the totals come with their spec) | 4, 12 | In Progress |
 | 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
+| 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, review state | 6, 9, 12, 13 | In Progress |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
@@ -86,9 +87,13 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   categories at import, the correction service, FR-36 and the catalog rules with lines. The
   categorization, import, storage, receipt-reading and data model docs and ADR 0004
   describe it.
+- The receipt review spec is Done (audited 2026-10-31): the receipt
+  endpoints, the receipt check and subtotals, the review state, and the Kuitit and receipt
+  pages. The review, calculation, UI, storage, categorization, data model, API and
+  architecture docs describe it. The line editing spec (FR-18, FR-43) comes next.
 - Storage, categorization, import, receipt-reading and UI docs describe what is implemented;
   their later feature specs complete them.
-- `docs/README.md` is not written yet. The glossary has the catalog, import, reading and line categorization terms.
+- `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization and review terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 

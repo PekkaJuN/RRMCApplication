@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -20,12 +20,13 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
   categories, products and `app_state`, and `move_product_lines` (FR-36)
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
   their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
-  `lines`, `get_line`, `set_line_category`, `get_by_hash`, `delete`)
+  `lines`, `get_line`, `set_line_category`, `get`, `get_by_hash`, `summaries`,
+  `set_reviewed`, `delete`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
   (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`,
-  `0004_line_categories.sql`)
+  `0004_line_categories.sql`, `0005_receipt_review.sql`)
 
 ## Interfaces
 
@@ -48,11 +49,15 @@ line linked to the product the category and source `remembered`. The rules are i
 [categorization](../categorization/README.md#rules).
 
 `ReceiptRepository(connection)` returns the frozen dataclass `ReceiptRow` (`id`,
-`image_hash`, `file_name`, `imported_at`). It has `add` (raises `sqlite3.IntegrityError` for
-an existing hash), `get_by_hash`, `delete` and `transaction()`. Lines come back as `LineRow`
-(position, name, amount, refund flag and the three category fields) from `lines`, or as
-`StoredLine` (with its id and a `LineCategory` or `None`) from `get_line`;
-`set_line_category` writes the three category columns. `LineCategory` and `CategorySource`
+`image_hash`, `file_name`, `imported_at`, the read fields and `reviewed`). It has `add`
+(raises `sqlite3.IntegrityError` for an existing hash), `get`, `get_by_hash`, `delete` and
+`transaction()`. `summaries()` lists every receipt as `ReceiptSummaryRow` with the sum of its
+line amounts, computed in SQL, in the review list order (no date first, then newest date,
+then newest id); `set_reviewed(id, reviewed=...)` returns `False` when the receipt does not
+exist. `add_line` returns the new line's id. Lines come back as `LineRow` (id, position,
+name, amount, refund flag and the three category fields) from `lines`, or as `StoredLine`
+(with its receipt id and a `LineCategory` or `None`) from `get_line`; `set_line_category`
+writes the three category columns. `LineCategory` and `CategorySource`
 are defined here. The rules are in [import](../import/README.md) and
 [categorization](../categorization/README.md#line-categorization).
 
@@ -71,8 +76,8 @@ are defined here. The rules are in [import](../import/README.md) and
 
 - Uses: Python's `sqlite3`; nothing else in the app.
 - Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
-  [categorization](../categorization/README.md), [import](../import/README.md); later every
-  feature subsystem through its repositories.
+  [categorization](../categorization/README.md), [import](../import/README.md),
+  [review](../review/README.md); later every feature subsystem through its repositories.
 
 ## Modules
 
