@@ -19,8 +19,8 @@ them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature i
 
 The foundation (containers, settings, storage, engine interfaces, health, app shell) exists,
 and so do categorization with the Tuotteet page, import with reading and categorization with
-the Tuonti page, and receipt review with the Kuitit and receipt pages. Totals, export and
-line editing are still the target design (see the greenfield rule in
+the Tuonti page, and receipt review with line editing on the Kuitit and receipt pages.
+Totals and export are still the target design (see the greenfield rule in
 [AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
@@ -202,14 +202,15 @@ sequenceDiagram
 
 ### Review and correction
 
-Implemented for the category choice and the review state
-([review](subsystems/review/README.md)); line editing (FR-18, FR-43) comes with its spec.
+Implemented ([review](subsystems/review/README.md)): the category choice, line edits, added
+and deleted lines, the store, date and total, and the review state.
 
 1. The UI loads a receipt with its lines, categories and subtotals, and the image through an
    API endpoint, which finds the file by its stored name in the done folder only.
-2. A category choice is sent to the API. Categorization stores it as the product's
-   remembered category and moves the product's other lines with it (FR-13, FR-36). Renamed
-   lines will be linked to products (FR-43) by the line editing spec.
+2. An edit is sent to the API. Review checks the values and runs the edit in one
+   transaction; categorization stores a category choice as the product's remembered
+   category and moves the product's other lines with it (FR-13, FR-36), and links a renamed
+   line to the product of its new name (FR-43).
 3. The answer is the whole receipt with the subtotals and the sum check from calculation
    (FR-19, FR-20). The UI shows it.
 

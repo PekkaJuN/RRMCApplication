@@ -192,42 +192,64 @@ class ProductService:
 
 
 class LineCategoryService:
-    """A category the user chooses for a receipt line, remembered for its product (FR-13).
+    """The product rules of receipt lines (FR-13, FR-36, FR-43).
 
-    Both repositories must be on one connection: the transaction is opened on the catalog's.
+    The caller holds the transaction, on the catalog's connection, which both repositories
+    must share; so one request can rename a line and choose its category together.
     """
 
     def __init__(self, catalog: CatalogRepository, receipts: ReceiptRepository) -> None:
         self._catalog = catalog
         self._receipts = receipts
 
-    def set_category(self, line_id: int, category_id: int) -> StoredLine:
+    def choose(self, line: StoredLine, category_id: int) -> None:
         """Give the line the category with source `user`, and store it as the category of
-        the line's product, creating the product when none matches (PC6).
+        the line's product, creating the product when none matches (FR-13).
 
-        Raises: NotFoundError, UnknownCategoryError, NotACategoryError,
-        DepositRefundLineError, InvalidNameError.
+        Raises: UnknownCategoryError, NotACategoryError, DepositRefundLineError,
+        InvalidNameError.
         """
-        with self._catalog.transaction():
-            line = self._receipts.get_line(line_id)
-            if line is None:
-                raise NotFoundError()
-            _check_category(self._catalog, category_id)
-            if line.is_deposit_refund:
-                raise DepositRefundLineError()
-            product = self._product_of(line)
-            if product is None:
-                display = validate_product_name(line.name)
-                product_id = self._catalog.add_product(display, normalize_key(display), category_id)
-            else:
-                product_id = product.id
-                if product.category_id != category_id:
-                    _change_product_category(self._catalog, product, category_id)
-            # After the product's lines moved, so this line keeps the source `user`.
-            self._receipts.set_line_category(line.id, LineCategory(category_id, "user", product_id))
-            stored = self._receipts.get_line(line.id)
-            assert stored is not None  # noqa: S101 - read back in the same transaction
-            return stored
+        _check_category(self._catalog, category_id)
+        if line.is_deposit_refund:
+            raise DepositRefundLineError()
+        product = self._product_of(line)
+        if product is None:
+            display = validate_product_name(line.name)
+            product_id = self._catalog.add_product(display, normalize_key(display), category_id)
+        else:
+            product_id = product.id
+            if product.category_id != category_id:
+                _change_product_category(self._catalog, product, category_id)
+        # After the product's lines moved, so this line keeps the source `user`.
+        self._receipts.set_line_category(line.id, LineCategory(category_id, "user", product_id))
+
+    def follow_name(self, line: StoredLine, name: str) -> LineCategory | None:
+        """The category of the normal line `line` once it is renamed to the display name
+        `name` (FR-43). The caller writes the line.
+
+        A case or spacing change keeps the category. A name match gives the product's
+        category. Otherwise a line with a category makes a new product with it, as a
+        correction does (FR-13). The product the line followed before is not changed.
+        """
+        key = normalize_key(name)
+        if key == normalize_key(line.name):
+            return line.category
+        product = self._catalog.get_product_by_key(key)
+        if product is not None:
+            return LineCategory(product.category_id, "remembered", product.id)
+        if line.category is None:
+            return None
+        product_id = self._catalog.add_product(name, key, line.category.category_id)
+        return LineCategory(line.category.category_id, "user", product_id)
+
+    def resolve(self, name: str) -> LineCategory | None:
+        """The category of a new normal line, or of a line that stops being a deposit
+        refund: its name match's, or none. No model call, so an edit answers at once (NFR-9).
+        """
+        product = self._catalog.get_product_by_key(normalize_key(name))
+        if product is None:
+            return None
+        return LineCategory(product.category_id, "remembered", product.id)
 
     def _product_of(self, line: StoredLine) -> ProductRow | None:
         """The line's product: the linked one, else the one with the line's name. A link

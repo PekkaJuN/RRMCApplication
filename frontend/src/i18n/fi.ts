@@ -106,5 +106,11 @@ export const fi = {
     subtotals: "Kategoriat",
     noCategory: "Ei kategoriaa",
     notFound: "Kuittia ei löydy.",
+    nameOf: (name: string) => `Tuote: ${name}`,
+    amountOf: (name: string) => `Summa: ${name}`,
+    refundOf: (name: string) => `Pantinpalautus: ${name}`,
+    newLine: "Uusi rivi",
+    addLine: "Lisää rivi",
+    amountFormat: "Anna summa muodossa 1,25.",
   },
 } as const;

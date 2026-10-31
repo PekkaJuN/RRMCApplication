@@ -109,10 +109,11 @@ test("receipt-review AC31: review, correct and confirm an imported receipt", asy
   await milk.selectOption({ label: chosen });
 
   await expect(milk.locator("option:checked")).toHaveText(chosen);
+  // The line name is an input since line editing (line-editing PC12).
   const milkRow = page
     .getByRole("table", { name: "Kuittirivit" })
     .getByRole("row")
-    .filter({ has: page.getByText("Maito", { exact: true }) });
+    .filter({ has: page.getByRole("textbox", { name: "Tuote: Maito" }) });
   await expect(milkRow.getByText("ehdotus")).toHaveCount(0);
   await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
 
@@ -133,4 +134,66 @@ test("receipt-review AC31: review, correct and confirm an imported receipt", asy
     .getByRole("row")
     .filter({ has: page.getByText("Maito", { exact: true }) });
   await expect(productRow).toContainText(chosen);
+});
+
+test("line-editing AC36: edit lines and the total of an imported receipt", async ({ page }) => {
+  await writeFile(
+    join(importDir, `kuitti-${RUN}_muokkaus.jpg`),
+    Buffer.concat([SYNTHETIC_JPEG, Buffer.from(" edit")]),
+  );
+  await page.goto("/tuonti");
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+  await expect(
+    page.getByRole("region", { name: "Edellinen tuonti" }).getByText("Tuotu: 1"),
+  ).toBeVisible();
+
+  await page
+    .getByRole("navigation", { name: "Päävalikko" })
+    .getByRole("link", { name: "Kuitit" })
+    .click();
+  // Same-date receipts list the newest import first, so the first one is this run's.
+  await page
+    .getByRole("table", { name: "Kuittilista" })
+    .getByRole("link", { name: "5.10.2026" })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Kuitti", exact: true })).toBeVisible();
+
+  const sodaAmount = page.getByRole("textbox", { name: "Summa: Limu" });
+  await sodaAmount.fill("2,00");
+  await sodaAmount.press("Tab");
+  await expect(page.getByText("Rivien summa 3,25 €", { exact: true })).toBeVisible();
+
+  const form = page.getByRole("form", { name: "Uusi rivi" });
+  await form.getByLabel("Tuote").fill("E2E-pantti");
+  await form.getByLabel("Summa").fill("-0,40");
+  await form.getByLabel("Pantinpalautus").check();
+  await form.getByRole("button", { name: "Lisää rivi" }).click();
+  await expect(page.getByRole("textbox", { name: "Tuote: E2E-pantti" })).toBeVisible();
+
+  const total = page.getByLabel("Loppusumma");
+  await total.fill("2,85");
+  await total.press("Enter");
+  const milkName = page.getByRole("textbox", { name: "Tuote: Maito" });
+  await milkName.fill("E2E-maito");
+  await milkName.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Tuote: E2E-maito" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
+
+  await page.reload();
+
+  const lines = page.getByRole("table", { name: "Kuittirivit" });
+  const names = lines.getByRole("textbox", { name: /^Tuote: / });
+  await expect(names).toHaveCount(3);
+  for (const [index, name] of ["E2E-maito", "Limu", "E2E-pantti"].entries()) {
+    await expect(names.nth(index)).toHaveValue(name);
+  }
+  await expect(page.getByRole("textbox", { name: "Summa: E2E-maito" })).toHaveValue("1,25");
+  await expect(page.getByRole("textbox", { name: "Summa: Limu" })).toHaveValue("2,00");
+  await expect(page.getByRole("textbox", { name: "Summa: E2E-pantti" })).toHaveValue("-0,40");
+  await expect(page.getByRole("checkbox", { name: "Pantinpalautus: E2E-pantti" })).toBeChecked();
+  await expect(page.getByText("Rivien summa 2,85 €", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Loppusumma")).toHaveValue("2,85");
+  await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
+  await expect(page.getByText("Tarkistamaton")).toBeVisible();
 });

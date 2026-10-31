@@ -3,7 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from app.storage.db import connect, is_available, transaction
+from app.storage.db import (
+    INTEGER_MAX,
+    INTEGER_MIN,
+    connect,
+    fits_integer,
+    is_available,
+    transaction,
+)
 
 
 def test_ac8_connect_creates_database_with_foreign_keys_and_wal(tmp_path: Path) -> None:
@@ -86,3 +93,18 @@ def test_connection_can_be_used_in_another_thread(tmp_path: Path) -> None:
     connection.close()
 
     assert errors == []
+
+
+@pytest.mark.parametrize("value", [INTEGER_MIN, 0, INTEGER_MAX])
+def test_ac23_values_in_sqlite_range_fit(value: int) -> None:
+    assert fits_integer(value)
+
+
+@pytest.mark.parametrize("value", [INTEGER_MIN - 1, INTEGER_MAX + 1])
+def test_ac23_values_outside_sqlite_range_do_not_fit(value: int) -> None:
+    # SQLite would raise OverflowError for these, which gave 500 (line-editing PC11).
+    assert not fits_integer(value)
+
+
+def test_ac23_range_is_signed_64_bit() -> None:
+    assert (INTEGER_MIN, INTEGER_MAX) == (-(2**63), 2**63 - 1)

@@ -1,6 +1,6 @@
 # API Reference
 
-- **Status:** In Progress (health, catalog, import and receipt endpoints; line editing, totals
+- **Status:** In Progress (health, catalog, import, receipt and line editing endpoints; totals
   and export endpoints are added by their specs)
 - **Updated:** 2026-10-31
 
@@ -211,12 +211,35 @@ Implemented in @backend/app/review/routes.py. The rules are in
 | `GET /api/receipts` | | 200, list of receipt summaries: receipts without a purchase date first, then the newest date first; the newest import first within a date | |
 | `GET /api/receipts/{id}` | | 200, the receipt | 404 `not_found` |
 | `GET /api/receipts/{id}/image` | | 200, the image bytes as `image/jpeg` or `image/png`, `Cache-Control: no-store` | 404 `not_found`, `image_missing` |
-| `PATCH /api/receipts/{id}` | `{"reviewed": true}` confirms, `false` makes it unreviewed again; always allowed | 200, the receipt | 404 `not_found`; 422 `invalid_request` |
-| `PATCH /api/receipts/{id}/lines/{line_id}` | `{"category_id": n}`: the user's category for the line, remembered for its product (FR-13); other lines of the product move with it (FR-36) | 200, the receipt | 404 `not_found` (also a line on another receipt); 422 `unknown_category`, `not_a_category`, `deposit_refund_line`, `invalid_name`, `invalid_request` |
+| `PATCH /api/receipts/{id}` | One or more of `store`, `purchase_date`, `total_cents`, `reviewed`; `reviewed` `true` confirms, `false` makes it unreviewed again, always allowed | 200, the receipt | 404 `not_found`; 422 `invalid_store`, `invalid_date`, `invalid_amount`, `invalid_request` |
+| `PATCH /api/receipts/{id}/lines/{line_id}` | One or more of `name`, `amount_cents`, `is_deposit_refund`, `category_id` | 200, the receipt | 404 `not_found` (also a line on another receipt); 422 `invalid_name`, `invalid_amount`, `deposit_refund_amount`, `unknown_category`, `not_a_category`, `deposit_refund_line`, `invalid_request` |
+| `POST /api/receipts/{id}/lines` | `name`, `amount_cents`, optional `is_deposit_refund` (default `false`) | 201, the receipt; the line is added after the last one | 404 `not_found`; 422 `invalid_name`, `invalid_amount`, `deposit_refund_amount`, `invalid_request` |
+| `DELETE /api/receipts/{id}/lines/{line_id}` | | 200, the receipt; the other lines keep their positions | 404 `not_found` (also a line on another receipt) |
 
-The bodies are strict: a missing field, `null`, `"12"` or `true` for `category_id`, and
-anything but `true` or `false` for `reviewed` give `invalid_request`. A category choice does
-not change the review state.
+Every write answers with the whole receipt, because a change can move other lines of the
+same product (FR-36) and changes the sums. No edit changes the review state.
+
+A line edit runs in one transaction in this order: the deposit refund flag and amount, then
+the name, then the category; if any rule fails, nothing changes. The rules are in
+[review](subsystems/review/README.md#line-edits):
+
+| Field | Rule |
+|---|---|
+| `name` | Trimmed, inner spaces collapsed; 1–100 characters (`invalid_name`). A new name follows its product (FR-43) |
+| `amount_cents` | -99 999 999 to 99 999 999 (`invalid_amount`); any sign on a normal line |
+| `is_deposit_refund` | A refund's resulting amount must be below 0 (`deposit_refund_amount`); it has no category (FR-44) |
+| `category_id` | The user's category, remembered for its product (FR-13); other lines of the product move with it (FR-36). `deposit_refund_line` for a line that is or becomes a refund |
+| `store` | Trimmed, inner spaces collapsed; 0–100 characters (`invalid_store`); `""` is no store |
+| `purchase_date` | A real date as `YYYY-MM-DD` (`invalid_date`) |
+| `total_cents` | 0 to 99 999 999 (`invalid_amount`) |
+
+Only the sent values are checked against these rules, so a long name read from a receipt
+does not stop an amount edit. None of the fields can be set back to `null`.
+
+The bodies are strict: an empty body, a field the endpoint does not know, `null`, and a
+value of the wrong JSON type (`"12"` or `1.5` for a number, `1` or `"yes"` for a boolean)
+give `invalid_request`. A receipt or line id outside SQLite's integer range gives
+`not_found`, and such a `category_id` gives `unknown_category`.
 
 A **receipt summary**:
 
@@ -264,6 +287,10 @@ The OCR text is not returned.
 | Status | `error` | `message` | When |
 |---|---|---|---|
 | 404 | `image_missing` | `Kuvaa ei löydy valmiiden kansiosta.` | The receipt exists, but its file is missing from the done folder, cannot be read, is not JPEG or PNG, or its stored name points outside the folder |
+| 422 | `invalid_amount` | `Summa ei kelpaa.` | A line amount or total outside its range |
+| 422 | `deposit_refund_amount` | `Pantinpalautuksen summan on oltava negatiivinen.` | A deposit refund whose resulting amount is 0 or more |
+| 422 | `invalid_date` | `Päivämäärä ei kelpaa.` | Not a real date as `YYYY-MM-DD` |
+| 422 | `invalid_store` | `Kaupan nimi saa olla enintään 100 merkkiä.` | A store longer than 100 characters |
 
 ## Subsystems
 
@@ -282,4 +309,5 @@ The OCR text is not returned.
 - [Receipt reading spec](../specs/features/receipt-reading.md): the reading step, its
   failure reasons and the start checks
 - [Receipt review spec](../specs/features/receipt-review.md): the receipt endpoints
+- [Line editing spec](../specs/features/line-editing.md): line and receipt edits
 - [development.md](development.md#troubleshooting): what the health results mean for the user

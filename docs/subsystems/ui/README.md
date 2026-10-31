@@ -31,8 +31,13 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/components/ImportPage.tsx — the Tuonti page: the "Tuo kuitit" button,
   progress, and the report of the latest run
 - @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the receipt list
-- @frontend/src/components/ReceiptPage.tsx — one receipt: header, review state, warning,
-  image beside the line table with category dropdowns, line sum and subtotals
+- @frontend/src/components/ReceiptPage.tsx — one receipt: editable store, date and total,
+  review state, warning, image beside the editable line table (name, amount, deposit refund,
+  category, delete), the add form, line sum and subtotals; one save queue
+- @frontend/src/components/EditableField.tsx — an input that saves when it is left or on
+  Enter, only when changed; Esc puts back the saved value; a refused save keeps the typed
+  text and shows its message
+- @frontend/src/components/AddLineForm.tsx — the `Uusi rivi` form
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -48,11 +53,13 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/catalog.ts — typed catalog client and the `CatalogItem` and `Product`
   types
 - @frontend/src/api/imports.ts — `getImport()`, `startImport()` and the `ImportState` type
-- @frontend/src/api/receipts.ts — `listReceipts()`, `getReceipt()`, `setLineCategory()`,
-  `setReviewed()`, `receiptImageUrl()` and the receipt types
-- @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator) and
-  `formatDate()` (`2026-10-05` → `5.10.2026`), with integer arithmetic and string splitting
-  only
+- @frontend/src/api/receipts.ts — `listReceipts()`, `getReceipt()`, `editLine()`,
+  `addLine()`, `deleteLine()`, `editReceipt()`, `setLineCategory()`, `setReviewed()`,
+  `receiptImageUrl()` and the receipt types
+- @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator),
+  `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `parseCents()` (`1,25` or
+  `1.25` → `125`, `null` for anything else) and `formatDate()` (`2026-10-05` → `5.10.2026`),
+  with integer arithmetic and string splitting only
 - @frontend/src/i18n/fi.ts — every Finnish UI text
 - @frontend/index.html — `lang="fi"`, title `Kuittisovellus`
 
@@ -92,18 +99,29 @@ On the Kuitit page the list is loaded when the page opens; missing date, store a
 show `–`. A list that cannot be loaded shows the error with `role="alert"`.
 
 The receipt page loads the receipt and the categories in parallel. The backend computes the
-line sum, warning and subtotals; the page only shows them. A category choice and the
-confirmation each send one `PATCH`, and the page shows the receipt from the answer, so
-subtotals, marks and other lines of the same product update without a reload (FR-19).
-While a change waits, every dropdown and the confirmation button are disabled, so answers
-cannot arrive out of order. A refused choice shows its message next to its line, a refused
-confirmation next to the button (`role="alert"`), and the old values stay. A model
+line sum, warning and subtotals; the page only shows them. The store, date (a date input)
+and total, and each line's name and amount, are `EditableField`s; a missing value is an empty
+input. Each line also has a deposit refund checkbox, its category and a delete button that
+asks first (`ConfirmDelete`); the `Uusi rivi` form under the table adds a line. Every change
+sends one request, and the page shows the receipt from the answer, so subtotals, marks,
+warning and other lines of the same product update without a reload (FR-19).
+
+Changes go through one queue (a promise chain in a `useRef`): each request starts after the
+previous answer, so answers cannot arrive out of order, and no control is disabled, so the
+user keeps the focus while a save waits. An amount field accepts `1,25`, `1.25`, `-0,40` or
+`3`; anything else shows `Anna summa muodossa 1,25.` without a request. A refused change
+shows its message next to its field, checkbox, dropdown, delete button, the add button or
+the confirmation button (`role="alert"`); a text field keeps the typed text until Esc, the
+checkbox and dropdown show the saved value again, and the add form keeps its values. While
+the categories load, or after they failed, a line shows its category as text
+(`Ryhmä > Kategoria`, or `–`) instead of a dropdown. A model
 suggestion shows the mark `ehdotus`; a deposit refund shows `Pantinpalautus` and no
 dropdown. An image that cannot be loaded (the `img` gets an error, for example the 404
 `image_missing`) is replaced by `Kuvaa ei löydy valmiiden kansiosta.`; the image and the
 table sit side by side through inline flex styles that wrap on a narrow window, since the
 app has no stylesheet. The texts are in the
-[receipt review spec](../../../specs/features/receipt-review.md#ui-texts).
+[receipt review spec](../../../specs/features/receipt-review.md#ui-texts) and the
+[line editing spec](../../../specs/features/line-editing.md#ui-texts).
 
 ## Data Flow
 

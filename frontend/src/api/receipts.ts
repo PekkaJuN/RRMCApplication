@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, type ApiResult } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, type ApiResult } from "./client";
 
 export type CategorySource = "remembered" | "model" | "user";
 
@@ -57,19 +57,60 @@ export function getReceipt(id: number): Promise<ApiResult<Receipt>> {
   return apiGet<Receipt>(`/api/receipts/${id}`);
 }
 
-/** The answer is the whole receipt: the choice can move other lines of the same product. */
+/** The fields of a line edit; send at least one (line-editing PC1). */
+export interface LineChanges {
+  name?: string;
+  amount_cents?: number;
+  is_deposit_refund?: boolean;
+  category_id?: number;
+}
+
+/** A line to add (line-editing PC6). */
+export interface NewLine {
+  name: string;
+  amount_cents: number;
+  is_deposit_refund: boolean;
+}
+
+/** The receipt fields of an edit; send at least one (line-editing PC8). */
+export interface ReceiptChanges {
+  store?: string;
+  purchase_date?: string;
+  total_cents?: number;
+  reviewed?: boolean;
+}
+
+/** Every write answers with the whole receipt: an edit can move other lines of a product. */
+export function editLine(
+  receiptId: number,
+  lineId: number,
+  changes: LineChanges,
+): Promise<ApiResult<Receipt>> {
+  return apiPatch<Receipt>(`/api/receipts/${receiptId}/lines/${lineId}`, changes);
+}
+
+export function addLine(receiptId: number, line: NewLine): Promise<ApiResult<Receipt>> {
+  return apiPost<Receipt>(`/api/receipts/${receiptId}/lines`, line);
+}
+
+export function deleteLine(receiptId: number, lineId: number): Promise<ApiResult<Receipt>> {
+  return apiDelete<Receipt>(`/api/receipts/${receiptId}/lines/${lineId}`);
+}
+
+export function editReceipt(id: number, changes: ReceiptChanges): Promise<ApiResult<Receipt>> {
+  return apiPatch<Receipt>(`/api/receipts/${id}`, changes);
+}
+
 export function setLineCategory(
   receiptId: number,
   lineId: number,
   categoryId: number,
 ): Promise<ApiResult<Receipt>> {
-  return apiPatch<Receipt>(`/api/receipts/${receiptId}/lines/${lineId}`, {
-    category_id: categoryId,
-  });
+  return editLine(receiptId, lineId, { category_id: categoryId });
 }
 
 export function setReviewed(id: number, reviewed: boolean): Promise<ApiResult<Receipt>> {
-  return apiPatch<Receipt>(`/api/receipts/${id}`, { reviewed });
+  return editReceipt(id, { reviewed });
 }
 
 export function receiptImageUrl(id: number): string {

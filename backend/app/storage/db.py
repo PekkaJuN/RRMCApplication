@@ -5,6 +5,16 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
+# SQLite stores signed 64-bit integers; a Python int outside this range raises OverflowError
+# when it is bound to a query.
+INTEGER_MIN = -(2**63)
+INTEGER_MAX = 2**63 - 1
+
+
+def fits_integer(value: int) -> bool:
+    """Tell whether `value` can be bound to a query, e.g. an id from a request path."""
+    return INTEGER_MIN <= value <= INTEGER_MAX
+
 
 def connect(path: Path) -> sqlite3.Connection:
     """Open the database at `path`, creating the file if it does not exist.

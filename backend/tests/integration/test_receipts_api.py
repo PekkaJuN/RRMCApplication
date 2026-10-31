@@ -1,4 +1,5 @@
-"""Receipt list, receipt view, image, category choice and review state (receipt-review spec)."""
+"""Receipt list, receipt view, image, category choice and review state (receipt-review spec);
+line and receipt edits (line-editing spec)."""
 
 import logging
 import sqlite3
@@ -96,6 +97,23 @@ def receipt_b(db: sqlite3.Connection) -> tuple[int, list[int]]:
         purchase_date="2026-10-06",
         store="Kauppa B",
     )
+
+
+def add_line(
+    db: sqlite3.Connection,
+    receipt_id: int,
+    position: int,
+    name: str,
+    amount: int,
+    *,
+    refund: bool = False,
+    category: LineCategory | None = None,
+) -> int:
+    receipts = ReceiptRepository(db)
+    with receipts.transaction():
+        return receipts.add_line(
+            receipt_id, position, name, amount, is_deposit_refund=refund, category=category
+        )
 
 
 def lines_snapshot(db: sqlite3.Connection) -> list[tuple[Any, ...]]:
@@ -386,13 +404,13 @@ def test_ac14_choice_moves_the_same_product_on_the_receipt(
 
 def test_ac15_category_choice_errors(api: TestClient, db: sqlite3.Connection) -> None:
     a, (milk, _) = receipt_a(db)
-    refund_receipt, (refund,) = add_receipt(db, [("Panttipalautus", -40, None)], number=8)
+    refund = add_line(db, a, 3, "Panttipalautus", -40, refund=True)
     drinks = category_id(db, "Juomat")
     before = lines_snapshot(db)
     cases: list[tuple[int, int, dict[str, object], str]] = [
         (a, milk, {"category_id": 999}, "unknown_category"),
         (a, milk, {"category_id": category_id(db, "Ruoka")}, "not_a_category"),
-        (refund_receipt, refund, {"category_id": drinks}, "deposit_refund_line"),
+        (a, refund, {"category_id": drinks}, "deposit_refund_line"),
         (a, milk, {"category_id": None}, "invalid_request"),
         (a, milk, {}, "invalid_request"),
         (a, milk, {"category_id": "12"}, "invalid_request"),
@@ -504,4 +522,510 @@ def test_pc11_no_names_in_the_logs(
 
     logged = "\n".join(record.getMessage() for record in caplog.records)
     for name in ("Limu", "Maito", "Maitotuotteet", "Juomat", "Testikauppa"):
+        assert name not in logged
+
+
+# Line editing spec (T14). Receipt A has the products Maito; Jogurtti is added where an AC
+# needs it.
+
+
+def snapshot(db: sqlite3.Connection) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+    receipts = [tuple(row) for row in db.execute("SELECT * FROM receipts ORDER BY id")]
+    products = [tuple(row) for row in db.execute("SELECT * FROM products ORDER BY id")]
+    return lines_snapshot(db) + receipts, products
+
+
+def product(db: sqlite3.Connection, name: str) -> tuple[int, int] | None:
+    """The id and category of the product with this name, or None."""
+    row = CatalogRepository(db).get_product_by_key(normalize_key(name))
+    return None if row is None else (row.id, row.category_id)
+
+
+def line_product(db: sqlite3.Connection, line_id: int) -> int | None:
+    return db.execute("SELECT product_id FROM receipt_lines WHERE id = ?", (line_id,)).fetchone()[0]
+
+
+def add_product(db: sqlite3.Connection, name: str, category: str) -> int:
+    catalog = CatalogRepository(db)
+    with catalog.transaction():
+        return catalog.add_product(name, normalize_key(name), category_id(db, category))
+
+
+def patch_line(api: TestClient, receipt_id: int, line_id: int, body: dict[str, Any]) -> Any:
+    return api.patch(f"/api/receipts/{receipt_id}/lines/{line_id}", json=body)
+
+
+def line_fields(body: dict[str, Any], index: int, *fields: str) -> tuple[Any, ...]:
+    return tuple(body["lines"][index][field] for field in fields)
+
+
+def test_ac1_rename_without_a_match_makes_a_product(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    a, (_, soda) = receipt_a(db)
+
+    response = patch_line(api, a, soda, {"name": "  Kivennäisvesi  "})
+
+    assert response.status_code == 200
+    assert line_fields(response.json(), 1, "name", "category_name", "category_source") == (
+        "Kivennäisvesi",
+        "Juomat",
+        "user",
+    )
+    water = product(db, "Kivennäisvesi")
+    assert water == (line_product(db, soda), category_id(db, "Juomat"))
+
+
+def test_ac2_rename_to_a_name_match(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    yoghurt = add_product(db, "Jogurtti", "Maitotuotteet")
+
+    body = patch_line(api, a, soda, {"name": "JOGURTTI"}).json()
+
+    assert line_fields(body, 1, "name", "category_name", "group_name", "category_source") == (
+        "JOGURTTI",
+        "Maitotuotteet",
+        "Ruoka",
+        "remembered",
+    )
+    assert line_product(db, soda) == yoghurt
+    assert [(item["category_name"], item["amount_cents"]) for item in body["subtotals"]] == [
+        ("Maitotuotteet", 349)
+    ]
+    assert db.execute("SELECT count(*) FROM products").fetchone()[0] == 2
+
+
+def test_ac3_rename_leaves_the_old_product_alone(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (milk_line, _) = receipt_a(db)
+    milk = product(db, "Maito")
+    assert milk is not None
+    dairy = category_id(db, "Maitotuotteet")
+    _, (b_line,) = add_receipt(
+        db, [("Maito", 125, LineCategory(dairy, "remembered", milk[0]))], number=2
+    )
+
+    body = patch_line(api, a, milk_line, {"name": "Kaurajuoma"}).json()
+
+    assert body["lines"][0]["category_source"] == "user"
+    assert product(db, "Kaurajuoma") == (line_product(db, milk_line), dairy)
+    assert product(db, "Maito") == milk
+    assert line_product(db, b_line) == milk[0]
+
+
+def test_ac4_case_change_renames_only(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (milk_line, _) = receipt_a(db)
+    products = snapshot(db)[1]
+
+    body = patch_line(api, a, milk_line, {"name": "MAITO"}).json()
+
+    assert line_fields(body, 0, "name", "category_name", "category_source") == (
+        "MAITO",
+        "Maitotuotteet",
+        "remembered",
+    )
+    assert snapshot(db)[1] == products
+
+
+def test_ac5_rename_without_a_category(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    odd = add_line(db, a, 3, "Outo", 50)
+
+    body = patch_line(api, a, odd, {"name": "Outo tuote"}).json()
+
+    assert line_fields(body, 2, "name", "category_id", "category_source") == (
+        "Outo tuote",
+        None,
+        None,
+    )
+    assert product(db, "Outo tuote") is None
+
+
+def test_ac6_rename_a_deposit_refund(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    refund = add_line(db, a, 3, "Panttipalautus", -40, refund=True)
+
+    body = patch_line(api, a, refund, {"name": "Maito"}).json()
+
+    assert line_fields(body, 2, "name", "is_deposit_refund", "category_id") == (
+        "Maito",
+        True,
+        None,
+    )
+    assert line_product(db, refund) is None
+
+
+def test_ac7_amount_change(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+
+    body = patch_line(api, a, soda, {"amount_cents": 300}).json()
+
+    assert line_fields(body, 1, "amount_cents", "category_name", "category_source") == (
+        300,
+        "Juomat",
+        "model",
+    )
+    assert (body["line_sum_cents"], body["difference_cents"], body["warning"]) == (425, -76, True)
+    assert [item["amount_cents"] for item in body["subtotals"]] == [125, 300]
+
+
+def test_ac8_zero_and_negative_amounts(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+
+    zero = patch_line(api, a, soda, {"amount_cents": 0})
+    negative = patch_line(api, a, soda, {"amount_cents": -50})
+
+    assert (zero.status_code, zero.json()["lines"][1]["amount_cents"]) == (200, 0)
+    body = negative.json()
+    assert line_fields(body, 1, "amount_cents", "category_name") == (-50, "Juomat")
+    assert (body["subtotals"][-1]["category_name"], body["subtotals"][-1]["amount_cents"]) == (
+        "Juomat",
+        -50,
+    )
+
+
+def test_ac9_mark_as_a_deposit_refund(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+
+    body = patch_line(api, a, soda, {"is_deposit_refund": True, "amount_cents": -40}).json()
+
+    assert line_fields(
+        body,
+        1,
+        "is_deposit_refund",
+        "amount_cents",
+        "category_id",
+        "category_name",
+        "category_source",
+    ) == (True, -40, None, None, None)
+    assert body["line_sum_cents"] == 85
+    assert [item["category_name"] for item in body["subtotals"]] == ["Maitotuotteet"]
+
+
+def test_ac10_deposit_refund_must_be_negative(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    refund = add_line(db, a, 3, "Panttipalautus", -40, refund=True)
+    before = snapshot(db)
+    cases: list[tuple[int, dict[str, Any]]] = [
+        (soda, {"is_deposit_refund": True}),
+        (refund, {"amount_cents": 0}),
+        (refund, {"amount_cents": 40}),
+        (soda, {"is_deposit_refund": True, "amount_cents": 10}),
+    ]
+
+    for line_id, body in cases:
+        response = patch_line(api, a, line_id, body)
+        assert response.status_code == 422, body
+        assert response.json() == {
+            "error": "deposit_refund_amount",
+            "message": "Pantinpalautuksen summan on oltava negatiivinen.",
+        }
+
+    assert snapshot(db) == before
+
+
+def test_ac11_unmarking_a_refund_resolves_the_line(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    milk = product(db, "Maito")
+    assert milk is not None
+    bottles = add_line(db, a, 3, "Panttipalautus", -40, refund=True)
+    small_milk = add_line(db, a, 4, "maito", -40, refund=True)
+
+    patch_line(api, a, bottles, {"is_deposit_refund": False})
+    body = patch_line(api, a, small_milk, {"is_deposit_refund": False}).json()
+
+    assert [
+        (line["is_deposit_refund"], line["category_name"], line["category_source"])
+        for line in body["lines"][2:]
+    ] == [(False, None, None), (False, "Maitotuotteet", "remembered")]
+    assert line_product(db, small_milk) == milk[0]
+    assert [(item["category_name"], item["amount_cents"]) for item in body["subtotals"]] == [
+        ("Maitotuotteet", 85),
+        ("Juomat", 224),
+        (None, -40),
+    ]
+
+
+def test_ac12_name_and_category_in_one_request(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    dairy = category_id(db, "Maitotuotteet")
+
+    body = patch_line(api, a, soda, {"name": "Kivennäisvesi", "category_id": dairy}).json()
+
+    assert line_fields(body, 1, "name", "category_name", "category_source") == (
+        "Kivennäisvesi",
+        "Maitotuotteet",
+        "user",
+    )
+    count = db.execute(
+        "SELECT count(*) FROM products WHERE name_key = 'kivennäisvesi' AND category_id = ?",
+        (dairy,),
+    ).fetchone()[0]
+    assert count == 1
+
+
+def test_ac13_refund_with_a_category_in_one_request(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    a, (_, soda) = receipt_a(db)
+    refund = add_line(db, a, 3, "Panttipalautus", -40, refund=True)
+    drinks = category_id(db, "Juomat")
+    before = snapshot(db)
+
+    responses = [
+        patch_line(
+            api, a, soda, {"is_deposit_refund": True, "amount_cents": -40, "category_id": drinks}
+        ),
+        patch_line(api, a, refund, {"name": "Pullot", "category_id": drinks}),
+    ]
+
+    assert [(r.status_code, r.json()["error"]) for r in responses] == [
+        (422, "deposit_refund_line"),
+        (422, "deposit_refund_line"),
+    ]
+    assert snapshot(db) == before
+
+
+def test_ac14_line_edit_errors(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    before = snapshot(db)
+    cases: list[tuple[dict[str, Any], str]] = [
+        ({"name": ""}, "invalid_name"),
+        ({"name": "   "}, "invalid_name"),
+        ({"name": "a" * 101}, "invalid_name"),
+        ({"amount_cents": 100_000_000}, "invalid_amount"),
+        ({"amount_cents": -100_000_000}, "invalid_amount"),
+        ({}, "invalid_request"),
+        ({"name": None}, "invalid_request"),
+        ({"amount_cents": "1"}, "invalid_request"),
+        ({"amount_cents": 1.5}, "invalid_request"),
+        ({"is_deposit_refund": 1}, "invalid_request"),
+        ({"name": "Limu", "color": "red"}, "invalid_request"),
+    ]
+
+    for body, error in cases:
+        response = patch_line(api, a, soda, body)
+        assert (response.status_code, response.json()["error"]) == (422, error), body
+
+    assert snapshot(db) == before
+    assert patch_line(api, a, soda, {"name": "a" * 100}).status_code == 200
+    assert patch_line(api, a, soda, {"amount_cents": 99_999_999}).status_code == 200
+
+
+def test_ac15_adding_lines(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    c, _ = add_receipt(db, [], number=3)
+    milk = product(db, "Maito")
+    assert milk is not None
+
+    responses = [
+        api.post(f"/api/receipts/{a}/lines", json={"name": "Banaani", "amount_cents": 99}),
+        api.post(f"/api/receipts/{a}/lines", json={"name": " maito ", "amount_cents": 125}),
+        api.post(
+            f"/api/receipts/{a}/lines",
+            json={"name": "Panttipalautus", "amount_cents": -40, "is_deposit_refund": True},
+        ),
+        api.post(f"/api/receipts/{c}/lines", json={"name": "Banaani", "amount_cents": 99}),
+    ]
+
+    assert [response.status_code for response in responses] == [201, 201, 201, 201]
+    body = responses[2].json()
+    assert [
+        (
+            line["position"],
+            line["name"],
+            line["is_deposit_refund"],
+            line["category_name"],
+            line["category_source"],
+        )
+        for line in body["lines"]
+    ] == [
+        (1, "Maito", False, "Maitotuotteet", "remembered"),
+        (2, "Limu", False, "Juomat", "model"),
+        (3, "Banaani", False, None, None),
+        (4, "maito", False, "Maitotuotteet", "remembered"),
+        (5, "Panttipalautus", True, None, None),
+    ]
+    assert line_product(db, body["lines"][3]["id"]) == milk[0]
+    assert body["line_sum_cents"] == 533
+    assert [line["position"] for line in responses[3].json()["lines"]] == [1]
+    assert product(db, "Banaani") is None
+
+
+def test_ac16_adding_a_line_errors(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    before = snapshot(db)
+    cases: list[tuple[int, dict[str, Any], int, str]] = [
+        (a, {"amount_cents": 99}, 422, "invalid_request"),
+        (a, {"name": "Banaani"}, 422, "invalid_request"),
+        (a, {"name": "", "amount_cents": 99}, 422, "invalid_name"),
+        (
+            a,
+            {"name": "Pullot", "amount_cents": 40, "is_deposit_refund": True},
+            422,
+            "deposit_refund_amount",
+        ),
+        (a, {"name": "Banaani", "amount_cents": 99, "category_id": 12}, 422, "invalid_request"),
+        (999, {"name": "Banaani", "amount_cents": 99}, 404, "not_found"),
+    ]
+
+    for receipt_id, body, status, error in cases:
+        response = api.post(f"/api/receipts/{receipt_id}/lines", json=body)
+        assert (response.status_code, response.json()["error"]) == (status, error), body
+
+    assert snapshot(db) == before
+
+
+def test_ac17_deleting_a_line(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    _, (b_line,) = receipt_b(db)
+    products = snapshot(db)[1]
+
+    first = api.delete(f"/api/receipts/{a}/lines/{soda}")
+    again = api.delete(f"/api/receipts/{a}/lines/{soda}")
+    other = api.delete(f"/api/receipts/{a}/lines/{b_line}")
+    added = api.post(f"/api/receipts/{a}/lines", json={"name": "Banaani", "amount_cents": 99})
+
+    assert first.status_code == 200
+    assert [line["name"] for line in first.json()["lines"]] == ["Maito"]
+    assert first.json()["line_sum_cents"] == 125
+    assert [(r.status_code, r.json()["error"]) for r in (again, other)] == [
+        (404, "not_found"),
+        (404, "not_found"),
+    ]
+    assert db.execute("SELECT count(*) FROM receipt_lines WHERE id = ?", (b_line,)).fetchone()[0]
+    assert snapshot(db)[1] == products
+    assert added.json()["lines"][1]["position"] == 2
+
+
+def test_ac18_deleting_keeps_the_other_positions(api: TestClient, db: sqlite3.Connection) -> None:
+    receipt_id, (_, second, _) = add_receipt(
+        db, [("Maito", 125, None), ("Limu", 224, None), ("Outo", 50, None)], number=4
+    )
+
+    api.delete(f"/api/receipts/{receipt_id}/lines/{second}")
+    body = api.post(
+        f"/api/receipts/{receipt_id}/lines", json={"name": "Banaani", "amount_cents": 99}
+    ).json()
+
+    assert [line["position"] for line in body["lines"]] == [1, 3, 4]
+
+
+def test_ac19_editing_store_date_and_total(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+
+    first = api.patch(
+        f"/api/receipts/{a}",
+        json={"store": "  Uusi   kauppa ", "purchase_date": "2026-10-06", "total_cents": 400},
+    )
+    listed = api.get("/api/receipts").json()[0]
+    second = api.patch(f"/api/receipts/{a}", json={"store": ""})
+
+    body = first.json()
+    assert first.status_code == 200
+    assert (body["store"], body["purchase_date"], body["total_cents"]) == (
+        "Uusi kauppa",
+        "2026-10-06",
+        400,
+    )
+    assert (body["difference_cents"], body["warning"]) == (51, True)
+    assert (listed["store"], listed["purchase_date"], listed["total_cents"]) == (
+        "Uusi kauppa",
+        "2026-10-06",
+        400,
+    )
+    assert second.json()["store"] == ""
+
+
+def test_ac20_filling_a_receipt_imported_before_reading(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    receipt_id, _ = add_receipt(db, [], number=5, total=None, purchase_date=None, store=None)
+
+    body = api.patch(
+        f"/api/receipts/{receipt_id}", json={"purchase_date": "2026-01-15", "total_cents": 0}
+    ).json()
+
+    assert (body["purchase_date"], body["total_cents"], body["store"]) == ("2026-01-15", 0, None)
+    assert (body["line_sum_cents"], body["difference_cents"], body["warning"]) == (0, 0, False)
+
+
+def test_ac21_receipt_field_errors(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    before = snapshot(db)
+    cases: list[tuple[dict[str, Any], str]] = [
+        ({"store": "a" * 101}, "invalid_store"),
+        ({"purchase_date": "2026-02-30"}, "invalid_date"),
+        ({"purchase_date": "5.10.2026"}, "invalid_date"),
+        ({"purchase_date": ""}, "invalid_date"),
+        ({"total_cents": -1}, "invalid_amount"),
+        ({"total_cents": 100_000_000}, "invalid_amount"),
+        ({"store": "X", "total_cents": -1}, "invalid_amount"),
+        ({}, "invalid_request"),
+        ({"store": None}, "invalid_request"),
+        ({"purchase_date": None}, "invalid_request"),
+        ({"total_cents": None}, "invalid_request"),
+        ({"total_cents": "349"}, "invalid_request"),
+        ({"reviewed": True, "note": "x"}, "invalid_request"),
+    ]
+
+    for body, error in cases:
+        response = api.patch(f"/api/receipts/{a}", json=body)
+        assert (response.status_code, response.json()["error"]) == (422, error), body
+
+    assert snapshot(db) == before
+    assert api.patch(f"/api/receipts/{a}", json={"store": "a" * 100}).status_code == 200
+
+
+def test_ac22_edits_keep_the_review_state(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (milk_line, soda) = receipt_a(db)
+    api.patch(f"/api/receipts/{a}", json={"reviewed": True})
+
+    responses = [
+        patch_line(api, a, soda, {"name": "Vesi"}),
+        patch_line(api, a, milk_line, {"amount_cents": 130}),
+        api.post(f"/api/receipts/{a}/lines", json={"name": "Banaani", "amount_cents": 99}),
+        api.delete(f"/api/receipts/{a}/lines/{soda}"),
+        api.patch(f"/api/receipts/{a}", json={"total_cents": 500}),
+    ]
+    last = api.patch(f"/api/receipts/{a}", json={"total_cents": 349, "reviewed": False})
+
+    assert [r.status_code for r in responses] == [200, 200, 201, 200, 200]
+    assert [r.json()["reviewed"] for r in responses] == [True] * 5
+    assert (last.json()["total_cents"], last.json()["reviewed"]) == (349, False)
+
+
+def test_ac23_ids_out_of_range(api: TestClient, db: sqlite3.Connection) -> None:
+    a, (_, soda) = receipt_a(db)
+    before = snapshot(db)
+
+    responses = [
+        api.get("/api/receipts/9223372036854775808"),
+        patch_line(api, a, 9223372036854775808, {"name": "X"}),
+        api.delete(f"/api/receipts/{a}/lines/-9223372036854775809"),
+        patch_line(api, a, soda, {"category_id": 9223372036854775808}),
+    ]
+
+    assert [(r.status_code, r.json()["error"]) for r in responses] == [
+        (404, "not_found"),
+        (404, "not_found"),
+        (404, "not_found"),
+        (422, "unknown_category"),
+    ]
+    assert snapshot(db) == before
+
+
+def test_pc16_no_names_in_the_logs_of_edits(
+    api: TestClient, db: sqlite3.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    a, (_, soda) = receipt_a(db)
+    caplog.set_level(logging.DEBUG)
+
+    patch_line(api, a, soda, {"name": "Kivennäisvesi"})
+    patch_line(api, a, soda, {"name": ""})
+    api.post(f"/api/receipts/{a}/lines", json={"name": "Banaani", "amount_cents": 99})
+    api.patch(f"/api/receipts/{a}", json={"store": "Uusi kauppa"})
+    api.patch(f"/api/receipts/{a}", json={"store": "a" * 101})
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    for name in ("Kivennäisvesi", "Banaani", "Uusi kauppa", "Limu", "Maito", "Testikauppa"):
         assert name not in logged

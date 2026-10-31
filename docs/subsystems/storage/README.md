@@ -15,13 +15,15 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
 
 - @backend/app/storage/db.py — `connect(path)` opens a connection; `transaction(connection)`
   wraps a block in one transaction; `is_available(path)` tells whether an existing database
-  can be read, for the health check
+  can be read, for the health check; `fits_integer(value)` tells whether an int fits SQLite's
+  signed 64-bit range (`INTEGER_MIN`, `INTEGER_MAX`), so an id from a request cannot raise
+  `OverflowError`
 - @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
   categories, products and `app_state`, and `move_product_lines` (FR-36)
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
   their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
-  `lines`, `get_line`, `set_line_category`, `get`, `get_by_hash`, `summaries`,
-  `set_reviewed`, `delete`)
+  `lines`, `get_line`, `set_line_category`, `update_line`, `next_position`, `delete_line`,
+  `get`, `get_by_hash`, `summaries`, `set_reviewed`, `set_fields`, `delete`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
@@ -53,11 +55,15 @@ line linked to the product the category and source `remembered`. The rules are i
 (raises `sqlite3.IntegrityError` for an existing hash), `get`, `get_by_hash`, `delete` and
 `transaction()`. `summaries()` lists every receipt as `ReceiptSummaryRow` with the sum of its
 line amounts, computed in SQL, in the review list order (no date first, then newest date,
-then newest id); `set_reviewed(id, reviewed=...)` returns `False` when the receipt does not
-exist. `add_line` returns the new line's id. Lines come back as `LineRow` (id, position,
-name, amount, refund flag and the three category fields) from `lines`, or as `StoredLine`
-(with its receipt id and a `LineCategory` or `None`) from `get_line`; `set_line_category`
-writes the three category columns. `LineCategory` and `CategorySource`
+then newest id); `set_reviewed(id, reviewed=...)` and `set_fields(id, store=...,
+purchase_date=..., total_cents=...)` return `False` when the receipt does not exist.
+`add_line` returns the new line's id; `next_position(receipt_id)` is the position after the
+last line (1 without lines), and positions can have gaps after `delete_line`, which returns
+`False` for a missing line. Lines come back as `LineRow` (id, position, name, amount, refund
+flag and the three category fields) from `lines`, or as `StoredLine` (with its receipt id,
+amount and a `LineCategory` or `None`) from `get_line`; `set_line_category` writes the three
+category columns, and `update_line` writes the name, amount, refund flag and category at
+once, so the schema's `CHECK`s see one consistent row. `LineCategory` and `CategorySource`
 are defined here. The rules are in [import](../import/README.md) and
 [categorization](../categorization/README.md#line-categorization).
 

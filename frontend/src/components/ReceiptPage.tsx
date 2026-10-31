@@ -1,23 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listCategories, type CatalogItem } from "../api/catalog";
 import type { ApiResult } from "../api/client";
 import {
+  addLine,
+  deleteLine,
+  editLine,
+  editReceipt,
   getReceipt,
   receiptImageUrl,
   setLineCategory,
   setReviewed,
+  type NewLine,
   type Receipt,
+  type ReceiptLine,
   type Subtotal,
 } from "../api/receipts";
-import { formatCents, formatDate } from "../format";
+import { formatCents, formatCentsInput, parseCents } from "../format";
 import { fi } from "../i18n/fi";
 import { isPlainLeftClick, PAGE_PATHS } from "../navigation";
+import { AddLineForm } from "./AddLineForm";
 import { CategorySelect } from "./CategorySelect";
+import { ConfirmDelete } from "./ConfirmDelete";
+import { EditableField } from "./EditableField";
 
 interface Props {
   id: number;
   onBack: () => void;
 }
+
+/** Sends one change; resolves to the error message, or null when it was saved. */
+type Send = (request: () => Promise<ApiResult<Receipt>>) => Promise<string | null>;
 
 // The app has no stylesheet; this one layout rule puts the image beside the lines (FR-16)
 // and wraps them on a narrow window.
@@ -30,7 +42,13 @@ const COLUMNS = {
 const IMAGE_COLUMN = { flex: "1 1 20rem", maxWidth: "40rem" } as const;
 const LINES_COLUMN = { flex: "2 1 24rem" } as const;
 
-/** One receipt: the image beside its lines, categories, sums and review state. */
+/** An amount field's save: text that is not an amount is refused without a request. */
+function saveCents(text: string, save: (cents: number) => Promise<string | null>) {
+  const cents = parseCents(text);
+  return cents === null ? Promise.resolve(fi.receipt.amountFormat) : save(cents);
+}
+
+/** One receipt: the image beside its editable lines, categories, sums and review state. */
 export function ReceiptPage({ id, onBack }: Props) {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -38,10 +56,10 @@ export function ReceiptPage({ id, onBack }: Props) {
   const [items, setItems] = useState<CatalogItem[] | null>(null);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [imageMissing, setImageMissing] = useState(false);
-  // While a change waits for its answer every control is disabled, so answers cannot arrive
-  // out of order.
-  const [busy, setBusy] = useState(false);
-  const [lineErrors, setLineErrors] = useState<Record<number, string>>({});
+  // Changes run one at a time, each after the previous answer, so answers cannot arrive out
+  // of order; no control is disabled meanwhile, so the focus stays where the user is
+  // (line-editing PC12).
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,34 +91,19 @@ export function ReceiptPage({ id, onBack }: Props) {
     };
   }, [id]);
 
-  /** Send one change; the answer is the whole receipt, so sums and moved lines update (FR-19). */
-  async function change(
-    request: Promise<ApiResult<Receipt>>,
-    showError: (message: string | null) => void,
-  ) {
-    setBusy(true);
-    showError(null);
-    const result = await request;
-    setBusy(false);
-    if (result.ok) {
-      setReceipt(result.data);
-    } else {
-      showError(result.error.message);
-    }
-  }
-
-  function chooseCategory(lineId: number, categoryId: number | null) {
-    if (categoryId === null) {
-      return;
-    }
-    void change(setLineCategory(id, lineId, categoryId), (message) =>
-      setLineErrors((errors) => {
-        const next = { ...errors };
-        delete next[lineId];
-        return message === null ? next : { ...next, [lineId]: message };
-      }),
-    );
-  }
+  /** The answer is the whole receipt, so sums, marks and moved lines update (FR-19). */
+  const send: Send = (request) => {
+    const result = queue.current.then(async () => {
+      const answer = await request();
+      if (answer.ok) {
+        setReceipt(answer.data);
+        return null;
+      }
+      return answer.error.message;
+    });
+    queue.current = result;
+    return result;
+  };
 
   return (
     <section aria-labelledby="receipt-heading">
@@ -121,26 +124,37 @@ export function ReceiptPage({ id, onBack }: Props) {
       {itemsError && <p role="alert">{itemsError}</p>}
       {receipt && (
         <>
-          <dl>
-            <dt>{fi.receipt.store}</dt>
-            <dd>{receipt.store || fi.receipts.missing}</dd>
-            <dt>{fi.receipt.date}</dt>
-            <dd>
-              {receipt.purchase_date ? formatDate(receipt.purchase_date) : fi.receipts.missing}
-            </dd>
-            <dt>{fi.receipt.total}</dt>
-            <dd>
-              {receipt.total_cents === null
-                ? fi.receipts.missing
-                : formatCents(receipt.total_cents)}
-            </dd>
-          </dl>
+          <p>
+            <EditableField
+              label={fi.receipt.store}
+              showLabel
+              value={receipt.store ?? ""}
+              onSave={(text) => send(() => editReceipt(id, { store: text }))}
+            />{" "}
+            <EditableField
+              label={fi.receipt.date}
+              showLabel
+              type="date"
+              value={receipt.purchase_date ?? ""}
+              onSave={(text) => send(() => editReceipt(id, { purchase_date: text }))}
+            />{" "}
+            <EditableField
+              label={fi.receipt.total}
+              showLabel
+              value={receipt.total_cents === null ? "" : formatCentsInput(receipt.total_cents)}
+              onSave={(text) =>
+                saveCents(text, (cents) => send(() => editReceipt(id, { total_cents: cents })))
+              }
+            />
+          </p>
           <p>
             {receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}{" "}
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void change(setReviewed(id, !receipt.reviewed), setReviewError)}
+              onClick={() => {
+                setReviewError(null);
+                void send(() => setReviewed(id, !receipt.reviewed)).then(setReviewError);
+              }}
             >
               {receipt.reviewed ? fi.receipt.cancelConfirmation : fi.receipt.confirm}
             </button>
@@ -163,13 +177,8 @@ export function ReceiptPage({ id, onBack }: Props) {
               )}
             </div>
             <div style={LINES_COLUMN}>
-              <Lines
-                receipt={receipt}
-                items={items}
-                disabled={busy || items === null}
-                errors={lineErrors}
-                onChoose={chooseCategory}
-              />
+              <Lines receipt={receipt} items={items} send={send} />
+              <AddLineForm onAdd={(line: NewLine) => send(() => addLine(id, line))} />
               <p>{`${fi.receipt.lineSum} ${formatCents(receipt.line_sum_cents)}`}</p>
               <Subtotals subtotals={receipt.subtotals} />
             </div>
@@ -198,12 +207,10 @@ function Warning({ receipt }: { receipt: Receipt }) {
 interface LinesProps {
   receipt: Receipt;
   items: CatalogItem[] | null;
-  disabled: boolean;
-  errors: Record<number, string>;
-  onChoose: (lineId: number, categoryId: number | null) => void;
+  send: Send;
 }
 
-function Lines({ receipt, items, disabled, errors, onChoose }: LinesProps) {
+function Lines({ receipt, items, send }: LinesProps) {
   if (receipt.lines.length === 0) {
     return <p>{fi.receipt.noLines}</p>;
   }
@@ -213,36 +220,116 @@ function Lines({ receipt, items, disabled, errors, onChoose }: LinesProps) {
         <tr>
           <th>{fi.receipt.product}</th>
           <th>{fi.receipt.amount}</th>
+          <th>{fi.receipt.depositRefund}</th>
           <th>{fi.receipt.category}</th>
+          <th />
         </tr>
       </thead>
       <tbody>
         {receipt.lines.map((line) => (
-          <tr key={line.id}>
-            <td>{line.name}</td>
-            <td>{formatCents(line.amount_cents)}</td>
-            <td>
-              {line.is_deposit_refund ? (
-                fi.receipt.depositRefund
-              ) : (
-                <>
-                  <CategorySelect
-                    label={fi.receipt.categoryOf(line.name)}
-                    items={items ?? []}
-                    value={line.category_id}
-                    disabled={disabled}
-                    onChange={(categoryId) => onChoose(line.id, categoryId)}
-                  />
-                  {line.category_source === "model" && <> {fi.receipt.suggestion}</>}
-                  {errors[line.id] && <span role="alert"> {errors[line.id]}</span>}
-                </>
-              )}
-            </td>
-          </tr>
+          <LineRow key={line.id} receiptId={receipt.id} line={line} items={items} send={send} />
         ))}
       </tbody>
     </table>
   );
+}
+
+interface LineRowProps {
+  receiptId: number;
+  line: ReceiptLine;
+  items: CatalogItem[] | null;
+  send: Send;
+}
+
+/** One editable line. The refund checkbox, category and delete keep their own messages. */
+function LineRow({ receiptId, line, items, send }: LineRowProps) {
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function sendWith(
+    request: () => Promise<ApiResult<Receipt>>,
+    showError: (message: string | null) => void,
+  ) {
+    showError(null);
+    void send(request).then(showError);
+  }
+
+  return (
+    <tr>
+      <td>
+        <EditableField
+          label={fi.receipt.nameOf(line.name)}
+          value={line.name}
+          onSave={(text) => send(() => editLine(receiptId, line.id, { name: text }))}
+        />
+      </td>
+      <td>
+        <EditableField
+          label={fi.receipt.amountOf(line.name)}
+          value={formatCentsInput(line.amount_cents)}
+          onSave={(text) =>
+            saveCents(text, (cents) =>
+              send(() => editLine(receiptId, line.id, { amount_cents: cents })),
+            )
+          }
+        />
+      </td>
+      <td>
+        {/* Checked from the saved line, so a refused change shows the saved state again. */}
+        <input
+          type="checkbox"
+          aria-label={fi.receipt.refundOf(line.name)}
+          checked={line.is_deposit_refund}
+          onChange={(event) => {
+            // Read now: React puts the controlled box back before the queued request runs.
+            const isDepositRefund = event.target.checked;
+            sendWith(
+              () => editLine(receiptId, line.id, { is_deposit_refund: isDepositRefund }),
+              setRefundError,
+            );
+          }}
+        />
+        {refundError && <span role="alert"> {refundError}</span>}
+      </td>
+      <td>
+        {line.is_deposit_refund ? (
+          fi.receipt.depositRefund
+        ) : items === null ? (
+          categoryText(line)
+        ) : (
+          <>
+            <CategorySelect
+              label={fi.receipt.categoryOf(line.name)}
+              items={items}
+              value={line.category_id}
+              onChange={(categoryId) => {
+                if (categoryId !== null) {
+                  sendWith(() => setLineCategory(receiptId, line.id, categoryId), setCategoryError);
+                }
+              }}
+            />
+            {line.category_source === "model" && <> {fi.receipt.suggestion}</>}
+            {categoryError && <span role="alert"> {categoryError}</span>}
+          </>
+        )}
+      </td>
+      <td>
+        <ConfirmDelete
+          onConfirm={() => sendWith(() => deleteLine(receiptId, line.id), setDeleteError)}
+        />
+        {deleteError && <span role="alert"> {deleteError}</span>}
+      </td>
+    </tr>
+  );
+}
+
+/** A line's category while the categories load or after they failed (line-editing PC15). */
+function categoryText(line: ReceiptLine): string {
+  if (line.category_name === null) {
+    return fi.receipts.missing;
+  }
+  return line.group_name ? `${line.group_name} > ${line.category_name}` : line.category_name;
 }
 
 function Subtotals({ subtotals }: { subtotals: Subtotal[] }) {

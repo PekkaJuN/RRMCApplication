@@ -98,8 +98,8 @@ One row per item line of a receipt, in printed order (receipt-reading spec).
 |---|---|---|
 | `id` | `INTEGER PRIMARY KEY` | Stable id |
 | `receipt_id` | `INTEGER NOT NULL`, `REFERENCES receipts ON DELETE CASCADE` | The receipt; deleting the receipt deletes its lines |
-| `position` | `INTEGER NOT NULL`, `CHECK (≥ 1)`, `UNIQUE` with `receipt_id` | Printed order, from 1 |
-| `name` | `TEXT NOT NULL`, `CHECK` not blank | Product name as read |
+| `position` | `INTEGER NOT NULL`, `CHECK (≥ 1)`, `UNIQUE` with `receipt_id` | Printed order, from 1. A line the user adds goes after the last one; a deleted line leaves a gap, and the other lines keep their positions |
+| `name` | `TEXT NOT NULL`, `CHECK` not blank | Product name as read, or as the user edited it (1–100 characters) |
 | `amount_cents` | `INTEGER NOT NULL` | Amount after any discount and including any deposit (FR-9); negative for a deposit refund |
 | `is_deposit_refund` | `INTEGER NOT NULL`, `0` or `1` | 1 for a deposit refund (panttipalautus); `CHECK` that such a line is negative |
 | `category_id` | `INTEGER`, references `categories (id)`, `ON DELETE RESTRICT` | The line's category; `NULL` when it has none. Always `NULL` for a deposit refund (FR-44) |
@@ -150,8 +150,8 @@ erDiagram
 - [categorization](subsystems/categorization/README.md) — the rules on top of the catalog
   tables, and the line categories
 - [import](subsystems/import/README.md) — creates the receipt and line rows
-- [review](subsystems/review/README.md) — reads receipts and lines for the review UI and
-  sets the review state
+- [review](subsystems/review/README.md) — reads receipts and lines for the review UI, edits,
+  adds and deletes lines, and sets the store, date, total and review state
 - [receipt-reading](subsystems/receipt-reading/README.md) — produces the read data
 
 ## Related Documents
@@ -164,4 +164,6 @@ erDiagram
   `receipt_lines`
 - [Categorization spec](../specs/features/categorization.md): the line category columns
 - [Receipt review spec](../specs/features/receipt-review.md): the `reviewed` column
+- [Line editing spec](../specs/features/line-editing.md): edited, added and deleted lines;
+  no schema change
 - [development.md](development.md#running-the-app): where the data lives when the app runs

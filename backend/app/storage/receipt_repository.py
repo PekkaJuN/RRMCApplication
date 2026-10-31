@@ -70,11 +70,12 @@ class LineRow:
 
 @dataclass(frozen=True)
 class StoredLine:
-    """One line looked up by its id, for changing its category."""
+    """One line looked up by its id, for changing it."""
 
     id: int
     receipt_id: int
     name: str
+    amount_cents: int
     is_deposit_refund: bool
     category: LineCategory | None
 
@@ -168,8 +169,8 @@ class ReceiptRepository:
 
     def get_line(self, line_id: int) -> StoredLine | None:
         row = self._connection.execute(
-            "SELECT id, receipt_id, name, is_deposit_refund, category_id, category_source,"
-            " product_id FROM receipt_lines WHERE id = ?",
+            "SELECT id, receipt_id, name, amount_cents, is_deposit_refund, category_id,"
+            " category_source, product_id FROM receipt_lines WHERE id = ?",
             (line_id,),
         ).fetchone()
         if row is None:
@@ -183,6 +184,7 @@ class ReceiptRepository:
             id=row["id"],
             receipt_id=row["receipt_id"],
             name=row["name"],
+            amount_cents=row["amount_cents"],
             is_deposit_refund=bool(row["is_deposit_refund"]),
             category=category,
         )
@@ -194,6 +196,37 @@ class ReceiptRepository:
             (*_category_values(category), line_id),
         )
 
+    def update_line(
+        self,
+        line_id: int,
+        *,
+        name: str,
+        amount_cents: int,
+        is_deposit_refund: bool,
+        category: LineCategory | None,
+    ) -> None:
+        """Write the line's resulting state at once, so the schema's CHECKs see one
+        consistent row (a refund is negative and has no category)."""
+        self._connection.execute(
+            "UPDATE receipt_lines SET name = ?, amount_cents = ?, is_deposit_refund = ?,"
+            " category_id = ?, category_source = ?, product_id = ? WHERE id = ?",
+            (name, amount_cents, int(is_deposit_refund), *_category_values(category), line_id),
+        )
+
+    def next_position(self, receipt_id: int) -> int:
+        """The position after the receipt's last line; 1 without lines. Positions can have
+        gaps after a delete."""
+        row = self._connection.execute(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM receipt_lines WHERE receipt_id = ?",
+            (receipt_id,),
+        ).fetchone()
+        return row[0]
+
+    def delete_line(self, line_id: int) -> bool:
+        """False when the line does not exist."""
+        cursor = self._connection.execute("DELETE FROM receipt_lines WHERE id = ?", (line_id,))
+        return cursor.rowcount == 1
+
     def get(self, receipt_id: int) -> ReceiptRow | None:
         row = self._connection.execute(_RECEIPT_SELECT + " WHERE id = ?", (receipt_id,)).fetchone()
         return _receipt(row) if row else None
@@ -202,6 +235,21 @@ class ReceiptRepository:
         """Set the review state (FR-21). False when the receipt does not exist."""
         cursor = self._connection.execute(
             "UPDATE receipts SET reviewed = ? WHERE id = ?", (int(reviewed), receipt_id)
+        )
+        return cursor.rowcount == 1
+
+    def set_fields(
+        self,
+        receipt_id: int,
+        *,
+        store: str | None,
+        purchase_date: str | None,
+        total_cents: int | None,
+    ) -> bool:
+        """Write the store, purchase date and total. False when the receipt does not exist."""
+        cursor = self._connection.execute(
+            "UPDATE receipts SET store = ?, purchase_date = ?, total_cents = ? WHERE id = ?",
+            (store, purchase_date, total_cents, receipt_id),
         )
         return cursor.rowcount == 1
 

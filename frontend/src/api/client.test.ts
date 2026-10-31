@@ -93,6 +93,14 @@ describe("write methods", () => {
     expect(result).toEqual({ ok: true, data: undefined });
   });
 
+  it("line-editing AC31: apiDelete returns the body when the answer has one", async () => {
+    server.use(http.delete("/api/things/1", () => HttpResponse.json({ id: 1, name: "a" })));
+
+    const result = await apiDelete<{ id: number; name: string }>("/api/things/1");
+
+    expect(result).toEqual({ ok: true, data: { id: 1, name: "a" } });
+  });
+
   it("AC27: a write that is refused returns the code and Finnish message", async () => {
     server.use(
       http.delete("/api/things/1", () =>
