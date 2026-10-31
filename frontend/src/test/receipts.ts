@@ -1,6 +1,42 @@
+import { http, HttpResponse } from "msw";
 import type { CatalogItem } from "../api/catalog";
 import type { CategorySource, Receipt, ReceiptLine, ReceiptSummary } from "../api/receipts";
 import { defaultItems, itemNamed } from "./catalog";
+import { server } from "./server";
+
+/** A receipt write as the backend received it; `body` is null for a DELETE. */
+export interface RecordedWrite {
+  method: string;
+  path: string;
+  body: unknown;
+}
+
+/**
+ * Answer every receipt write (PATCH, POST, DELETE) with `answer` and record it in the
+ * returned list, in the order the requests arrived (line-editing P5).
+ */
+export function recordWrites(
+  answer: (write: RecordedWrite) => Response | Promise<Response> = () =>
+    HttpResponse.json(RECEIPT_A),
+): RecordedWrite[] {
+  const writes: RecordedWrite[] = [];
+  const record = async ({ request }: { request: Request }) => {
+    const write = {
+      method: request.method,
+      path: new URL(request.url).pathname,
+      body: request.method === "DELETE" ? null : ((await request.json()) as unknown),
+    };
+    writes.push(write);
+    return answer(write);
+  };
+  server.use(
+    http.patch("/api/receipts/:id", record),
+    http.patch("/api/receipts/:id/lines/:lineId", record),
+    http.post("/api/receipts/:id/lines", record),
+    http.delete("/api/receipts/:id/lines/:lineId", record),
+  );
+  return writes;
+}
 
 /** The default catalog, whose ids the receipt fixtures use. */
 export const ITEMS: CatalogItem[] = defaultItems();

@@ -163,7 +163,8 @@ it("AC22: a receipt opens from the list and the back link returns", async () => 
 
   expect(window.location.pathname).toBe("/kuitit/3");
   expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
-  expect(await screen.findByText("Testikauppa")).toBeInTheDocument();
+  // The store is an input since line editing (line-editing PC12).
+  expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
   const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
   expect(within(navigation).getByRole("link", { name: "Kuitit" })).toHaveAttribute(
     "aria-current",
@@ -182,5 +183,6 @@ it("AC22: a reload at /kuitit/<id> shows the receipt", async () => {
   render(<App />);
 
   expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
-  expect(await screen.findByText("Testikauppa")).toBeInTheDocument();
+  // The store is an input since line editing (line-editing PC12).
+  expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
 });

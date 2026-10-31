@@ -2,6 +2,19 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-10-31: A field lost text typed while its save waited
+
+- **Context:** Audit of the line-editing spec (PC12, AC32).
+- **Symptom:** none seen; found in review. Typing in a field after Enter, while the save
+  waited, was wiped when the answer arrived, and the new text was never sent.
+- **Root cause:** `EditableField` cleared its draft after every successful save, whatever
+  the draft was by then.
+- **Solution:** the draft is cleared only while it still equals the text that was sent
+  (@frontend/src/components/EditableField.tsx); regression test `line-editing AC32: text
+  typed while a save waits is kept when the answer arrives`.
+- **Prevention:** state set after an `await` must check that the state it replaces did not
+  change during the wait.
+
 ## 2026-10-30: A proxy test could not fail
 
 - **Context:** Audit of the receipt-reading spec (AC23).

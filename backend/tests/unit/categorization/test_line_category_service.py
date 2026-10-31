@@ -14,7 +14,7 @@ from app.categorization.errors import (
 from app.categorization.names import normalize_key
 from app.categorization.service import LineCategoryService
 from app.storage.catalog_repository import CatalogRepository
-from app.storage.receipt_repository import LineCategory, ReceiptRepository
+from app.storage.receipt_repository import LineCategory, ReceiptRepository, StoredLine
 
 LONG_NAME = "Banaani " * 13  # 104 characters, over the 100 of a product name
 
@@ -31,9 +31,28 @@ def receipts(db: sqlite3.Connection) -> ReceiptRepository:
     return ReceiptRepository(db)
 
 
+class Correction:
+    """A category choice in one transaction, as review runs it: `choose` works inside the
+    caller's transaction (line-editing P3)."""
+
+    def __init__(self, catalog: CatalogRepository, receipts: ReceiptRepository) -> None:
+        self._catalog = catalog
+        self._receipts = receipts
+
+    def set_category(self, line_id: int, category_id: int) -> StoredLine:
+        with self._catalog.transaction():
+            line = self._receipts.get_line(line_id)
+            if line is None:
+                raise NotFoundError()
+            LineCategoryService(self._catalog, self._receipts).choose(line, category_id)
+            stored = self._receipts.get_line(line_id)
+        assert stored is not None
+        return stored
+
+
 @pytest.fixture
-def service(catalog: CatalogRepository, receipts: ReceiptRepository) -> LineCategoryService:
-    return LineCategoryService(catalog, receipts)
+def service(catalog: CatalogRepository, receipts: ReceiptRepository) -> Correction:
+    return Correction(catalog, receipts)
 
 
 class LineWriteFails(ReceiptRepository):
@@ -53,9 +72,7 @@ def test_ac15_failed_correction_rolls_back_the_product_and_its_lines(
     before = snapshot(db)
 
     with pytest.raises(sqlite3.OperationalError):
-        LineCategoryService(catalog, LineWriteFails(db)).set_category(
-            first, category_id(catalog, "Juomat")
-        )
+        Correction(catalog, LineWriteFails(db)).set_category(first, category_id(catalog, "Juomat"))
 
     assert snapshot(db) == before
 
@@ -106,7 +123,7 @@ def snapshot(db: sqlite3.Connection) -> tuple[list[tuple[object, ...]], list[tup
 def test_ac16_errors_change_nothing(
     db: sqlite3.Connection,
     catalog: CatalogRepository,
-    service: LineCategoryService,
+    service: Correction,
     case: str,
     error: type[Exception],
 ) -> None:
@@ -130,7 +147,7 @@ def test_ac16_errors_change_nothing(
 
 
 def test_ac23_refund_error_names_no_line(
-    db: sqlite3.Connection, catalog: CatalogRepository, service: LineCategoryService
+    db: sqlite3.Connection, catalog: CatalogRepository, service: Correction
 ) -> None:
     refund_id = add_line(db, "Panttipalautus", amount=-40, refund=True)
 
@@ -148,7 +165,7 @@ def test_ac13_unlinked_line_creates_product(
     db: sqlite3.Connection,
     catalog: CatalogRepository,
     receipts: ReceiptRepository,
-    service: LineCategoryService,
+    service: Correction,
 ) -> None:
     line_id = add_line(db, "Banaani", LineCategory(category_id(catalog, "Muut"), "model", None))
     fruit = category_id(catalog, "Hedelmät")
@@ -166,7 +183,7 @@ def test_ac14_unlinked_line_uses_existing_product(
     db: sqlite3.Connection,
     catalog: CatalogRepository,
     receipts: ReceiptRepository,
-    service: LineCategoryService,
+    service: Correction,
 ) -> None:
     product_id = catalog.add_product("Banaani", "banaani", category_id(catalog, "Herkut"))
     muut = LineCategory(category_id(catalog, "Muut"), "model", None)
@@ -193,7 +210,7 @@ def test_ac15_linked_line_moves_other_lines(
     db: sqlite3.Connection,
     catalog: CatalogRepository,
     receipts: ReceiptRepository,
-    service: LineCategoryService,
+    service: Correction,
 ) -> None:
     dairy = category_id(catalog, "Maitotuotteet")
     product_id = catalog.add_product("Kevytmaito 1L", "kevytmaito 1l", dairy)
@@ -222,7 +239,7 @@ def test_ac15_confirming_the_same_category_changes_only_the_source(
     db: sqlite3.Connection,
     catalog: CatalogRepository,
     receipts: ReceiptRepository,
-    service: LineCategoryService,
+    service: Correction,
 ) -> None:
     dairy = category_id(catalog, "Maitotuotteet")
     product_id = catalog.add_product("Kevytmaito 1L", "kevytmaito 1l", dairy)
@@ -236,3 +253,106 @@ def test_ac15_confirming_the_same_category_changes_only_the_source(
         LineCategory(dairy, "user", product_id),
         LineCategory(dairy, "user", product_id),
     ]
+
+
+# Line editing spec P3: a renamed line follows its name (FR-43).
+
+
+def follow(
+    catalog: CatalogRepository, receipts: ReceiptRepository, line_id: int, name: str
+) -> LineCategory | None:
+    line = receipts.get_line(line_id)
+    assert line is not None
+    return LineCategoryService(catalog, receipts).follow_name(line, name)
+
+
+def test_ac1_no_match_makes_a_product(
+    db: sqlite3.Connection, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    drinks = category_id(catalog, "Juomat")
+    line_id = add_line(db, "Limu", LineCategory(drinks, "model", None))
+
+    category = follow(catalog, receipts, line_id, "Kivennäisvesi")
+
+    product = catalog.get_product_by_key("kivennäisvesi")
+    assert product is not None
+    assert (product.name, product.category_id) == ("Kivennäisvesi", drinks)
+    assert category == LineCategory(drinks, "user", product.id)
+
+
+def test_ac2_name_match_is_remembered(
+    db: sqlite3.Connection, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    dairy = category_id(catalog, "Maitotuotteet")
+    yoghurt = catalog.add_product("Jogurtti", "jogurtti", dairy)
+    line_id = add_line(db, "Limu", LineCategory(category_id(catalog, "Juomat"), "model", None))
+
+    category = follow(catalog, receipts, line_id, "JOGURTTI")
+
+    assert category == LineCategory(dairy, "remembered", yoghurt)
+    assert len(catalog.list_products()) == 1
+
+
+def test_ac3_old_product_untouched(
+    db: sqlite3.Connection, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    dairy = category_id(catalog, "Maitotuotteet")
+    milk = catalog.add_product("Maito", "maito", dairy)
+    remembered = LineCategory(dairy, "remembered", milk)
+    line_id = add_line(db, "Maito", remembered, receipt="a")
+    other_id = add_line(db, "Maito", remembered, receipt="b")
+
+    category = follow(catalog, receipts, line_id, "Kaurajuoma")
+
+    oat = catalog.get_product_by_key("kaurajuoma")
+    assert oat is not None
+    assert category == LineCategory(dairy, "user", oat.id)
+    old = catalog.get_product(milk)
+    assert old is not None
+    assert (old.name, old.category_id) == ("Maito", dairy)
+    other = receipts.get_line(other_id)
+    assert other is not None
+    assert other.category == remembered
+
+
+def test_ac4_same_key_keeps_the_category(
+    db: sqlite3.Connection, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    dairy = category_id(catalog, "Maitotuotteet")
+    milk = catalog.add_product("Maito", "maito", dairy)
+    line_id = add_line(db, "Maito", LineCategory(dairy, "remembered", milk))
+
+    category = follow(catalog, receipts, line_id, "MAITO")
+
+    assert category == LineCategory(dairy, "remembered", milk)
+    assert len(catalog.list_products()) == 1
+
+
+def test_ac5_no_category_no_product(
+    db: sqlite3.Connection, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    line_id = add_line(db, "Outo")
+
+    assert follow(catalog, receipts, line_id, "Outo tuote") is None
+    assert catalog.list_products() == []
+
+
+# Line editing spec P3: resolving a new or unmarked line by its name match only.
+
+
+def test_ac15_resolve_by_name_match(
+    catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    dairy = category_id(catalog, "Maitotuotteet")
+    milk = catalog.add_product("Maito", "maito", dairy)
+
+    category = LineCategoryService(catalog, receipts).resolve(" maito ")
+
+    assert category == LineCategory(dairy, "remembered", milk)
+
+
+def test_ac15_resolve_without_match_creates_nothing(
+    catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    assert LineCategoryService(catalog, receipts).resolve("Banaani") is None
+    assert catalog.list_products() == []

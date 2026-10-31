@@ -5,8 +5,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
-from app.review.schemas import LineCategoryUpdate, ReceiptOut, ReceiptSummaryOut, ReviewUpdate
-from app.review.service import ReviewService
+from app.review.schemas import LineUpdate, NewLine, ReceiptOut, ReceiptSummaryOut, ReceiptUpdate
+from app.review.service import LineEdit, ReceiptEdit, ReviewService
 from app.settings import Settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
@@ -47,19 +47,49 @@ def create_review_router(settings: Settings) -> APIRouter:
     @router.patch("/receipts/{receipt_id}")
     def update_receipt(
         receipt_id: int,
-        body: ReviewUpdate,
+        body: ReceiptUpdate,
         service: Annotated[ReviewService, Depends(review_service)],
     ) -> ReceiptOut:
-        return ReceiptOut.from_view(service.set_reviewed(receipt_id, reviewed=body.reviewed))
+        edit = ReceiptEdit(
+            store=body.store,
+            purchase_date=body.purchase_date,
+            total_cents=body.total_cents,
+            reviewed=body.reviewed,
+        )
+        view = service.update_receipt(receipt_id, edit)
+        return ReceiptOut.from_view(view)
 
     @router.patch("/receipts/{receipt_id}/lines/{line_id}")
     def update_line(
         receipt_id: int,
         line_id: int,
-        body: LineCategoryUpdate,
+        body: LineUpdate,
         service: Annotated[ReviewService, Depends(review_service)],
     ) -> ReceiptOut:
-        view = service.set_line_category(receipt_id, line_id, body.category_id)
+        edit = LineEdit(
+            name=body.name,
+            amount_cents=body.amount_cents,
+            is_deposit_refund=body.is_deposit_refund,
+            category_id=body.category_id,
+        )
+        view = service.edit_line(receipt_id, line_id, edit)
         return ReceiptOut.from_view(view)
+
+    @router.post("/receipts/{receipt_id}/lines", status_code=201)
+    def add_line(
+        receipt_id: int,
+        body: NewLine,
+        service: Annotated[ReviewService, Depends(review_service)],
+    ) -> ReceiptOut:
+        view = service.add_line(
+            receipt_id, body.name, body.amount_cents, is_deposit_refund=body.is_deposit_refund
+        )
+        return ReceiptOut.from_view(view)
+
+    @router.delete("/receipts/{receipt_id}/lines/{line_id}")
+    def delete_line(
+        receipt_id: int, line_id: int, service: Annotated[ReviewService, Depends(review_service)]
+    ) -> ReceiptOut:
+        return ReceiptOut.from_view(service.delete_line(receipt_id, line_id))
 
     return router

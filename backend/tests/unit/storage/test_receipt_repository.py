@@ -162,6 +162,7 @@ def test_get_line_and_set_its_category(db: sqlite3.Connection) -> None:
         id=line_id,
         receipt_id=receipt.id,
         name="Ruisleipä",
+        amount_cents=189,
         is_deposit_refund=False,
         category=LineCategory(category_id, "user", product_id),
     )
@@ -267,3 +268,107 @@ def test_summaries_sum_the_lines(db: sqlite3.Connection) -> None:
             line_sum_cents=300,
         ),
     ]
+
+
+# Line editing spec P2: line writes.
+
+
+def test_get_line_has_the_amount(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    line_id = repository.add_line(receipt.id, 1, "Panttipalautus", -40, is_deposit_refund=True)
+
+    line = repository.get_line(line_id)
+
+    assert line is not None
+    assert line.amount_cents == -40
+
+
+def test_update_line_writes_every_field(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    line_id = repository.add_line(receipt.id, 1, "Limu", 224, is_deposit_refund=False)
+
+    repository.update_line(
+        line_id,
+        name="Ruisleipä",
+        amount_cents=300,
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "user", product_id),
+    )
+    repository.update_line(
+        line_id, name="Pullot", amount_cents=-40, is_deposit_refund=True, category=None
+    )
+
+    assert repository.lines(receipt.id) == [LineRow(line_id, 1, "Pullot", -40, True)]
+
+
+@pytest.mark.parametrize(("amount", "with_category"), [(0, False), (40, False), (-40, True)])
+def test_update_line_refuses_an_invalid_refund(
+    db: sqlite3.Connection, amount: int, with_category: bool
+) -> None:
+    # The schema's CHECKs: a refund is negative and has no category (FR-44).
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    line_id = repository.add_line(receipt.id, 1, "Limu", 224, is_deposit_refund=False)
+    category = LineCategory(category_id, "user", product_id) if with_category else None
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repository.update_line(
+            line_id, name="Limu", amount_cents=amount, is_deposit_refund=True, category=category
+        )
+
+
+def test_ac18_next_position_after_a_gap(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    assert repository.next_position(receipt.id) == 1
+
+    repository.add_line(receipt.id, 1, "Maito", 125, is_deposit_refund=False)
+    repository.add_line(receipt.id, 3, "Limu", 224, is_deposit_refund=False)
+
+    assert repository.next_position(receipt.id) == 4
+
+
+def test_ac17_delete_line(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    milk = repository.add_line(receipt.id, 1, "Maito", 125, is_deposit_refund=False)
+    soda = repository.add_line(receipt.id, 2, "Limu", 224, is_deposit_refund=False)
+
+    assert repository.delete_line(soda) is True
+    assert repository.delete_line(soda) is False
+    assert [line.id for line in repository.lines(receipt.id)] == [milk]
+
+
+def test_ac19_set_fields_writes_store_date_and_total(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+
+    assert repository.set_fields(
+        receipt.id, store="Uusi kauppa", purchase_date="2026-10-06", total_cents=400
+    )
+
+    stored = repository.get(receipt.id)
+    assert stored is not None
+    assert (stored.store, stored.purchase_date, stored.total_cents) == (
+        "Uusi kauppa",
+        "2026-10-06",
+        400,
+    )
+
+
+def test_set_fields_of_a_missing_receipt(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+
+    assert not repository.set_fields(1, store="", purchase_date="2026-10-06", total_cents=0)
+
+
+def test_set_fields_refuses_a_date_of_the_wrong_shape(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repository.set_fields(receipt.id, store="", purchase_date="5.10.2026", total_cents=0)

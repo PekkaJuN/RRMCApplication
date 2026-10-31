@@ -12,3 +12,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 5 | [Receipt reading](features/receipt-reading.md) | Done | FR-6–FR-10, FR-31; PRD open question 4 |
 | 6 | [Line categorization](features/categorization.md) | Done | FR-12–FR-15 (backend), FR-36, FR-44; PRD open question 6 |
 | 7 | [Receipt review](features/receipt-review.md) | Done | FR-16, FR-17, FR-19–FR-21, FR-13 (UI) |
+| 8 | [Line editing](features/line-editing.md) | Done | FR-18 (without quantity and unit price), FR-43, FR-19, FR-44 for edits |

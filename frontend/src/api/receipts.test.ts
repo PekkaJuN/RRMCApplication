@@ -1,8 +1,19 @@
 import { http, HttpResponse } from "msw";
 import { expect, it } from "vitest";
-import { DAIRY, RECEIPT_A, RECEIPT_A_LIMU_DAIRY, SUMMARY_A, SUMMARY_B } from "../test/receipts";
+import {
+  DAIRY,
+  RECEIPT_A,
+  RECEIPT_A_LIMU_DAIRY,
+  recordWrites,
+  SUMMARY_A,
+  SUMMARY_B,
+} from "../test/receipts";
 import { server } from "../test/server";
 import {
+  addLine,
+  deleteLine,
+  editLine,
+  editReceipt,
   getReceipt,
   listReceipts,
   receiptImageUrl,
@@ -75,4 +86,53 @@ it("AC28: an error answer keeps the code and message", async () => {
 
 it("AC22: the image address", () => {
   expect(receiptImageUrl(3)).toBe("/api/receipts/3/image");
+});
+
+// Line editing (P5).
+
+it("line-editing AC25: edits a line with PATCH on the line", async () => {
+  const calls = recordWrites();
+
+  expect(await editLine(3, 102, { name: "Vesi", amount_cents: -40 })).toEqual({
+    ok: true,
+    data: RECEIPT_A,
+  });
+  expect(calls).toEqual([
+    {
+      method: "PATCH",
+      path: "/api/receipts/3/lines/102",
+      body: { name: "Vesi", amount_cents: -40 },
+    },
+  ]);
+});
+
+it("line-editing AC30: adds a line with POST on the lines", async () => {
+  const calls = recordWrites();
+  const line = { name: "Banaani", amount_cents: 99, is_deposit_refund: false };
+
+  expect(await addLine(3, line)).toEqual({ ok: true, data: RECEIPT_A });
+  expect(calls).toEqual([{ method: "POST", path: "/api/receipts/3/lines", body: line }]);
+});
+
+it("line-editing AC31: deletes a line and gets the receipt back", async () => {
+  const calls = recordWrites();
+
+  expect(await deleteLine(3, 102)).toEqual({ ok: true, data: RECEIPT_A });
+  expect(calls).toEqual([{ method: "DELETE", path: "/api/receipts/3/lines/102", body: null }]);
+});
+
+it("line-editing AC29: edits the receipt fields with PATCH on the receipt", async () => {
+  const calls = recordWrites();
+
+  expect(await editReceipt(3, { total_cents: 400, purchase_date: "2026-10-06" })).toEqual({
+    ok: true,
+    data: RECEIPT_A,
+  });
+  expect(calls).toEqual([
+    {
+      method: "PATCH",
+      path: "/api/receipts/3",
+      body: { total_cents: 400, purchase_date: "2026-10-06" },
+    },
+  ]);
 });

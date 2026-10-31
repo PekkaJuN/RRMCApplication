@@ -1,18 +1,50 @@
 """API schemas of /api/receipts (receipt-review spec, API shapes)."""
 
-from pydantic import BaseModel, StrictBool, StrictInt
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr, model_validator
 
 from app.review.service import LineView, ReceiptSummary, ReceiptView, SubtotalView
 from app.storage.receipt_repository import CategorySource
 
 
-class LineCategoryUpdate(BaseModel):
-    # Strict, so "12" or true is refused instead of read as a number (AC15).
-    category_id: StrictInt
+class _Body(BaseModel):
+    # Unknown fields are refused, so a misspelled field is an error, not a silent no-op
+    # (line-editing PC10). Strict types refuse "12" for a number and 1 for a boolean.
+    model_config = ConfigDict(extra="forbid")
 
 
-class ReviewUpdate(BaseModel):
-    reviewed: StrictBool
+class _PartialBody(_Body):
+    """A partial update: at least one field, and a sent field is never null (PC10). None
+    therefore always means "not sent" to the service."""
+
+    @model_validator(mode="after")
+    def _sent_fields_have_values(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("no fields")
+        if any(getattr(self, field) is None for field in self.model_fields_set):
+            raise ValueError("null field")
+        return self
+
+
+class LineUpdate(_PartialBody):
+    name: StrictStr | None = None
+    amount_cents: StrictInt | None = None
+    is_deposit_refund: StrictBool | None = None
+    category_id: StrictInt | None = None
+
+
+class NewLine(_Body):
+    name: StrictStr
+    amount_cents: StrictInt
+    is_deposit_refund: StrictBool = False
+
+
+class ReceiptUpdate(_PartialBody):
+    store: StrictStr | None = None
+    purchase_date: StrictStr | None = None
+    total_cents: StrictInt | None = None
+    reviewed: StrictBool | None = None
 
 
 class ReceiptSummaryOut(BaseModel):

@@ -32,7 +32,7 @@ Last reviewed: 2026-10-31
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
-| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization and review terms | 2 | In Progress |
+| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review and line editing terms | 2 | In Progress |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 
@@ -90,10 +90,15 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The receipt review spec is Done (audited 2026-10-31): the receipt
   endpoints, the receipt check and subtotals, the review state, and the Kuitit and receipt
   pages. The review, calculation, UI, storage, categorization, data model, API and
-  architecture docs describe it. The line editing spec (FR-18, FR-43) comes next.
+  architecture docs describe it.
+- The line editing spec is Done (audited 2026-10-31): line edits,
+  added and deleted lines, the store, date and total, FR-43, strict bodies and id bounds.
+  The review, categorization, storage, UI, data model, API and architecture docs describe
+  it.
 - Storage, categorization, import, receipt-reading and UI docs describe what is implemented;
   their later feature specs complete them.
-- `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization and review terms.
+- `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization, review and line
+  editing terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 

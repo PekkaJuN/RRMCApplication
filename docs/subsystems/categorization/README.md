@@ -11,7 +11,9 @@ each product belongs to (PRD 6.8).
 It also gives each receipt line its category when a receipt is imported: the remembered
 category of a known product first, otherwise a suggestion from the local model
 ([line categorization](#line-categorization)). A user's correction of a line is stored as
-the product's category, and a product's new category moves its lines (FR-13, FR-36). It
+the product's category, and a product's new category moves its lines (FR-13, FR-36). A
+renamed line follows the product of its new name (FR-43), and a line the user adds gets the
+category of its name match. It
 does not calculate totals and runs no SQL; storage does that.
 
 The behavior is specified in the
@@ -38,7 +40,8 @@ The behavior is specified in the
 ## Interfaces
 
 The services are plain classes that take a `CatalogRepository`, so other subsystems can call
-them without the API (import does; the review UI will). Each write runs in one transaction.
+them without the API (import and review do). Each write of `CategoryService` and
+`ProductService` runs in one transaction; `LineCategoryService` runs in the caller's.
 
 | Call | Returns | Raises |
 |---|---|---|
@@ -50,7 +53,9 @@ them without the API (import does; the review UI will). Each write runs in one t
 | `ProductService.create(name, category_id)` | the new product | `InvalidNameError`, `UnknownCategoryError`, `NotACategoryError`, `DuplicateNameError` |
 | `ProductService.update(id, *, name, category_id)` | the product; a new category moves its linked lines | `NotFoundError` and the errors of `create` |
 | `ProductService.delete(id)` | | `NotFoundError` |
-| `LineCategoryService(catalog, receipts).set_category(line_id, category_id)` | the line (`StoredLine`) | `NotFoundError`, `UnknownCategoryError`, `NotACategoryError`, `DepositRefundLineError`, `InvalidNameError` |
+| `LineCategoryService(catalog, receipts).choose(line, category_id)` | | `UnknownCategoryError`, `NotACategoryError`, `DepositRefundLineError`, `InvalidNameError` |
+| `LineCategoryService.follow_name(line, name)` | the `LineCategory` of the normal line once renamed, or `None`; may add a product | |
+| `LineCategoryService.resolve(name)` | the name match's `LineCategory` (`remembered`), or `None` | |
 | `LineCategorizer(repository, suggester).suggest(lines)` | `Suggestions`: normalized name → category id | `ModelUnavailableError` |
 | `LineCategorizer.resolve(lines, suggestions)` | one `LineCategory` or `None` per line | |
 | `seed_defaults(repository, now)` | | |
@@ -123,13 +128,15 @@ The model request (`ModelSuggester`) uses `ReceiptModel.generate`:
 - With `RRMC_ENGINES=fake`, `FakeSuggester` suggests the first option (`Auto > Autohuolto`
   with the default list) for every name.
 
-A user correction (`LineCategoryService.set_category`), in one transaction. The UI reaches
-it through `PATCH /api/receipts/{id}/lines/{line_id}`
-([review](../review/README.md)). The two repositories must share one connection, because
-the transaction is opened on the catalog's:
+The receipt edits of the review UI reach `LineCategoryService` through
+`PATCH /api/receipts/{id}/lines/{line_id}` and `POST /api/receipts/{id}/lines`
+([review](../review/README.md#line-edits)). Its methods run inside the caller's transaction,
+so one request can rename a line and choose its category together; the caller opens it on
+the catalog's connection, which both repositories must share.
 
-1. The line must exist, the category must be a category, and the line must not be a deposit
-   refund.
+A user correction (`choose`):
+
+1. The category must be a category, and the line must not be a deposit refund.
 2. The product is the linked one, else the one with the line's normalized name, else a new
    product with the line's name (1–100 characters, else `InvalidNameError`).
 3. If the product's category changes, the product and every line linked to it get the new
@@ -137,6 +144,19 @@ the transaction is opened on the catalog's:
 4. The corrected line gets the category, source `user`, and the link.
 
 Only the corrected line is linked; other unlinked lines with the same name stay as they are.
+
+A renamed normal line (`follow_name`, FR-43), with the new display name:
+
+| Case | The line's category |
+|---|---|
+| Same normalized name (case or spacing changed) | Unchanged |
+| A product has the new normalized name (name match) | The product's, source `remembered`, linked to it |
+| No name match, the line has a category | A new product with the new name and that category; source `user`, linked |
+| No name match, no category | None; no product is created |
+
+The product the line followed before is not changed, and neither are its other lines. A new
+line, or a line that stops being a deposit refund, is resolved by its name match alone
+(`resolve`); the model is not called (NFR-9).
 
 ## Data Flow
 
@@ -153,7 +173,7 @@ Only the corrected line is linked; other unlinked lines with the same name stay 
   [receipt-reading](../receipt-reading/README.md#interfaces), the shared error format
   (@backend/app/errors.py) and texts (@backend/app/texts.py).
 - Used by: the API, [import](../import/README.md) (`LineCategorizer`, `create_suggester`),
-  and later the review UI (`LineCategoryService`).
+  and [review](../review/README.md) (`CategoryService`, `LineCategoryService`).
 
 ## Modules
 
@@ -166,13 +186,15 @@ None yet.
   row, and it would give a 500 instead of the right code.
 - Product names are personal purchase data. They are not logged; the request log leaves out
   bodies and query strings. The categorization errors name no line, product or category.
-- `DepositRefundLineError` (`deposit_refund_line`, 422) has no endpoint yet; the review UI
-  spec will expose it.
+- A rename of a line whose category is a model suggestion stores that suggestion as the new
+  product's category (FR-43). The user sees it beside the name and corrects it with the
+  dropdown, which moves the product (FR-36).
 
 ## Related Documents
 
 - [Product management spec](../../../specs/features/product-management.md)
 - [Categorization spec](../../../specs/features/categorization.md)
+- [Line editing spec](../../../specs/features/line-editing.md): FR-43 and resolving a line
 - [ADR 0004](../../adr/0004-line-categorization.md): remembered first, separate model call
 - [datamodel.md](../../datamodel.md#categories): the catalog tables
 - [api-reference.md](../../api-reference.md#catalog-groups-categories-and-products)
