@@ -314,3 +314,12 @@ it("export AC13: while a new period loads, the links keep the period of the show
     ),
   );
 });
+
+it("styling AC1: the Yhteenveto page has no inline style", async () => {
+  answerTotals();
+  const { container } = render(<TotalsPage />);
+
+  await screen.findByRole("table", { name: "Viikot" });
+  expect(screen.getAllByRole("link")).toHaveLength(3);
+  expect(container.querySelectorAll("[style]")).toHaveLength(0);
+});

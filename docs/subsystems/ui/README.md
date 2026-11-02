@@ -25,7 +25,8 @@ keeps the page because Vite answers every path with `index.html`.
 
 ## Key Files and Entry Points
 
-- @frontend/src/main.tsx — mounts `App`
+- @frontend/src/main.tsx — mounts `App` and imports the stylesheet
+- @frontend/src/styles.css — the app's only stylesheet (see [Styling](#styling))
 - @frontend/src/App.tsx — app shell: heading, navigation, status line, `<main>` with the
   current page
 - @frontend/src/navigation.ts — `usePage()`, `pageFromPath()`, `PAGE_PATHS`
@@ -130,8 +131,8 @@ the categories load, or after they failed, a line shows its category as text
 suggestion shows the mark `ehdotus`; a deposit refund shows `Pantinpalautus` and no
 dropdown. An image that cannot be loaded (the `img` gets an error, for example the 404
 `image_missing`) is replaced by `Kuvaa ei löydy valmiiden kansiosta.`; the image and the
-table sit side by side through inline flex styles that wrap on a narrow window, since the
-app has no stylesheet. The texts are in the
+table sit side by side on a window at least 900 px wide and stack on a narrower one
+(`.receipt-columns`). The texts are in the
 [receipt review spec](../../../specs/features/receipt-review.md#ui-texts) and the
 [line editing spec](../../../specs/features/line-editing.md#ui-texts).
 
@@ -156,8 +157,41 @@ period whose totals are shown, not the draft; while a new period loads, they kee
 previous one, so the links and the tables always agree. The browser downloads the file itself, through the Vite proxy,
 and takes its name from `Content-Disposition`. They are shown while the totals of the
 period are loaded (also when it has no lines) and hidden while the period is refused or
-the totals cannot be loaded. They look like buttons through an inline style. The texts are
+the totals cannot be loaded. They have the `button` class. The texts are
 in the [CSV export spec](../../../specs/features/csv-export.md#ui-texts).
+
+### Styling
+
+One plain CSS file, @frontend/src/styles.css, imported once in `main.tsx`, styles the whole
+app (NFR-16, [styling spec](../../../specs/features/styling.md)). There is no CSS framework
+and no `style` attribute in the components. Vite bundles the file, and the font is the
+system font, so the UI loads nothing from another host.
+
+- **Custom properties** on `:root` hold every color, space, the radius, the content width
+  and the font: `--color-text`, `--color-muted`, `--color-bg`, `--color-surface`,
+  `--color-border`, `--color-line`, `--color-accent`, the error and notice colors,
+  `--space-1` to `--space-4`, `--radius`, `--content-width`, `--font`. Every text color
+  meets WCAG AA (4.5:1) on its background; the ratios are in the spec's Plan P1.
+- **Element and state selectors first:** the header, `nav a[aria-current="page"]`, tables,
+  `button`, inputs, `:focus-visible`, `button:disabled`, `main p[role="alert"]` (error),
+  `main p[role="status"]` (notice), `span[role="alert"]` (inline error).
+- **Classes**, only where the markup cannot tell the cases apart:
+
+  | Class | Where | Does |
+  |---|---|---|
+  | `amount` | money cells and headings, amount inputs (`EditableField`'s `className`) | Right aligned, tabular figures |
+  | `table-box` | a `div` around each table | A wide table scrolls inside it, not the page |
+  | `button` | the download links | The button look |
+  | `row-group`, `row-category`, `row-total` | totals table rows | Bold group and total rows; categories indented under the group name (the toggle has a fixed width) |
+  | `receipt-columns`, `receipt-image`, `receipt-lines` | receipt page | Side by side from 900 px, stacked below |
+
+- `main` is at most 1200 px wide and centred; the header wraps on a narrow window.
+- The input rule's `font` shorthand resets `font-variant-numeric`, so `input.amount` comes
+  after it.
+
+The E2E tests in @frontend/e2e/style.spec.ts check the computed styles in Chromium and run
+axe on every page; jsdom in the component tests does not apply the stylesheet. The first
+axe run of the existing markup found no WCAG 2.1 AA violation, so no markup changed for it.
 
 ## Data Flow
 
@@ -205,4 +239,5 @@ None yet.
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
 - [Category totals spec](../../../specs/features/totals.md) PC4–PC7
 - [CSV export spec](../../../specs/features/csv-export.md) PC6
+- [Visual style and accessibility spec](../../../specs/features/styling.md)
 - [development.md](../../development.md#code-standards): TypeScript and React rules

@@ -7,6 +7,8 @@ interface Props {
   type?: "text" | "date";
   /** A visible `<label>` instead of `aria-label`. */
   showLabel?: boolean;
+  /** The input's class, e.g. `amount` for a money field. */
+  className?: string;
   /** Save the typed text; resolves to the error message, or null when it was saved. */
   onSave: (text: string) => Promise<string | null>;
 }
@@ -16,7 +18,14 @@ interface Props {
  * back the saved value (line-editing PC12, PC14). A refused save keeps the typed text, so the
  * user can fix it, and shows the message next to the field.
  */
-export function EditableField({ label, value, type = "text", showLabel, onSave }: Props) {
+export function EditableField({
+  label,
+  value,
+  type = "text",
+  showLabel,
+  className,
+  onSave,
+}: Props) {
   const id = useId();
   // null: nothing typed, the saved value shows.
   const [draft, setDraft] = useState<string | null>(null);
@@ -49,6 +58,7 @@ export function EditableField({ label, value, type = "text", showLabel, onSave }
       <input
         id={id}
         type={type}
+        className={className}
         aria-label={showLabel ? undefined : label}
         value={draft ?? value}
         onChange={(event) => setDraft(event.target.value)}

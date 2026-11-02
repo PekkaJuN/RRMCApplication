@@ -212,6 +212,7 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 | NFR-12 | Development is spec-driven and test-driven (see `AGENTS.md`). Tests use synthetic receipts only. |
 | NFR-13 | OCR and the model sit behind backend interfaces. A configuration setting selects the real implementation or a deterministic fake, so tests and E2E runs do not need Tesseract or Ollama and give the same result every time. |
 | NFR-14 | The UI is tested at three levels: component tests (Vitest + React Testing Library, API mocked with MSW), and a few end-to-end tests of the main journeys (Playwright, real backend with the fakes from NFR-13). |
+| NFR-16 | The UI has one consistent look from one plain CSS stylesheet (no CSS framework), and meets WCAG 2.1 level AA as far as automated checks can tell: every page passes an axe check in the E2E tests. |
 
 ## 8. Solution outline (decided)
 
@@ -287,6 +288,8 @@ Resolved:
 
 - Default category list: section 6.9 (2026-10-20).
 - UI language: Finnish, NFR-15 (2026-10-20).
+- Visual style: one plain CSS stylesheet with custom properties, no framework; automated
+  accessibility checks with axe (WCAG 2.1 AA): NFR-16 (2026-11-02).
 - Two-level categories with user-created groups: FR-11, FR-38, FR-39 (2026-10-20).
 - Changing a product's category also updates saved receipt lines: FR-36 (2026-10-20).
 - Categorization is per line; a category used by receipt lines cannot be deleted: open question 6, FR-37 (2026-10-30).

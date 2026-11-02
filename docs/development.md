@@ -123,6 +123,16 @@ The E2E backend's import folder is the test-only volume `rrmc-e2e-import`, also 
 the `e2e` container at `E2E_IMPORT_DIR`. The import journey (@frontend/e2e/import.spec.ts)
 empties it and writes synthetic files there. It is never the real import folder.
 
+Playwright has two projects (@frontend/playwright.config.ts): `chromium` runs every spec
+except @frontend/e2e/style.spec.ts, and `style` runs that one after them, because it imports
+a receipt of its own (a synthetic PNG from @frontend/e2e/synthetic.ts) and must not race the
+import journeys. `style` checks computed styles and runs axe (`@axe-core/playwright`) with
+the WCAG 2.1 A and AA rules on every page. To run only it on the kept database:
+
+```powershell
+docker compose --profile e2e run --rm e2e npx playwright test --project=style --no-deps
+```
+
 ### Container tests
 
 `scripts/container-tests.ps1` checks what only a running Docker setup can show: ports bound
@@ -350,7 +360,13 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
   as far as needed.
 - No `dangerouslySetInnerHTML`. No `alert`, `confirm` or `prompt`; confirmations are in the page.
 - Accessibility: every input has a label, actions are `<button>`s, lists are lists. This is
-  also what makes role-based test queries work.
+  also what makes role-based test queries work. Every page passes axe (WCAG 2.1 AA) in the
+  E2E tests (NFR-16).
+- Styles live in @frontend/src/styles.css only. No `style` attribute and no CSS-in-JS.
+  Colors, spaces and sizes come from the custom properties on `:root`. Prefer element and
+  state selectors (`[aria-current]`, `[role="alert"]`, `:disabled`) over new classes; name a
+  class after what it is (`amount`), not how it looks
+  ([ui](subsystems/ui/README.md#styling)).
 
 ### UI texts
 

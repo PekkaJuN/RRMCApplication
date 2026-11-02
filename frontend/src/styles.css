@@ -1,0 +1,260 @@
+/* The app's only stylesheet (styling spec, NFR-16). Colors and spacing come from the
+   custom properties below; every text color meets WCAG AA (4.5:1) on its background. */
+
+:root {
+  --color-text: #1f2937;
+  --color-muted: #4b5563;
+  --color-bg: #ffffff;
+  --color-surface: #f3f4f6;
+  --color-surface-hover: #e5e7eb;
+  --color-border: #6b7280;
+  --color-line: #e5e7eb;
+  --color-accent: #1d4ed8;
+  --color-error-text: #991b1b;
+  --color-error-bg: #fef2f2;
+  --color-error-border: #dc2626;
+  --color-notice-text: #78350f;
+  --color-notice-bg: #fffbeb;
+  --color-notice-border: #d97706;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --radius: 4px;
+  --content-width: 1200px;
+  --font: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* Layout (PC2): the header on one row on a wide window, the content centred. */
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+header [role="status"] {
+  margin-left: auto;
+}
+
+header [role="status"] ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+main {
+  box-sizing: border-box;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-3);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Navigation (PC3) */
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+nav a {
+  padding: var(--space-1) 0;
+  color: var(--color-accent);
+  font-weight: 400;
+  text-decoration: none;
+  border-bottom: none;
+}
+
+nav a[aria-current="page"] {
+  font-weight: 700;
+  border-bottom: 3px solid var(--color-accent);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+/* Tables (PC4) */
+
+.table-box {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+caption {
+  text-align: left;
+  font-weight: 700;
+  padding: var(--space-2) 0;
+}
+
+th,
+td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  vertical-align: middle;
+}
+
+thead th {
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-border);
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-group th,
+.row-total th,
+.row-total td {
+  font-weight: 700;
+}
+
+.row-total {
+  border-top: 2px solid var(--color-border);
+}
+
+/* The group's toggle has a fixed width, so its categories line up under its name. */
+.row-group th button {
+  width: 2.5em;
+  margin-right: var(--space-1);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.row-category th {
+  padding-left: calc(var(--space-2) + 2.5em + var(--space-1) + var(--space-4));
+  font-weight: 400;
+}
+
+/* Buttons and inputs (PC5, PC6) */
+
+button,
+.button {
+  display: inline-block;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  line-height: 1.5;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+button:hover,
+.button:hover {
+  background: var(--color-surface-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input:not([type="checkbox"]),
+select {
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* After the input rule: its `font` shorthand resets the figures of an amount input. */
+input.amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.button + .button {
+  margin-left: var(--space-2);
+}
+
+/* Keyboard focus (PC8) */
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Messages (PC7). The header's status line is a div, so these rules do not reach it. */
+
+main p[role="alert"],
+main p[role="status"] {
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid;
+  border-radius: var(--radius);
+}
+
+main p[role="alert"] {
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border-left-color: var(--color-error-border);
+}
+
+main p[role="status"] {
+  color: var(--color-notice-text);
+  background: var(--color-notice-bg);
+  border-left-color: var(--color-notice-border);
+}
+
+span[role="alert"] {
+  color: var(--color-error-text);
+}
+
+/* Receipt page (PC9): image and lines stacked, side by side on a wide window. */
+
+.receipt-image {
+  margin-bottom: var(--space-3);
+}
+
+@media (min-width: 900px) {
+  .receipt-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--space-3);
+    align-items: start;
+  }
+
+  .receipt-image {
+    margin-bottom: 0;
+  }
+}
