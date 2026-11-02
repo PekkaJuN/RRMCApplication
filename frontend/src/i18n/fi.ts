@@ -131,5 +131,8 @@ export const fi = {
     empty: "Ei ostoksia valitulla jaksolla.",
     unreviewed: (count: number) => `Tarkistamattomia kuitteja jaksolla: ${count}`,
     undated: (count: number) => `Kuitteja ilman päivää (ei mukana): ${count}`,
+    exportWeeks: "Vie viikkosummat (CSV)",
+    exportMonths: "Vie kuukausisummat (CSV)",
+    exportLines: "Vie rivit (CSV)",
   },
 } as const;

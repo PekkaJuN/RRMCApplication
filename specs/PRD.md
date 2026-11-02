@@ -116,7 +116,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 
 | ID | Requirement |
 |---|---|
-| FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. The export covers one period, chosen with the same options and the same rules as the totals view (FR-25), including partial weeks at the period's edges; the period shown in the totals view is preselected. Receipt lines are included by their receipt's purchase date. [NEEDS CLARIFICATION: exact CSV columns, separator (`;` for Finnish Excel?) and decimal format] |
+| FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. The export covers one period, chosen with the same options and the same rules as the totals view (FR-25), including partial weeks at the period's edges; the period shown in the totals view is preselected. Receipt lines are included by their receipt's purchase date. The export gives two kinds of CSV file, both for Finnish Excel (`;` separator, UTF-8 with BOM, a header row in Finnish): **lines**, one row per receipt line with the columns Päivä, Viikko, Kuukausi, Kauppa, Tuote, Summa, Ryhmä, Kategoria, Pantinpalautus, Kuitin tila (deposit refunds included and marked); and **totals** in long format, by week or by month as the user chooses before the export (one file holds only one of them), one row per week or month column and category that has lines, with the columns Jakso, Alkaa, Päättyy, Osittainen, Ryhmä, Kategoria, Summa (no rows for group sums or zeros; lines without a category as `Ei kategoriaa`; deposit refunds left out, FR-44). Amounts have a decimal comma and no euro sign or thousands separator (`1,25`, `-0,40`); dates are `YYYY-MM-DD`. |
 | FR-27 | Exporters implement one common interface, so new targets can be added without changing the rest of the app. |
 | FR-28 | *Later release:* export to a private Google Sheet with gspread and a service account. |
 
@@ -277,7 +277,7 @@ A suggested order of feature specs for the MVP:
 5. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
 6. Resolved (2026-10-30): a receipt is categorized per line only; a receipt with one line
    gets one category through that line ([categorization spec](features/categorization.md)).
-7. [NEEDS CLARIFICATION] CSV format details (FR-26).
+7. Resolved (2026-11-02): CSV format details: FR-26.
 8. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
    be archived too (e.g. after a long break)? Can archived data be viewed or exported
    separately? Can archiving be undone? Does FR-36 recategorization also update archived
@@ -294,6 +294,7 @@ Resolved:
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
 - A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
+- CSV export: two files (lines, and totals in long format), `;` separator, decimal comma, UTF-8 with BOM, Finnish headers: FR-26, open question 7 (2026-11-02).
 - Totals and CSV export are limited to a period (one month, a range of months, one ISO week or a range of weeks); the default is the current month; ISO weeks at the period's edges count only their days inside it: FR-25, FR-26 (2026-11-02).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
 - Supported formats are JPEG and PNG only; HEIC and PDF are not supported: FR-2 (2026-10-28).

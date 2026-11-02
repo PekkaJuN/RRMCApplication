@@ -211,3 +211,106 @@ it("totals P6: an older answer arriving last is not shown", async () => {
   expect(screen.queryByText("Tarkistamattomia kuitteja jaksolla: 7")).not.toBeInTheDocument();
   expect(screen.getByText("Tarkistamattomia kuitteja jaksolla: 3")).toBeInTheDocument();
 });
+
+function exportLinks(): [string, string | null, string | null][] {
+  return screen
+    .getAllByRole("link")
+    .map((link) => [
+      link.textContent ?? "",
+      link.getAttribute("href"),
+      link.getAttribute("download"),
+    ]);
+}
+
+it("export AC13: three export links of the shown period follow a new period", async () => {
+  answerTotals();
+  window.history.replaceState(null, "", "/yhteenveto?unit=week&from=2026-W40&to=2026-W41");
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  expect(exportLinks()).toEqual([
+    [
+      "Vie viikkosummat (CSV)",
+      "/api/export/totals?unit=week&from=2026-W40&to=2026-W41&by=week",
+      "",
+    ],
+    [
+      "Vie kuukausisummat (CSV)",
+      "/api/export/totals?unit=week&from=2026-W40&to=2026-W41&by=month",
+      "",
+    ],
+    ["Vie rivit (CSV)", "/api/export/lines?unit=week&from=2026-W40&to=2026-W41", ""],
+  ]);
+
+  fireEvent.change(screen.getByLabelText("Päättyen"), { target: { value: "2026-W42" } });
+
+  await vi.waitFor(() =>
+    expect(screen.getByRole("link", { name: "Vie rivit (CSV)" })).toHaveAttribute(
+      "href",
+      "/api/export/lines?unit=week&from=2026-W40&to=2026-W42",
+    ),
+  );
+  expect(screen.getByRole("link", { name: "Vie viikkosummat (CSV)" })).toHaveAttribute(
+    "href",
+    "/api/export/totals?unit=week&from=2026-W40&to=2026-W42&by=week",
+  );
+});
+
+it("export AC14: the links are shown for a period without lines", async () => {
+  answerTotals(() => HttpResponse.json(emptyTotals()));
+  render(<TotalsPage />);
+
+  await screen.findByText("Ei ostoksia valitulla jaksolla.");
+  expect(screen.getAllByRole("link")).toHaveLength(3);
+});
+
+it("export AC14: no link while the period is refused", async () => {
+  answerTotals(() =>
+    HttpResponse.json(
+      { error: "invalid_period", message: "Jakso on virheellinen." },
+      { status: 422 },
+    ),
+  );
+  render(<TotalsPage />);
+
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("export AC14: no link when the totals cannot be loaded", async () => {
+  server.use(http.get("/api/totals", () => HttpResponse.error()));
+  render(<TotalsPage />);
+
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("export AC13: while a new period loads, the links keep the period of the shown totals", async () => {
+  let release: () => void = () => undefined;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  answerTotals(async (params) => {
+    if (params.get("to") === "2026-W42") {
+      await waiting;
+    }
+    return HttpResponse.json(OCTOBER);
+  });
+  window.history.replaceState(null, "", "/yhteenveto?unit=week&from=2026-W40&to=2026-W41");
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  fireEvent.change(screen.getByLabelText("Päättyen"), { target: { value: "2026-W42" } });
+
+  expect(screen.getByRole("link", { name: "Vie rivit (CSV)" })).toHaveAttribute(
+    "href",
+    "/api/export/lines?unit=week&from=2026-W40&to=2026-W41",
+  );
+  release();
+  await vi.waitFor(() =>
+    expect(screen.getByRole("link", { name: "Vie rivit (CSV)" })).toHaveAttribute(
+      "href",
+      "/api/export/lines?unit=week&from=2026-W40&to=2026-W42",
+    ),
+  );
+});

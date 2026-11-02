@@ -1,4 +1,4 @@
-import { readdir, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -263,4 +263,46 @@ test("totals AC14, AC11: a corrected line shows in the month's totals", async ({
   await expect(category.locator("option:checked")).toHaveText("Leivät");
 
   expect(await octoberBread(page)).toBe(before + 310);
+});
+
+/** Click an export link and return the download's name and text (without the BOM). */
+async function download(page: Page, link: string): Promise<{ name: string; text: string }> {
+  const started = page.waitForEvent("download");
+  await page.getByRole("link", { name: link }).click();
+  const file = await started;
+  const bytes = await readFile(await file.path());
+  expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  return { name: file.suggestedFilename(), text: bytes.subarray(3).toString("utf-8") };
+}
+
+const TOTALS_HEADER = "Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa\r\n";
+
+test("export AC1, AC2, AC16, AC13: download the CSV files of a month", async ({ page }) => {
+  await writeFile(
+    join(importDir, `kuitti-${RUN}_vienti.jpg`),
+    Buffer.concat([SYNTHETIC_JPEG, Buffer.from(" export")]),
+  );
+  await page.goto("/tuonti");
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+  await expect(
+    page.getByRole("region", { name: "Edellinen tuonti" }).getByText("Tuotu: 1"),
+  ).toBeVisible();
+  await page.goto(OCTOBER_TOTALS);
+  await expect(page.getByRole("link", { name: "Vie rivit (CSV)" })).toBeVisible();
+
+  const weeks = await download(page, "Vie viikkosummat (CSV)");
+  const months = await download(page, "Vie kuukausisummat (CSV)");
+  const lines = await download(page, "Vie rivit (CSV)");
+
+  expect(weeks.name).toBe("summat_viikot_2026-10_2026-10.csv");
+  expect(months.name).toBe("summat_kuukaudet_2026-10_2026-10.csv");
+  expect(lines.name).toBe("kuittirivit_2026-10_2026-10.csv");
+  expect(weeks.text.startsWith(TOTALS_HEADER)).toBe(true);
+  expect(weeks.text).toContain("\r\n2026-W41;2026-10-05;2026-10-11;ei;");
+  expect(weeks.text).not.toContain("\r\n2026-10;");
+  expect(months.text.startsWith(TOTALS_HEADER)).toBe(true);
+  expect(months.text).toContain("\r\n2026-10;2026-10-01;2026-10-31;ei;");
+  expect(months.text).not.toContain("2026-W");
+  expect(lines.text).toContain(";Maito;1,25;");
+  expect(lines.text).toContain(";Limu;2,24;");
 });

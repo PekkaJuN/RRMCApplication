@@ -113,3 +113,26 @@ def test_lines_in_a_year_below_1000_find_their_columns() -> None:
     period = parse_period("month", "0999-01", "0999-01")
     totals = period_totals(period, [line("0999-01-05", 100, LEIPA)], CATALOG)
     assert totals.month_totals == [100]
+
+
+def test_export_ac5_line_counts_per_column() -> None:
+    lines = [
+        line("2026-10-05", 300, LEIPA),
+        line("2026-10-05", -300, LEIPA),
+        line("2026-10-06", 125, MAITO),
+        line("2026-10-06", -40, None, refund=True),
+        line("2026-11-01", 999, LEIPA),
+    ]
+    totals = period_totals(OCTOBER, lines, CATALOG)
+    [ruoka] = totals.rows
+    leipa = next(row for row in ruoka.categories if row.id == LEIPA)
+    assert (leipa.months, leipa.month_counts) == ([0], [2])
+    assert leipa.week_counts == [0, 2, 0, 0, 0]
+    assert ruoka.month_counts == [3]
+    assert ruoka.week_counts == [0, 3, 0, 0, 0]
+
+
+def test_export_line_counts_of_the_no_category_row() -> None:
+    totals = period_totals(OCTOBER, [line("2026-10-05", 199, None)], CATALOG)
+    [none] = totals.rows
+    assert (none.week_counts, none.month_counts) == ([0, 1, 0, 0, 0], [1])

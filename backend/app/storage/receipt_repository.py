@@ -90,6 +90,20 @@ class DatedLineRow:
     is_deposit_refund: bool
 
 
+@dataclass(frozen=True)
+class ExportLineRow:
+    """A line with the names the lines file shows (export spec P4)."""
+
+    purchase_date: str
+    store: str | None
+    name: str
+    amount_cents: int
+    is_deposit_refund: bool
+    group_name: str | None
+    category_name: str | None
+    reviewed: bool
+
+
 def _category_values(category: LineCategory | None) -> tuple[int | None, str | None, int | None]:
     if category is None:
         return None, None, None
@@ -303,6 +317,35 @@ class ReceiptRepository:
                 amount_cents=row["amount_cents"],
                 category_id=row["category_id"],
                 is_deposit_refund=bool(row["is_deposit_refund"]),
+            )
+            for row in rows
+        ]
+
+    def export_lines(self, start: str, end: str) -> list[ExportLineRow]:
+        """The lines of the receipts dated from `start` to `end` (inclusive), in date order,
+        then import order, then position on the receipt."""
+        rows = self._connection.execute(
+            "SELECT receipts.purchase_date, receipts.store, receipt_lines.name,"
+            " receipt_lines.amount_cents, receipt_lines.is_deposit_refund,"
+            " category_group.name AS group_name, category.name AS category_name,"
+            " receipts.reviewed"
+            " FROM receipt_lines JOIN receipts ON receipts.id = receipt_lines.receipt_id"
+            " LEFT JOIN categories AS category ON category.id = receipt_lines.category_id"
+            " LEFT JOIN categories AS category_group ON category_group.id = category.parent_id"
+            " WHERE receipts.purchase_date BETWEEN ? AND ?"
+            " ORDER BY receipts.purchase_date, receipts.id, receipt_lines.position",
+            (start, end),
+        )
+        return [
+            ExportLineRow(
+                purchase_date=row["purchase_date"],
+                store=row["store"],
+                name=row["name"],
+                amount_cents=row["amount_cents"],
+                is_deposit_refund=bool(row["is_deposit_refund"]),
+                group_name=row["group_name"],
+                category_name=row["category_name"],
+                reviewed=bool(row["reviewed"]),
             )
             for row in rows
         ]

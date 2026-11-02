@@ -111,8 +111,9 @@ docker compose run --rm frontend npm run format
 The E2E tests start `backend-e2e`, a backend with `RRMC_ENGINES=fake` and a temporary `/data`
 (new empty database and folders each time the container starts), and run Playwright in the
 `e2e` container, which starts its own Vite server. `run --rm` leaves `backend-e2e` running,
-so a second run reuses its database; the journeys are written to pass either way. Stop it
-with:
+so a second run reuses its database; the journeys are written to pass either way. It does
+not reload code, so after a backend change restart it (`docker compose restart
+backend-e2e`, which also empties its test data) or stop it with:
 
 ```powershell
 docker compose --profile e2e down

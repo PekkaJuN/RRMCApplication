@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { exportUrl, type ExportKind } from "../api/export";
 import { getTotals, type Totals } from "../api/totals";
 import { fi } from "../i18n/fi";
 import { PAGE_PATHS } from "../navigation";
@@ -12,6 +13,21 @@ import {
   type PeriodUnit,
 } from "../period";
 import { TotalsTable } from "./TotalsTable";
+
+// The app has no stylesheet, so the download links get a button-like look here.
+const EXPORT_LINK_STYLE = {
+  display: "inline-block",
+  border: "1px solid",
+  borderRadius: "4px",
+  padding: "2px 8px",
+  marginRight: "8px",
+} as const;
+
+const EXPORT_LINKS: readonly [ExportKind, string][] = [
+  ["weeks", fi.totals.exportWeeks],
+  ["months", fi.totals.exportMonths],
+  ["lines", fi.totals.exportLines],
+];
 
 function periodFromAddress(): Period {
   return periodFromSearch(window.location.search) ?? currentMonth(new Date());
@@ -28,6 +44,9 @@ export function TotalsPage() {
   // The inputs' text; it differs from `period` only while an input is emptied.
   const [draft, setDraft] = useState<Period>(period);
   const [totals, setTotals] = useState<Totals | null>(null);
+  // The period of `totals`: the links download what the tables show, also while a newer
+  // period is still loading (export spec PC6).
+  const [shownPeriod, setShownPeriod] = useState<Period>(period);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
   // Only the answer to the latest request is shown, so fast changes cannot show old totals.
@@ -55,6 +74,7 @@ export function TotalsPage() {
       }
       if (result.ok) {
         setTotals(result.data);
+        setShownPeriod(period);
         setError(null);
       } else {
         setTotals(null);
@@ -120,6 +140,15 @@ export function TotalsPage() {
           />
         </label>
       </p>
+      {totals !== null && (
+        <p>
+          {EXPORT_LINKS.map(([kind, text]) => (
+            <a key={kind} href={exportUrl(kind, shownPeriod)} download style={EXPORT_LINK_STYLE}>
+              {text}
+            </a>
+          ))}
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {totals !== null && totals.unreviewed_receipts > 0 && (
         <p role="status">{fi.totals.unreviewed(totals.unreviewed_receipts)}</p>

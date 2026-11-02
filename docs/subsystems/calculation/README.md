@@ -57,7 +57,10 @@ ISO week and per month of a period (FR-22–FR-25, FR-44), used by
   rest per category and column. Rows follow `catalog` (the category list order): a group
   when one of its categories has a line, with those categories as its `categories` and
   their column sums as its amounts; a category without a group when it has a line; last a
-  `none` row for lines without a category. A category whose lines sum to 0 is listed. The
+  `none` row for lines without a category. A category whose lines sum to 0 is listed.
+  Each row also has `week_counts` and `month_counts`, the number of counted lines per
+  column (a group's are its categories' sums), so the [export](../export/README.md) can
+  tell a sum of 0 with lines from no lines; they are not part of a row's equality. The
   column totals sum the top-level rows, so the `none` row is in them and a group is not
   counted twice. A category id missing from `catalog` cannot happen (`ON DELETE
   RESTRICT`); its lines would be in no row.
@@ -71,7 +74,8 @@ the line sum that storage computed in SQL as a one-item list.
 ## Dependencies
 
 - Uses: nothing.
-- Used by: [review](../review/README.md), [totals](../totals/README.md).
+- Used by: [review](../review/README.md), [totals](../totals/README.md),
+  [export](../export/README.md) (the period and totals types).
 
 ## Modules
 
@@ -87,4 +91,5 @@ None yet.
 
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC2, Plan P2
 - [Category totals spec](../../../specs/features/totals.md) PC1, Plan P1–P2
+- [CSV export spec](../../../specs/features/csv-export.md) Plan P3 (line counts)
 - [Architecture](../../architecture.md#component-map)

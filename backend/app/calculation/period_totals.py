@@ -37,6 +37,10 @@ class TotalsRow:
     weeks: list[int]
     months: list[int]
     categories: list["TotalsRow"] = field(default_factory=lambda: list[TotalsRow]())
+    # How many counted lines each column has, so a sum of 0 with lines can be told from no
+    # lines (export spec AC5). Not part of equality: the sums define a row.
+    week_counts: list[int] = field(default_factory=lambda: list[int](), compare=False)
+    month_counts: list[int] = field(default_factory=lambda: list[int](), compare=False)
 
 
 @dataclass(frozen=True)
@@ -58,19 +62,34 @@ def period_totals(
     # Amounts per category id (None: no category), one list entry per column.
     week_sums: dict[int | None, list[int]] = defaultdict(lambda: [0] * len(weeks))
     month_sums: dict[int | None, list[int]] = defaultdict(lambda: [0] * len(months))
+    week_counts: dict[int | None, list[int]] = defaultdict(lambda: [0] * len(weeks))
+    month_counts: dict[int | None, list[int]] = defaultdict(lambda: [0] * len(months))
     for line in lines:
         # Deposit refunds are not spending (FR-44).
         if line.is_deposit_refund or not period.contains(line.purchase_date):
             continue
-        year, week, _ = line.purchase_date.isocalendar()
+        year, week_number, _ = line.purchase_date.isocalendar()
         day = line.purchase_date
-        week_sums[line.category_id][week_index[f"{year:04d}-W{week:02d}"]] += line.amount_cents
-        month_sums[line.category_id][month_index[f"{day.year:04d}-{day.month:02d}"]] += (
-            line.amount_cents
+        week = week_index[f"{year:04d}-W{week_number:02d}"]
+        month = month_index[f"{day.year:04d}-{day.month:02d}"]
+        week_sums[line.category_id][week] += line.amount_cents
+        month_sums[line.category_id][month] += line.amount_cents
+        week_counts[line.category_id][week] += 1
+        month_counts[line.category_id][month] += 1
+
+    def leaf_row(kind: RowKind, item_id: int | None, name: str | None) -> TotalsRow:
+        return TotalsRow(
+            kind,
+            item_id,
+            name,
+            week_sums[item_id],
+            month_sums[item_id],
+            week_counts=week_counts[item_id],
+            month_counts=month_counts[item_id],
         )
 
     def category_row(item: RowCategory) -> TotalsRow:
-        return TotalsRow("category", item.id, item.name, week_sums[item.id], month_sums[item.id])
+        return leaf_row("category", item.id, item.name)
 
     rows: list[TotalsRow] = []
     for item in catalog:
@@ -89,12 +108,16 @@ def period_totals(
                         _column_sums([row.weeks for row in members], len(weeks)),
                         _column_sums([row.months for row in members], len(months)),
                         members,
+                        week_counts=_column_sums([row.week_counts for row in members], len(weeks)),
+                        month_counts=_column_sums(
+                            [row.month_counts for row in members], len(months)
+                        ),
                     )
                 )
         elif item.parent_id is None and item.id in week_sums:
             rows.append(category_row(item))
     if None in week_sums:
-        rows.append(TotalsRow("none", None, None, week_sums[None], month_sums[None]))
+        rows.append(leaf_row("none", None, None))
     return PeriodTotals(
         period=period,
         weeks=weeks,
