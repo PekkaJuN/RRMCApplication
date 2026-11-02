@@ -43,7 +43,11 @@ export function AddLineForm({ onAdd }: Props) {
       </label>{" "}
       <label>
         {fi.receipt.amount}{" "}
-        <input value={amount} onChange={(event) => setAmount(event.target.value)} />
+        <input
+          className="amount"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </label>
       {amountError && <span role="alert"> {amountError}</span>}{" "}
       <label>

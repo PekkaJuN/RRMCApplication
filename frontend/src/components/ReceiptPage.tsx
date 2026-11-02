@@ -33,15 +33,6 @@ type Send = (request: () => Promise<ApiResult<Receipt>>) => Promise<string | nul
 
 // The app has no stylesheet; this one layout rule puts the image beside the lines (FR-16)
 // and wraps them on a narrow window.
-const COLUMNS = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "1rem",
-  alignItems: "flex-start",
-} as const;
-const IMAGE_COLUMN = { flex: "1 1 20rem", maxWidth: "40rem" } as const;
-const LINES_COLUMN = { flex: "2 1 24rem" } as const;
-
 /** An amount field's save: text that is not an amount is refused without a request. */
 function saveCents(text: string, save: (cents: number) => Promise<string | null>) {
   const cents = parseCents(text);
@@ -161,8 +152,8 @@ export function ReceiptPage({ id, onBack }: Props) {
             {reviewError && <span role="alert"> {reviewError}</span>}
           </p>
           <Warning receipt={receipt} />
-          <div style={COLUMNS}>
-            <div style={IMAGE_COLUMN}>
+          <div className="receipt-columns">
+            <div className="receipt-image">
               {imageMissing ? (
                 <p>{fi.receipt.imageMissing}</p>
               ) : (
@@ -170,13 +161,12 @@ export function ReceiptPage({ id, onBack }: Props) {
                   <img
                     src={receiptImageUrl(receipt.id)}
                     alt={fi.receipt.image}
-                    style={{ maxWidth: "100%" }}
                     onError={() => setImageMissing(true)}
                   />
                 </a>
               )}
             </div>
-            <div style={LINES_COLUMN}>
+            <div className="receipt-lines">
               <Lines receipt={receipt} items={items} send={send} />
               <AddLineForm onAdd={(line: NewLine) => send(() => addLine(id, line))} />
               <p>{`${fi.receipt.lineSum} ${formatCents(receipt.line_sum_cents)}`}</p>
@@ -215,22 +205,24 @@ function Lines({ receipt, items, send }: LinesProps) {
     return <p>{fi.receipt.noLines}</p>;
   }
   return (
-    <table aria-label={fi.receipt.lines}>
-      <thead>
-        <tr>
-          <th>{fi.receipt.product}</th>
-          <th>{fi.receipt.amount}</th>
-          <th>{fi.receipt.depositRefund}</th>
-          <th>{fi.receipt.category}</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        {receipt.lines.map((line) => (
-          <LineRow key={line.id} receiptId={receipt.id} line={line} items={items} send={send} />
-        ))}
-      </tbody>
-    </table>
+    <div className="table-box">
+      <table aria-label={fi.receipt.lines}>
+        <thead>
+          <tr>
+            <th>{fi.receipt.product}</th>
+            <th className="amount">{fi.receipt.amount}</th>
+            <th>{fi.receipt.depositRefund}</th>
+            <th>{fi.receipt.category}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {receipt.lines.map((line) => (
+            <LineRow key={line.id} receiptId={receipt.id} line={line} items={items} send={send} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -267,6 +259,7 @@ function LineRow({ receiptId, line, items, send }: LineRowProps) {
       <td>
         <EditableField
           label={fi.receipt.amountOf(line.name)}
+          className="amount"
           value={formatCentsInput(line.amount_cents)}
           onSave={(text) =>
             saveCents(text, (cents) =>

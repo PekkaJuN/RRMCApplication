@@ -36,46 +36,48 @@ export function ReceiptsPage({ onOpen }: Props) {
       {error && <p role="alert">{error}</p>}
       {receipts?.length === 0 && <p>{fi.receipts.empty}</p>}
       {receipts && receipts.length > 0 && (
-        <table aria-label={fi.receipts.table}>
-          <thead>
-            <tr>
-              <th>{fi.receipts.date}</th>
-              <th>{fi.receipts.store}</th>
-              <th>{fi.receipts.total}</th>
-              <th>{fi.receipts.warning}</th>
-              <th>{fi.receipts.state}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receipts.map((receipt) => (
-              <tr key={receipt.id}>
-                <td>
-                  <a
-                    href={receiptPath(receipt.id)}
-                    onClick={(event) => {
-                      if (isPlainLeftClick(event)) {
-                        event.preventDefault();
-                        onOpen(receipt.id);
-                      }
-                    }}
-                  >
-                    {receipt.purchase_date
-                      ? formatDate(receipt.purchase_date)
-                      : fi.receipts.missing}
-                  </a>
-                </td>
-                <td>{receipt.store || fi.receipts.missing}</td>
-                <td>
-                  {receipt.total_cents === null
-                    ? fi.receipts.missing
-                    : formatCents(receipt.total_cents)}
-                </td>
-                <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
-                <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
+        <div className="table-box">
+          <table aria-label={fi.receipts.table}>
+            <thead>
+              <tr>
+                <th>{fi.receipts.date}</th>
+                <th>{fi.receipts.store}</th>
+                <th className="amount">{fi.receipts.total}</th>
+                <th>{fi.receipts.warning}</th>
+                <th>{fi.receipts.state}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {receipts.map((receipt) => (
+                <tr key={receipt.id}>
+                  <td>
+                    <a
+                      href={receiptPath(receipt.id)}
+                      onClick={(event) => {
+                        if (isPlainLeftClick(event)) {
+                          event.preventDefault();
+                          onOpen(receipt.id);
+                        }
+                      }}
+                    >
+                      {receipt.purchase_date
+                        ? formatDate(receipt.purchase_date)
+                        : fi.receipts.missing}
+                    </a>
+                  </td>
+                  <td>{receipt.store || fi.receipts.missing}</td>
+                  <td className="amount">
+                    {receipt.total_cents === null
+                      ? fi.receipts.missing
+                      : formatCents(receipt.total_cents)}
+                  </td>
+                  <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
+                  <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

@@ -118,3 +118,13 @@ it("totals AC15: a group expands to show its categories and collapses again", as
   expect(rowTexts()).toHaveLength(5);
   expect(screen.getByRole("button", { name: "Näytä kategoriat: Ruoka" })).toBeInTheDocument();
 });
+
+it("styling AC1: an expanded totals table has no inline style", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<Weeks />);
+
+  await user.click(screen.getByRole("button", { name: "Näytä kategoriat: Ruoka" }));
+
+  expect(screen.getByRole("rowheader", { name: "Leivät" })).toBeInTheDocument();
+  expect(container.querySelectorAll("[style]")).toHaveLength(0);
+});

@@ -14,15 +14,6 @@ import {
 } from "../period";
 import { TotalsTable } from "./TotalsTable";
 
-// The app has no stylesheet, so the download links get a button-like look here.
-const EXPORT_LINK_STYLE = {
-  display: "inline-block",
-  border: "1px solid",
-  borderRadius: "4px",
-  padding: "2px 8px",
-  marginRight: "8px",
-} as const;
-
 const EXPORT_LINKS: readonly [ExportKind, string][] = [
   ["weeks", fi.totals.exportWeeks],
   ["months", fi.totals.exportMonths],
@@ -143,7 +134,7 @@ export function TotalsPage() {
       {totals !== null && (
         <p>
           {EXPORT_LINKS.map(([kind, text]) => (
-            <a key={kind} href={exportUrl(kind, shownPeriod)} download style={EXPORT_LINK_STYLE}>
+            <a key={kind} href={exportUrl(kind, shownPeriod)} download className="button">
               {text}
             </a>
           ))}

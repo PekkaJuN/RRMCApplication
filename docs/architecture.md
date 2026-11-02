@@ -33,7 +33,7 @@ target design (see the greenfield rule in [AGENTS.md](../AGENTS.md#greenfield-ru
 | Image preprocessing | Python imaging library (chosen in the receipt-reading spec) | Grayscale, deskew, contrast, scaling (FR-6) |
 | OCR | Tesseract 5.x, `fin` + `eng` | Installed in the backend container |
 | Parsing and categorization model | Local model through Ollama | Model name is one setting (FR-29); Ollama on `localhost` with cloud features off |
-| Frontend | React, Vite, TypeScript | Finnish UI (NFR-15) |
+| Frontend | React, Vite, TypeScript; one plain CSS stylesheet | Finnish UI (NFR-15); WCAG 2.1 AA checked with axe (NFR-16) |
 | Export | CSV; Google Sheets (gspread) in a later release | Behind one exporter interface (FR-27) |
 | Tests | pytest; Vitest, React Testing Library, MSW; Playwright | See [Testing seams](#testing-seams) |
 | Runtime | Docker Compose | Backend and UI containers; Ollama on Windows. See [Runtime and deployment](#runtime-and-deployment) |

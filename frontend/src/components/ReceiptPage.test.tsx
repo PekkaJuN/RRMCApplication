@@ -709,3 +709,11 @@ it("line-editing AC33: errors show by their field and keep or restore the values
   expect(soda).toHaveValue("Limu");
   expect(within(sodaRow!).queryByText("Nimen pituuden on oltava 1–100 merkkiä.")).toBeNull();
 });
+
+it("styling AC1: the receipt page has no inline style", async () => {
+  answers(RECEIPT_A);
+  const { container } = render(<ReceiptPage id={3} onBack={vi.fn()} />);
+
+  await lineRows();
+  expect(container.querySelectorAll("[style]")).toHaveLength(0);
+});

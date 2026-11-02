@@ -15,8 +15,6 @@ interface Props {
   onToggle: (groupId: number) => void;
 }
 
-const INDENT = { paddingLeft: "1.5em" } as const;
-
 /** One totals table: a row per group, category without a group and no category, then the
  * total; a group's categories show when it is expanded (totals spec PC4). */
 export function TotalsTable({ label, unit, columns, rows, totals, expanded, onToggle }: Props) {
@@ -33,7 +31,11 @@ export function TotalsTable({ label, unit, columns, rows, totals, expanded, onTo
   }
 
   function amountCells(amounts: number[]) {
-    return amounts.map((amount, index) => <td key={columns[index]?.key}>{formatCents(amount)}</td>);
+    return amounts.map((amount, index) => (
+      <td key={columns[index]?.key} className="amount">
+        {formatCents(amount)}
+      </td>
+    ));
   }
 
   function rowsOf(row: TotalsRow) {
@@ -49,7 +51,7 @@ export function TotalsTable({ label, unit, columns, rows, totals, expanded, onTo
     const name = row.name ?? "";
     const open = expanded.has(groupId);
     return [
-      <tr key={`group-${groupId}`}>
+      <tr key={`group-${groupId}`} className="row-group">
         <th scope="row">
           <button
             type="button"
@@ -65,10 +67,8 @@ export function TotalsTable({ label, unit, columns, rows, totals, expanded, onTo
       </tr>,
       ...(open
         ? row.categories.map((category) => (
-            <tr key={`category-${category.id ?? "none"}`}>
-              <th scope="row" style={INDENT}>
-                {category.name}
-              </th>
+            <tr key={`category-${category.id ?? "none"}`} className="row-category">
+              <th scope="row">{category.name}</th>
               {amountCells(amountsOf(category))}
             </tr>
           ))
@@ -77,25 +77,27 @@ export function TotalsTable({ label, unit, columns, rows, totals, expanded, onTo
   }
 
   return (
-    <table aria-label={label}>
-      <caption>{label}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{fi.totals.category}</th>
-          {columns.map((column) => (
-            <th key={column.key} scope="col">
-              {heading(column)}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>{rows.flatMap(rowsOf)}</tbody>
-      <tfoot>
-        <tr>
-          <th scope="row">{fi.totals.total}</th>
-          {amountCells(totals)}
-        </tr>
-      </tfoot>
-    </table>
+    <div className="table-box">
+      <table aria-label={label}>
+        <caption>{label}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{fi.totals.category}</th>
+            {columns.map((column) => (
+              <th key={column.key} scope="col" className="amount">
+                {heading(column)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{rows.flatMap(rowsOf)}</tbody>
+        <tfoot>
+          <tr className="row-total">
+            <th scope="row">{fi.totals.total}</th>
+            {amountCells(totals)}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   );
 }

@@ -59,7 +59,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | In Progress |
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | In Progress |
 | 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines` and `/totals`: CSV files of a period behind the exporter interface; Google Sheets later | 4, 13, 18 | In Progress |
-| 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
+| 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | In Progress |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, review state | 6, 9, 12, 13 | In Progress |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | In Progress |
 

@@ -120,26 +120,28 @@ export function ProductsPage() {
         error={errors.newProduct}
         run={run}
       />
-      <table aria-label={fi.products.table}>
-        <thead>
-          <tr>
-            <th scope="col">{fi.products.name}</th>
-            <th scope="col">{fi.products.category}</th>
-            <th scope="col" />
-          </tr>
-        </thead>
-        <tbody>
-          {products?.map((item) => (
-            <ProductRow
-              key={item.id}
-              product={item}
-              items={items}
-              error={errors[`product-${item.id}`]}
-              run={run}
-            />
-          ))}
-        </tbody>
-      </table>
+      <div className="table-box">
+        <table aria-label={fi.products.table}>
+          <thead>
+            <tr>
+              <th scope="col">{fi.products.name}</th>
+              <th scope="col">{fi.products.category}</th>
+              <th scope="col" />
+            </tr>
+          </thead>
+          <tbody>
+            {products?.map((item) => (
+              <ProductRow
+                key={item.id}
+                product={item}
+                items={items}
+                error={errors[`product-${item.id}`]}
+                run={run}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
       {products?.length === 0 && (
         <p>{isFiltered ? fi.products.noMatches : fi.products.noProducts}</p>
       )}
