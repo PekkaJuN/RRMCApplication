@@ -54,3 +54,5 @@ INVALID_STORE = "Kaupan nimi saa olla enintään 100 merkkiä."
 
 # Category totals (totals spec)
 INVALID_PERIOD = "Jakso on virheellinen."
+
+NO_CATEGORY = "Ei kategoriaa"

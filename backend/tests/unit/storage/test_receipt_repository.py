@@ -5,6 +5,7 @@ import pytest
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import (
     DatedLineRow,
+    ExportLineRow,
     LineCategory,
     LineRow,
     ReceiptRepository,
@@ -421,3 +422,61 @@ def test_ac9_count_undated(db: sqlite3.Connection) -> None:
     repository.set_reviewed(reviewed, reviewed=True)
 
     assert repository.count_undated() == 2
+
+
+# Export spec P4: the lines of the lines file, with their receipt's and category's names.
+
+
+def test_export_ac1_lines_with_store_state_category_and_group(db: sqlite3.Connection) -> None:
+    catalog = CatalogRepository(db)
+    ruoka = catalog.add_category("Ruoka", "ruoka", "group", None)
+    leivat = catalog.add_category("Leivät", "leivät", "category", ruoka)
+    juomat = catalog.add_category("Juomat", "juomat", "category", None)
+    repository = ReceiptRepository(db)
+    first = repository.add("1" * 64, "a.jpg", TIME, store="Kauppa", purchase_date="2026-10-01")
+    last = add_dated(repository, 2, "2026-10-31")
+    repository.set_reviewed(last, reviewed=True)
+    for receipt_id in (add_dated(repository, 3, "2026-09-30"), add_dated(repository, 4, None)):
+        repository.add_line(receipt_id, 1, "Ulkona", 999, is_deposit_refund=False)
+    add_dated(repository, 5, "2026-11-01")
+    repository.add_line(
+        first.id,
+        1,
+        "Ruisleipä",
+        300,
+        is_deposit_refund=False,
+        category=LineCategory(leivat, "user", None),
+    )
+    repository.add_line(
+        first.id,
+        2,
+        "Limu",
+        250,
+        is_deposit_refund=False,
+        category=LineCategory(juomat, "user", None),
+    )
+    repository.add_line(last, 1, "Tuntematon", 199, is_deposit_refund=False)
+    repository.add_line(last, 2, "Panttipalautus", -40, is_deposit_refund=True)
+
+    assert repository.export_lines("2026-10-01", "2026-10-31") == [
+        ExportLineRow("2026-10-01", "Kauppa", "Ruisleipä", 300, False, "Ruoka", "Leivät", False),
+        ExportLineRow("2026-10-01", "Kauppa", "Limu", 250, False, None, "Juomat", False),
+        ExportLineRow("2026-10-31", None, "Tuntematon", 199, False, None, None, True),
+        ExportLineRow("2026-10-31", None, "Panttipalautus", -40, True, None, None, True),
+    ]
+
+
+def test_export_ac11_lines_order(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    b = add_dated(repository, 1, "2026-10-06")
+    a = add_dated(repository, 2, "2026-10-02")
+    d = add_dated(repository, 3, "2026-10-06")
+    repository.add_line(d, 3, "D3", 1, is_deposit_refund=False)
+    repository.add_line(d, 1, "D1", 1, is_deposit_refund=False)
+    repository.add_line(b, 2, "B2", 1, is_deposit_refund=False)
+    repository.add_line(b, 1, "B1", 1, is_deposit_refund=False)
+    repository.add_line(a, 1, "A1", 1, is_deposit_refund=False)
+
+    lines = repository.export_lines("2026-10-01", "2026-10-31")
+
+    assert [line.name for line in lines] == ["A1", "B1", "B2", "D1", "D3"]

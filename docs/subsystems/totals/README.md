@@ -1,6 +1,6 @@
 # Totals
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md#totals) | → [Calculation](../calculation/README.md#period-totals) | → [Categorization](../categorization/README.md) | → [Storage](../storage/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md#totals) | → [Calculation](../calculation/README.md#period-totals) | → [Categorization](../categorization/README.md) | → [Storage](../storage/README.md) | → [Export](../export/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -35,6 +35,8 @@ The endpoint, its shape and its error code are in the
 | Method | Does | Raises |
 |---|---|---|
 | `TotalsService(catalog, receipts).totals(unit, first, last)` | Parses the period, reads the lines dated in it, the unreviewed count of the period, the undated count and the category list in one transaction, and returns the period totals | `InvalidPeriodError` |
+| `TotalsService.period(unit, first, last)` | Parses the period | `InvalidPeriodError` |
+| `TotalsService.read(period)` | Reads the dated lines and the category list and returns `period_totals`; opens no transaction, so the caller holds one ([export](../export/README.md)) | nothing |
 
 ## Data Flow
 
@@ -52,7 +54,8 @@ The endpoint, its shape and its error code are in the
 - Uses: [calculation](../calculation/README.md),
   [categorization](../categorization/README.md) (the category list order),
   [storage](../storage/README.md).
-- Used by: the [UI](../ui/README.md) Yhteenveto page; later the export.
+- Used by: the [UI](../ui/README.md) Yhteenveto page; [export](../export/README.md) for
+  the totals file.
 
 ## Modules
 

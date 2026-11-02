@@ -40,12 +40,15 @@ keeps the page because Vite answers every path with `index.html`.
   text and shows its message
 - @frontend/src/components/AddLineForm.tsx — the `Uusi rivi` form
 - @frontend/src/components/TotalsPage.tsx — the Yhteenveto page: the period chooser, the
-  two counts and the two tables; owns the period and keeps it in the address
+  three download links, the two counts and the two tables; owns the period and keeps it
+  in the address
 - @frontend/src/components/TotalsTable.tsx — one totals table (weeks or months): group rows
   that expand, categories, `Ei kategoriaa`, `Yhteensä`; partial column headings
 - @frontend/src/period.ts — the period's address form (`periodFromSearch`,
   `periodToSearch`), `currentMonth`, `currentWeek` (ISO), `weekLabel`, `monthLabel`
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
+- @frontend/src/api/export.ts — `exportUrl(kind, period)`: the download URLs of the
+  [export](../export/README.md)
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -147,6 +150,15 @@ unreviewed and undated receipts show as `role="status"` when not 0. Chrome and E
 pickers for the inputs; Firefox shows text fields that accept the same text. The texts are
 in the [totals spec](../../../specs/features/totals.md#ui-texts).
 
+Under the chooser, three plain links with the `download` attribute, `Vie viikkosummat
+(CSV)`, `Vie kuukausisummat (CSV)` and `Vie rivit (CSV)`, point at the export URLs of the
+period whose totals are shown, not the draft; while a new period loads, they keep the
+previous one, so the links and the tables always agree. The browser downloads the file itself, through the Vite proxy,
+and takes its name from `Content-Disposition`. They are shown while the totals of the
+period are loaded (also when it has no lines) and hidden while the period is refused or
+the totals cannot be loaded. They look like buttons through an inline style. The texts are
+in the [CSV export spec](../../../specs/features/csv-export.md#ui-texts).
+
 ## Data Flow
 
 The browser loads the UI from Vite and calls `/api/...` on the same origin. Vite forwards
@@ -192,4 +204,5 @@ None yet.
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
 - [Category totals spec](../../../specs/features/totals.md) PC4–PC7
+- [CSV export spec](../../../specs/features/csv-export.md) PC6
 - [development.md](../../development.md#code-standards): TypeScript and React rules

@@ -46,6 +46,10 @@ gives the Finnish word the user sees.
 | Group total | ryhmän summa | The sum of a group's category totals in a column |
 | Unreviewed count | — | The unreviewed receipts dated in the period; their totals may still change |
 | Undated count | — | All receipts without a purchase date; they are in no period |
+| Lines file | kuittirivit | The CSV export of every line of the receipts dated in a period, deposit refunds included ([export](subsystems/export/README.md)) |
+| Totals file | summat | The CSV export of a period's category totals by week (`summat_viikot`) or by month (`summat_kuukaudet`), in long format |
+| Long format | pitkä muoto | One row per column and category, with the period column's key in a cell, instead of one column per week or month; suited to a pivot table |
+| Exporter | — | The interface that turns a period's lines or totals into a file; CSV now, Google Sheets later (FR-27) |
 
 ## Subsystems
 

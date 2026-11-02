@@ -14,3 +14,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 7 | [Receipt review](features/receipt-review.md) | Done | FR-16, FR-17, FR-19–FR-21, FR-13 (UI) |
 | 8 | [Line editing](features/line-editing.md) | Done | FR-18 (without quantity and unit price), FR-43, FR-19, FR-44 for edits |
 | 9 | [Category totals](features/totals.md) | Done | FR-22–FR-25, FR-44 for totals |
+| 10 | [CSV export](features/csv-export.md) | Done | FR-26, FR-27, FR-44 for exported totals |

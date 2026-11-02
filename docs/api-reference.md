@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** In Progress (health, catalog, import, receipt and line editing endpoints; totals
-  and export endpoints are added by their specs)
-- **Updated:** 2026-10-31
+- **Status:** In Progress (health, catalog, import, receipt, line editing, totals and export
+  endpoints)
+- **Updated:** 2026-11-02
 
 ## Overview
 
@@ -336,6 +336,48 @@ without a purchase date, which are in no period.
 |---|---|---|---|
 | 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week that does not exist; `from` after `to`; a longer period |
 
+### Export
+
+Implemented in @backend/app/export/routes.py; the package is
+[export](subsystems/export/README.md). Both endpoints take the period as `GET /api/totals`
+does and answer a CSV download for Finnish Excel (PRD FR-26).
+
+| Method and path | Query | Success | Errors |
+|---|---|---|---|
+| `GET /api/export/lines` | `unit`, `from`, `to` as in `GET /api/totals` | 200, the lines file `kuittirivit_<from>_<to>.csv` | 422 `invalid_period` |
+| `GET /api/export/totals` | the same, and `by` `week` or `month` | 200, the totals file `summat_viikot_<from>_<to>.csv` or `summat_kuukaudet_<from>_<to>.csv` | 422 `invalid_period`, then 422 `invalid_request` |
+
+Every 200 answer has `Content-Type: text/csv; charset=utf-8`, `Content-Disposition:
+attachment; filename="<name>"` and `Cache-Control: no-store`. The content is UTF-8 with a
+byte order mark, `;` between fields and `\r\n` after every row; a period without lines
+gives the header row only. The cell rules (quoting, the `'` before a formula-like text) are
+in [export](subsystems/export/README.md#csv-format).
+
+The lines file has one row per line of the receipts dated in the period, deposit refunds
+included, in purchase date order, then import order, then position:
+
+```text
+Päivä;Viikko;Kuukausi;Kauppa;Tuote;Summa;Ryhmä;Kategoria;Pantinpalautus;Kuitin tila
+2026-10-06;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu
+2026-10-06;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu
+```
+
+The totals file is in long format: one row per week or month column (`by`) and category
+with counted lines in that column, as in `GET /api/totals` (deposit refunds left out;
+`Ei kategoriaa` for lines without a category; no group rows, no rows for columns without
+lines):
+
+```text
+Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
+2026-W40;2026-10-01;2026-10-04;kyllä;Ruoka;Maitotuotteet;1,25
+2026-W41;2026-10-05;2026-10-11;ei;;Juomat;2,50
+```
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 422 | `invalid_period` | `Jakso on virheellinen.` | As in `GET /api/totals`; checked first |
+| 422 | `invalid_request` | `Pyyntö on virheellinen.` | `by` of the totals file is missing or not `week` or `month` |
+
 ## Subsystems
 
 - [ui](subsystems/ui/README.md) — the only client of the API
@@ -344,6 +386,7 @@ without a purchase date, which are in no period.
 - [import](subsystems/import/README.md) — the rules behind the import endpoints
 - [review](subsystems/review/README.md) — the receipt endpoints
 - [totals](subsystems/totals/README.md) — the totals endpoint
+- [export](subsystems/export/README.md) — the CSV export endpoints
 
 ## Related Documents
 

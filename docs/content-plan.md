@@ -58,7 +58,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | In Progress |
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | In Progress |
-| 14 | Export | `docs/subsystems/export/README.md` | Common exporter interface; CSV first, Google Sheets later | 4, 13 | Not Started |
+| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines` and `/totals`: CSV files of a period behind the exporter interface; Google Sheets later | 4, 13, 18 | In Progress |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning | 6, 12, 13 | In Progress |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, review state | 6, 9, 12, 13 | In Progress |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | In Progress |
@@ -103,12 +103,12 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   Yhteenveto page. The totals, calculation, storage, UI, API, architecture and glossary docs
   describe it.
 - `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization, review, line
-  editing and totals terms.
+  editing, totals and export terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
 
 ## Related documents
 
 - ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md), [glossary.md](glossary.md), [learnings.md](learnings.md); `docs/README.md` to be created
-- ↓ Tier 2: [storage](subsystems/storage/README.md), [import](subsystems/import/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [calculation](subsystems/calculation/README.md), [review](subsystems/review/README.md), [totals](subsystems/totals/README.md), [ui](subsystems/ui/README.md); export to be created
+- ↓ Tier 2: [storage](subsystems/storage/README.md), [import](subsystems/import/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [calculation](subsystems/calculation/README.md), [review](subsystems/review/README.md), [totals](subsystems/totals/README.md), [export](subsystems/export/README.md), [ui](subsystems/ui/README.md)
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

@@ -2,6 +2,17 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-02: E2E download canceled with a new endpoint
+
+- **Context:** CSV export spec, E2E test of the download links (T10).
+- **Symptom:** Playwright reported `download.path: canceled`; the backend answered 404 for
+  `/api/export/totals`, although the integration tests passed.
+- **Root cause:** `backend-e2e` stays running after `run --rm` and does not reload code, so
+  it served the app as it was when it started, without the new routes.
+- **Solution:** `docker compose restart backend-e2e`, then the E2E run passed twice.
+- **Prevention:** restart `backend-e2e` after a backend change before the E2E run
+  ([development.md](development.md#e2e-tests)).
+
 ## 2026-10-31: A field lost text typed while its save waited
 
 - **Context:** Audit of the line-editing spec (PC12, AC32).

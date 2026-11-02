@@ -74,6 +74,12 @@ receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive) as `DatedLineRow`
 `count_undated()` the receipts without a purchase date. The date `CHECK` keeps every
 `purchase_date` as `YYYY-MM-DD`, so `BETWEEN` on the text compares dates.
 
+For the [export](../export/README.md), `export_lines(start, end)` returns the lines of the
+receipts dated in the range as `ExportLineRow` (purchase date, store, name, amount, refund
+flag, group name, category name, review state), ordered by purchase date, receipt id and
+position. It joins the line's category and that category's group with `LEFT JOIN`, so a
+line without a category, or a category without a group, has `None` names.
+
 ## Data Flow
 
 1. `python -m app.prestart` runs before Uvicorn and calls `migrate_database`. On
@@ -90,7 +96,8 @@ receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive) as `DatedLineRow`
 - Uses: Python's `sqlite3`; nothing else in the app.
 - Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
   [categorization](../categorization/README.md), [import](../import/README.md),
-  [review](../review/README.md); later every feature subsystem through its repositories.
+  [review](../review/README.md), [totals](../totals/README.md),
+  [export](../export/README.md).
 
 ## Modules
 

@@ -1,7 +1,8 @@
 # System Architecture
 
 - **Status:** In Progress (foundation, categorization, import with reading, receipt
-  review with the receipt check, and totals implemented; export is target design)
+  review with the receipt check, totals and CSV export implemented; Google Sheets export
+  is target design)
 - **Updated:** 2026-11-02
 
 ## Overview
@@ -19,9 +20,9 @@ them. Requirements are in [the PRD](../specs/PRD.md); behavior of each feature i
 
 The foundation (containers, settings, storage, engine interfaces, health, app shell) exists,
 and so do categorization with the Tuotteet page, import with reading and categorization with
-the Tuonti page, and receipt review with line editing on the Kuitit and receipt pages.
-Totals and export are still the target design (see the greenfield rule in
-[AGENTS.md](../AGENTS.md#greenfield-rule)).
+the Tuonti page, receipt review with line editing on the Kuitit and receipt pages, and
+the Yhteenveto page with totals and CSV export. The Google Sheets export is still the
+target design (see the greenfield rule in [AGENTS.md](../AGENTS.md#greenfield-rule)).
 
 ## Tech stack
 
@@ -60,6 +61,7 @@ backend/                 FastAPI app and all processing
                          and period totals
     review/              receipt endpoints: list, receipt view, image, category choice, review state
     totals/              GET /api/totals: category totals per week and month of a period
+    export/              CSV downloads of a period's lines and totals behind the Exporter interface
     <subsystem>/         one package per feature subsystem (see Component map)
   evaluation/            development tool, not part of the app: compares reading variants
                          on the user's receipts (python -m evaluation)
@@ -117,6 +119,7 @@ flowchart LR
   IMP --> ST[storage]
   CAT --> ST
   EXP --> TOT
+  EXP --> ST
   ST --> DB[(SQLite)]
   IMP --> FS[(import folders)]
 ```
@@ -130,7 +133,7 @@ flowchart LR
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
 | **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, the review state | Calculate sums or remember categories itself | FR-16–FR-21 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
-| **export** | Exporter interface and the CSV exporter; later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
+| **export** | `GET /api/export/lines` and `/totals`: reads a period's lines and totals and builds the files through the exporter interface; the CSV exporter, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
 | **ui** | Pages: receipts list, receipt review (image beside an editable table), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, NFR-15 |
 
 Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
@@ -146,7 +149,8 @@ The `health` package reports the state of the database, the image folders, OCR a
 - Only **storage** runs SQL. Other subsystems use its repositories.
 - Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`;
   `categorization` → `storage` and the read line type of `receipt-reading`;
-  `export` → `totals`; `totals` and `review` → `calculation`, `categorization`, `storage`.
+  `export` → `totals`, `calculation` (types only), `storage`; `totals` and `review` →
+  `calculation`, `categorization`, `storage`.
   `calculation` does no I/O and depends on nothing. No subsystem depends on `import`,
   `export` or `review`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
@@ -222,13 +226,15 @@ and deleted lines, the store, date and total, and the review state.
 
 ### Totals and export
 
-Implemented for totals ([totals](subsystems/totals/README.md)); export comes with its spec.
+Implemented: [totals](subsystems/totals/README.md) and [export](subsystems/export/README.md)
+(CSV; Google Sheets comes with its spec).
 
 Totals are always calculated from the database when requested; they are not stored. The
 Yhteenveto page asks `GET /api/totals` for a period; totals reads the lines dated in it and
-calculation sums them per category, group, ISO week and month (FR-22–FR-25). Exports will
-use the same totals service, so an export always matches the totals view (FR-26, PRD risk
-table).
+calculation sums them per category, group, ISO week and month (FR-22–FR-25). The page's
+download links ask `GET /api/export/totals` (by week or by month) and
+`GET /api/export/lines` for the same period. The totals file uses the same totals service,
+so an export always matches the totals view (FR-26, PRD risk table).
 
 ## Key interfaces
 
@@ -237,7 +243,7 @@ table).
 | `ReceiptReader` | receipt-reading | `OcrReceiptReader` (Tesseract, then the text model) | Image in, read receipt out (store, date, total, lines, OCR text); the one interface import calls, so a vision reader can be added later |
 | `OcrEngine` | receipt-reading | Tesseract | `orient()` turns the image upright, `read()` returns its text; `check()` tells whether Tesseract with `fin` and `eng` can run |
 | `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization suggests categories for unknown names ([ADR 0004](adr/0004-line-categorization.md)). Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
-| `Exporter` | export | CSV writer; later Google Sheets | Write lines and totals to a target (FR-27) |
+| `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)` and `totals_file(totals, by)` return a file (name, media type, bytes) (FR-27) |
 
 Both interfaces live in the shared `engines` package (see
 [receipt-reading](subsystems/receipt-reading/README.md#interfaces)). The model is loaded at backend start and kept
@@ -306,7 +312,8 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
   periods and the weekly and monthly totals
 - [review](subsystems/review/README.md) — the receipt endpoints of the review UI
 - [totals](subsystems/totals/README.md) — the totals endpoint
-- export: `docs/subsystems/export/README.md` (not written yet)
+- [export](subsystems/export/README.md) — the CSV export endpoints and the exporter
+  interface
 - [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
   Tuotteet, Tuonti, Kuitit, receipt and Yhteenveto pages
 
