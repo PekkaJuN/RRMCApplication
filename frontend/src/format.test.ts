@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
-import { formatCents, formatCentsInput, formatDate, parseCents } from "./format";
+import { formatCents, formatCentsInput, formatDate, formatDayMonth, parseCents } from "./format";
+
+it("totals AC17: a day without its year", () => {
+  expect(["2026-10-01", "2026-12-28"].map(formatDayMonth)).toEqual(["1.10.", "28.12."]);
+});
 
 it("AC30: amounts are euros with a decimal comma and no thousands separator", () => {
   expect([0, 5, 125, -40, -125, 123456].map(formatCents)).toEqual([

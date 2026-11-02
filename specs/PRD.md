@@ -109,14 +109,14 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-22 | The app shows the total per category per ISO 8601 week (Monday to Sunday) and per calendar month. A group's total is the sum of its categories; the user can expand a group to see its categories. |
 | FR-23 | Totals group by the receipt's purchase date, not by the import date. |
 | FR-24 | Totals update when a receipt is edited. |
-| FR-25 | The user can choose the period shown (for example a month or a range of weeks). |
+| FR-25 | The user chooses the period shown: one calendar month, a range of months, one ISO week or a range of ISO weeks. The default is the current calendar month. Only receipts whose purchase date falls inside the period are counted. An ISO week that crosses the period's start or end counts only its days inside the period, so it shows a partial total (e.g. ISO week 1 of 2026, Mon 29 Dec 2025 – Sun 4 Jan 2026, shown for January 2026 counts only 1–4 January). |
 | FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
 
 | ID | Requirement |
 |---|---|
-| FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. [NEEDS CLARIFICATION: exact CSV columns, separator (`;` for Finnish Excel?) and decimal format] |
+| FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. The export covers one period, chosen with the same options and the same rules as the totals view (FR-25), including partial weeks at the period's edges; the period shown in the totals view is preselected. Receipt lines are included by their receipt's purchase date. [NEEDS CLARIFICATION: exact CSV columns, separator (`;` for Finnish Excel?) and decimal format] |
 | FR-27 | Exporters implement one common interface, so new targets can be added without changing the rest of the app. |
 | FR-28 | *Later release:* export to a private Google Sheet with gspread and a service account. |
 
@@ -294,6 +294,7 @@ Resolved:
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
 - A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
+- Totals and CSV export are limited to a period (one month, a range of months, one ISO week or a range of weeks); the default is the current month; ISO weeks at the period's edges count only their days inside it: FR-25, FR-26 (2026-11-02).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).
 - Supported formats are JPEG and PNG only; HEIC and PDF are not supported: FR-2 (2026-10-28).
 - Hardware and processing time: CPU only, 3 minutes per receipt: NFR-8, open question 1 (2026-10-28).

@@ -1,6 +1,6 @@
 # UI
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
 
 ## Overview
 
@@ -8,14 +8,15 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and four pages: **Tuotteet** for groups, categories and
-products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, and the
-**receipt page** for one receipt. The app opens on Tuotteet.
+reports the backend's health) and five pages: **Tuotteet** for groups, categories and
+products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, the
+**receipt page** for one receipt, and **Yhteenveto** for the category totals. The app opens
+on Tuotteet.
 
 A few pages do not justify a router library. @frontend/src/navigation.ts maps the address to
 a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` → Kuitit,
 `/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
-`/kuitit/...` → Kuitit, any other path → Tuotteet. `usePage()` returns the page, `go(page,
+`/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, any other path → Tuotteet. `usePage()` returns the page, `go(page,
 receiptId?)` and the open receipt's id. The navigation links are real links (`/`, `/tuonti`,
 `/kuitit`), and so are the date links of the list and the back link of a receipt; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
@@ -38,6 +39,13 @@ keeps the page because Vite answers every path with `index.html`.
   Enter, only when changed; Esc puts back the saved value; a refused save keeps the typed
   text and shows its message
 - @frontend/src/components/AddLineForm.tsx — the `Uusi rivi` form
+- @frontend/src/components/TotalsPage.tsx — the Yhteenveto page: the period chooser, the
+  two counts and the two tables; owns the period and keeps it in the address
+- @frontend/src/components/TotalsTable.tsx — one totals table (weeks or months): group rows
+  that expand, categories, `Ei kategoriaa`, `Yhteensä`; partial column headings
+- @frontend/src/period.ts — the period's address form (`periodFromSearch`,
+  `periodToSearch`), `currentMonth`, `currentWeek` (ISO), `weekLabel`, `monthLabel`
+- @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -57,7 +65,8 @@ keeps the page because Vite answers every path with `index.html`.
   `addLine()`, `deleteLine()`, `editReceipt()`, `setLineCategory()`, `setReviewed()`,
   `receiptImageUrl()` and the receipt types
 - @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator),
-  `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `parseCents()` (`1,25` or
+  `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `formatDayMonth()`
+  (`2026-10-01` → `1.10.`), `parseCents()` (`1,25` or
   `1.25` → `125`, `null` for anything else) and `formatDate()` (`2026-10-05` → `5.10.2026`),
   with integer arithmetic and string splitting only
 - @frontend/src/i18n/fi.ts — every Finnish UI text
@@ -123,6 +132,21 @@ app has no stylesheet. The texts are in the
 [receipt review spec](../../../specs/features/receipt-review.md#ui-texts) and the
 [line editing spec](../../../specs/features/line-editing.md#ui-texts).
 
+The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`),
+or the current month by the browser's local date when the address has no complete,
+well-formed period, and writes it back with `replaceState`, so the address always shows the
+period. Each change pushes a history entry, and `popstate` reads the period again, so the
+back button returns to the previous period. The `Yhteenveto` link does nothing while the
+page is open, so it cannot drop the period from the address. The chooser is a `Jakso` select (`Kuukausi`,
+`Viikko`) and two native `month` or `week` inputs, `Alkaen` and `Päättyen`, whose values
+are the API's format; changing the unit sets both to the month or ISO week of today. An
+emptied input sends nothing. Only the answer to the latest request is shown. The backend
+decides validity, so a refused period shows `Jakso on virheellinen.` (`role="alert"`). The
+two tables share one set of expanded groups, so a group opens in both. The counts of
+unreviewed and undated receipts show as `role="status"` when not 0. Chrome and Edge show
+pickers for the inputs; Firefox shows text fields that accept the same text. The texts are
+in the [totals spec](../../../specs/features/totals.md#ui-texts).
+
 ## Data Flow
 
 The browser loads the UI from Vite and calls `/api/...` on the same origin. Vite forwards
@@ -167,4 +191,5 @@ None yet.
 - [Receipt import spec](../../../specs/features/receipt-import.md) PC11
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
+- [Category totals spec](../../../specs/features/totals.md) PC4–PC7
 - [development.md](../../development.md#code-standards): TypeScript and React rules

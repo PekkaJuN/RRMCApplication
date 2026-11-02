@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import indexHtml from "../index.html?raw";
 import type { Health } from "./api/health";
 import { App } from "./App";
@@ -10,6 +10,7 @@ import { defaultItems, fakeCatalog } from "./test/catalog";
 import { IDLE } from "./test/imports";
 import { RECEIPT_A, SUMMARY_A, SUMMARY_B } from "./test/receipts";
 import { server } from "./test/server";
+import { answerTotals } from "./test/totals";
 
 const HEALTHY: Health = {
   status: "ok",
@@ -61,14 +62,19 @@ it("AC25: shows the heading, the navigation and the status line", async () => {
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
 });
 
-// The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti" and
-// receipt-review PC7 "Kuitit".
+// The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti",
+// receipt-review PC7 "Kuitit" and the totals spec PC4 "Yhteenveto".
 it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   render(<App />);
 
   const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
   const links = within(navigation).getAllByRole("link");
-  expect(links.map((link) => link.textContent)).toEqual(["Tuotteet", "Tuonti", "Kuitit"]);
+  expect(links.map((link) => link.textContent)).toEqual([
+    "Tuotteet",
+    "Tuonti",
+    "Kuitit",
+    "Yhteenveto",
+  ]);
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
   expect(within(main).getByRole("heading", { name: "Tuotteet" })).toBeInTheDocument();
@@ -185,4 +191,46 @@ it("AC22: a reload at /kuitit/<id> shows the receipt", async () => {
   expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
   // The store is an input since line editing (line-editing PC12).
   expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
+});
+
+// Totals spec: the Yhteenveto page.
+
+it("totals AC14: the Yhteenveto link opens the totals of the current month", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 10, 2, 12) });
+  try {
+    const queries = answerTotals();
+    const user = userEvent.setup();
+    render(<App />);
+    const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+    await user.click(within(navigation).getByRole("link", { name: "Yhteenveto" }));
+
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("heading", { name: "Yhteenveto" })).toBeInTheDocument();
+    expect(await within(main).findByRole("table", { name: "Viikot" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("link", { name: "Yhteenveto" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(queries).toEqual(["unit=month&from=2026-11&to=2026-11"]);
+    expect(window.location.pathname).toBe("/yhteenveto");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("totals PC5: the Yhteenveto link on the Yhteenveto page keeps the chosen period", async () => {
+  window.history.replaceState(null, "", "/yhteenveto?unit=week&from=2026-W40&to=2026-W41");
+  answerTotals();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+  await screen.findByRole("table", { name: "Viikot" });
+  const entries = window.history.length;
+
+  await user.click(within(navigation).getByRole("link", { name: "Yhteenveto" }));
+
+  expect(window.location.search).toBe("?unit=week&from=2026-W40&to=2026-W41");
+  expect(window.history.length).toBe(entries);
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("2026-W40");
 });

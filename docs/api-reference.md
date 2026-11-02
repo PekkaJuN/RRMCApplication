@@ -292,6 +292,50 @@ The OCR text is not returned.
 | 422 | `invalid_date` | `Päivämäärä ei kelpaa.` | Not a real date as `YYYY-MM-DD` |
 | 422 | `invalid_store` | `Kaupan nimi saa olla enintään 100 merkkiä.` | A store longer than 100 characters |
 
+### Totals
+
+Implemented in @backend/app/totals/routes.py. The rules are in
+[calculation](subsystems/calculation/README.md#period-totals); the package is
+[totals](subsystems/totals/README.md).
+
+| Method and path | Query | Success | Errors |
+|---|---|---|---|
+| `GET /api/totals` | `unit` `month` or `week`; `from` and `to` as `2026-10` or `2026-W40`, inclusive; at most 24 months or 104 weeks | 200, the totals of the period | 422 `invalid_period` |
+
+```json
+{
+  "unit": "month", "from": "2026-10", "to": "2026-10",
+  "start_date": "2026-10-01", "end_date": "2026-10-31",
+  "weeks": [
+    {"key": "2026-W40", "start_date": "2026-10-01", "end_date": "2026-10-04", "partial": true}
+  ],
+  "months": [
+    {"key": "2026-10", "start_date": "2026-10-01", "end_date": "2026-10-31", "partial": false}
+  ],
+  "rows": [
+    {"kind": "group", "id": 1, "name": "Ruoka", "weeks": [125], "months": [125],
+     "categories": [
+       {"kind": "category", "id": 2, "name": "Maitotuotteet", "weeks": [125], "months": [125], "categories": []}
+     ]},
+    {"kind": "none", "id": null, "name": null, "weeks": [199], "months": [199], "categories": []}
+  ],
+  "week_totals": [324],
+  "month_totals": [324],
+  "unreviewed_receipts": 1,
+  "undated_receipts": 0
+}
+```
+
+The example shows one week column of five. A column's dates are its days inside the period;
+`partial` is true when that is not the whole week or month. A row's `weeks` and `months` are
+cents in column order. `rows` is `[]` when the period has no lines. `unreviewed_receipts`
+counts the unreviewed receipts dated in the period; `undated_receipts` counts all receipts
+without a purchase date, which are in no period.
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week that does not exist; `from` after `to`; a longer period |
+
 ## Subsystems
 
 - [ui](subsystems/ui/README.md) — the only client of the API
@@ -299,6 +343,7 @@ The OCR text is not returned.
   endpoints
 - [import](subsystems/import/README.md) — the rules behind the import endpoints
 - [review](subsystems/review/README.md) — the receipt endpoints
+- [totals](subsystems/totals/README.md) — the totals endpoint
 
 ## Related Documents
 
@@ -310,4 +355,5 @@ The OCR text is not returned.
   failure reasons and the start checks
 - [Receipt review spec](../specs/features/receipt-review.md): the receipt endpoints
 - [Line editing spec](../specs/features/line-editing.md): line and receipt edits
+- [Category totals spec](../specs/features/totals.md): the totals endpoint
 - [development.md](development.md#troubleshooting): what the health results mean for the user

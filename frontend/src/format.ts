@@ -33,6 +33,12 @@ export function parseCents(text: string): number | null {
   return sign && cents !== 0 ? -cents : cents;
 }
 
+/** `2026-10-01` → `1.10.`: the first day of a partial column (totals spec PC4). */
+export function formatDayMonth(isoDate: string): string {
+  const [, month, day] = isoDate.split("-");
+  return `${Number(day)}.${Number(month)}.`;
+}
+
 /** `2026-10-05` → `5.10.2026`. */
 export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");

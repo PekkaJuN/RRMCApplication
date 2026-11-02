@@ -1,6 +1,6 @@
 import { readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // The e2e container shares the E2E backend's import folder (a test-only volume, see
 // compose.yaml). A duplicate stays there by design, so files of an earlier run are removed
@@ -196,4 +196,71 @@ test("line-editing AC36: edit lines and the total of an imported receipt", async
   await expect(page.getByLabel("Loppusumma")).toHaveValue("2,85");
   await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
   await expect(page.getByText("Tarkistamaton")).toBeVisible();
+});
+
+const OCTOBER_TOTALS = "/yhteenveto?unit=month&from=2026-10&to=2026-10";
+
+/** Cents of a money text: `1234,56 €` → 123456. */
+function cents(text: string): number {
+  return Number(text.replace(" €", "").replace(",", ""));
+}
+
+/**
+ * The October 2026 total of Leivät in the Kuukaudet table, 0 when it has no row. The E2E
+ * database keeps earlier tests' receipts, so the test compares totals instead of fixing them.
+ */
+async function octoberBread(page: Page): Promise<number> {
+  await page.goto(OCTOBER_TOTALS);
+  const months = page.getByRole("table", { name: "Kuukaudet" });
+  await expect(months.or(page.getByText("Ei ostoksia valitulla jaksolla."))).toBeVisible();
+  const expand = months.getByRole("button", { name: "Näytä kategoriat: Ruoka" });
+  if ((await expand.count()) === 0) {
+    return 0;
+  }
+  await expand.click();
+  const bread = months
+    .getByRole("row")
+    .filter({ has: page.getByRole("rowheader", { name: "Leivät" }) });
+  if ((await bread.count()) === 0) {
+    return 0;
+  }
+  return cents((await bread.getByRole("cell").first().textContent()) ?? "");
+}
+
+test("totals AC14, AC11: a corrected line shows in the month's totals", async ({ page }) => {
+  await writeFile(
+    join(importDir, `kuitti-${RUN}_yhteenveto.jpg`),
+    Buffer.concat([SYNTHETIC_JPEG, Buffer.from(" totals")]),
+  );
+  await page.goto("/tuonti");
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+  await expect(
+    page.getByRole("region", { name: "Edellinen tuonti" }).getByText("Tuotu: 1"),
+  ).toBeVisible();
+  const before = await octoberBread(page);
+  await expect(page).toHaveURL(OCTOBER_TOTALS);
+  await expect(page.getByRole("heading", { name: "Yhteenveto" })).toBeVisible();
+
+  await page
+    .getByRole("navigation", { name: "Päävalikko" })
+    .getByRole("link", { name: "Kuitit" })
+    .click();
+  // Same-date receipts list the newest import first, so the first one is this run's.
+  await page
+    .getByRole("table", { name: "Kuittilista" })
+    .getByRole("link", { name: "5.10.2026" })
+    .first()
+    .click();
+  // A product name of its own, so no earlier line follows the category choice (FR-36).
+  const name = `E2E-leipä-${RUN}`;
+  const form = page.getByRole("form", { name: "Uusi rivi" });
+  await form.getByLabel("Tuote").fill(name);
+  await form.getByLabel("Summa").fill("3,10");
+  await form.getByRole("button", { name: "Lisää rivi" }).click();
+  const category = page.getByRole("combobox", { name: `Kategoria: ${name}` });
+  await expect(category).toBeEnabled();
+  await category.selectOption({ label: "Leivät" });
+  await expect(category.locator("option:checked")).toHaveText("Leivät");
+
+  expect(await octoberBread(page)).toBe(before + 310);
 });

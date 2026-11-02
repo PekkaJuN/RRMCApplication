@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -66,6 +66,13 @@ category columns, and `update_line` writes the name, amount, refund flag and cat
 once, so the schema's `CHECK`s see one consistent row. `LineCategory` and `CategorySource`
 are defined here. The rules are in [import](../import/README.md) and
 [categorization](../categorization/README.md#line-categorization).
+
+For the [totals](../totals/README.md), `dated_lines(start, end)` returns the lines of the
+receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive) as `DatedLineRow`
+(purchase date, amount, category id, refund flag; no product name), in no order.
+`count_unreviewed(start, end)` counts the unreviewed receipts dated in the range, and
+`count_undated()` the receipts without a purchase date. The date `CHECK` keeps every
+`purchase_date` as `YYYY-MM-DD`, so `BETWEEN` on the text compares dates.
 
 ## Data Flow
 
