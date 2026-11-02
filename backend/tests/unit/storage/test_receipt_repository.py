@@ -4,6 +4,7 @@ import pytest
 
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import (
+    DatedLineRow,
     LineCategory,
     LineRow,
     ReceiptRepository,
@@ -372,3 +373,51 @@ def test_set_fields_refuses_a_date_of_the_wrong_shape(db: sqlite3.Connection) ->
 
     with pytest.raises(sqlite3.IntegrityError):
         repository.set_fields(receipt.id, store="", purchase_date="5.10.2026", total_cents=0)
+
+
+# Totals spec P3: the lines, counts and dates of a period.
+
+
+def test_ac8_dated_lines_in_a_range(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    first = add_dated(repository, 1, "2026-10-01")
+    last = add_dated(repository, 2, "2026-10-31")
+    before = add_dated(repository, 3, "2026-09-30")
+    after = add_dated(repository, 4, "2026-11-01")
+    undated = add_dated(repository, 5, None)
+    category = LineCategory(category_id, "user", product_id)
+    repository.add_line(first, 1, "Ruisleipä", 300, is_deposit_refund=False, category=category)
+    repository.add_line(last, 1, "Panttipalautus", -40, is_deposit_refund=True)
+    for receipt_id in (before, after, undated):
+        repository.add_line(receipt_id, 1, "Maito", 999, is_deposit_refund=False)
+
+    lines = repository.dated_lines("2026-10-01", "2026-10-31")
+
+    assert sorted(lines, key=lambda row: row.purchase_date) == [
+        DatedLineRow("2026-10-01", 300, category_id, is_deposit_refund=False),
+        DatedLineRow("2026-10-31", -40, None, is_deposit_refund=True),
+    ]
+
+
+def test_ac20_count_unreviewed_in_a_range(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    confirmed = add_dated(repository, 1, "2026-10-05")
+    repository.set_reviewed(confirmed, reviewed=True)
+    add_dated(repository, 2, "2026-10-01")
+    add_dated(repository, 3, "2026-10-31")
+    add_dated(repository, 4, "2026-11-01")
+    add_dated(repository, 5, None)
+
+    assert repository.count_unreviewed("2026-10-01", "2026-10-31") == 2
+
+
+def test_ac9_count_undated(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    assert repository.count_undated() == 0
+    add_dated(repository, 1, None)
+    add_dated(repository, 2, "2026-10-05")
+    reviewed = add_dated(repository, 3, None)
+    repository.set_reviewed(reviewed, reviewed=True)
+
+    assert repository.count_undated() == 2

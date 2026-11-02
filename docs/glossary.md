@@ -39,6 +39,13 @@ gives the Finnish word the user sees.
 | Truth file | — | `<image>.truth.json`: the values the user reads from a paper receipt, against which the evaluation scores a variant |
 | Variant | — | One way of reading a receipt in the evaluation: `ocr:<model>` (Tesseract, then a text model) or `vision:<model>` (the image to a vision model) |
 | Full subset | — | The evaluated receipts whose truth file lists the lines; only they get line scores |
+| Period | jakso | Whole calendar months or whole ISO weeks, from a first to a last unit, that the totals cover ([calculation](subsystems/calculation/README.md#period-totals)) |
+| ISO week | viikko | ISO 8601 week, Monday to Sunday; week 1 holds the year's first Thursday, so it can start in December. Named by its ISO year: `2026-W01`, `vk 1/2026` |
+| Column | sarake | One ISO week or month with a day in the period, clipped to the period's days |
+| Partial column | osittainen | A column clipped by the period, e.g. week 40 of 2026 shown for October 2026 holds only 1–4 October |
+| Group total | ryhmän summa | The sum of a group's category totals in a column |
+| Unreviewed count | — | The unreviewed receipts dated in the period; their totals may still change |
+| Undated count | — | All receipts without a purchase date; they are in no period |
 
 ## Subsystems
 

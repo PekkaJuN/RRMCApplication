@@ -76,3 +76,19 @@ it("AC22: the back button returns from a receipt to the list", () => {
   expect(result.current[0]).toBe("receipts");
   expect(result.current[2]).toBeNull();
 });
+
+// Totals spec: the Yhteenveto page.
+
+it("totals AC14, AC22: /yhteenveto is the totals page, also with a period", () => {
+  expect(pageFromPath("/yhteenveto")).toBe("totals");
+  expect(pageFromPath("/yhteenveto/")).toBe("products");
+});
+
+it("totals AC14: go pushes /yhteenveto", () => {
+  const { result } = renderHook(() => usePage());
+
+  act(() => result.current[1]("totals"));
+
+  expect(result.current[0]).toBe("totals");
+  expect(window.location.pathname).toBe("/yhteenveto");
+});

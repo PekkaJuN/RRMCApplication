@@ -4,6 +4,7 @@ import { ProductsPage } from "./components/ProductsPage";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { ReceiptsPage } from "./components/ReceiptsPage";
 import { StatusLine } from "./components/StatusLine";
+import { TotalsPage } from "./components/TotalsPage";
 import { fi } from "./i18n/fi";
 import { isPlainLeftClick, PAGE_PATHS, usePage, type Page } from "./navigation";
 
@@ -11,6 +12,7 @@ const LINKS: { page: Exclude<Page, "receipt">; text: string }[] = [
   { page: "products", text: fi.products.heading },
   { page: "import", text: fi.import.heading },
   { page: "receipts", text: fi.receipts.heading },
+  { page: "totals", text: fi.totals.heading },
 ];
 
 export function App() {
@@ -23,6 +25,10 @@ export function App() {
       return;
     }
     event.preventDefault();
+    // Yhteenveto keeps its period in the address; its own link must not drop it (totals PC5).
+    if (target === "totals" && page === "totals") {
+      return;
+    }
     go(target);
   }
 
@@ -35,6 +41,8 @@ export function App() {
       case "receipt":
         // `receiptId` is set whenever the page is `receipt`; the key reloads on another id.
         return <ReceiptPage key={receiptId} id={receiptId ?? 0} onBack={() => go("receipts")} />;
+      case "totals":
+        return <TotalsPage />;
       default:
         return <ProductsPage />;
     }

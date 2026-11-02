@@ -51,3 +51,6 @@ INVALID_AMOUNT = "Summa ei kelpaa."
 DEPOSIT_REFUND_AMOUNT = "Pantinpalautuksen summan on oltava negatiivinen."
 INVALID_DATE = "Päivämäärä ei kelpaa."
 INVALID_STORE = "Kaupan nimi saa olla enintään 100 merkkiä."
+
+# Category totals (totals spec)
+INVALID_PERIOD = "Jakso on virheellinen."

@@ -80,6 +80,16 @@ class StoredLine:
     category: LineCategory | None
 
 
+@dataclass(frozen=True)
+class DatedLineRow:
+    """A line with its receipt's purchase date, for the totals; no product name (NFR-3)."""
+
+    purchase_date: str
+    amount_cents: int
+    category_id: int | None
+    is_deposit_refund: bool
+
+
 def _category_values(category: LineCategory | None) -> tuple[int | None, str | None, int | None]:
     if category is None:
         return None, None, None
@@ -274,6 +284,43 @@ class ReceiptRepository:
             )
             for row in rows
         ]
+
+    def dated_lines(self, start: str, end: str) -> list[DatedLineRow]:
+        """The lines of the receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive).
+
+        The column's `CHECK` keeps every date in that shape, so text order is date order.
+        """
+        rows = self._connection.execute(
+            "SELECT receipts.purchase_date, receipt_lines.amount_cents,"
+            " receipt_lines.category_id, receipt_lines.is_deposit_refund"
+            " FROM receipt_lines JOIN receipts ON receipts.id = receipt_lines.receipt_id"
+            " WHERE receipts.purchase_date BETWEEN ? AND ?",
+            (start, end),
+        )
+        return [
+            DatedLineRow(
+                purchase_date=row["purchase_date"],
+                amount_cents=row["amount_cents"],
+                category_id=row["category_id"],
+                is_deposit_refund=bool(row["is_deposit_refund"]),
+            )
+            for row in rows
+        ]
+
+    def count_unreviewed(self, start: str, end: str) -> int:
+        """How many unreviewed receipts are dated from `start` to `end` (inclusive)."""
+        row = self._connection.execute(
+            "SELECT COUNT(*) FROM receipts WHERE reviewed = 0 AND purchase_date BETWEEN ? AND ?",
+            (start, end),
+        ).fetchone()
+        return int(row[0])
+
+    def count_undated(self) -> int:
+        """How many receipts have no purchase date."""
+        row = self._connection.execute(
+            "SELECT COUNT(*) FROM receipts WHERE purchase_date IS NULL"
+        ).fetchone()
+        return int(row[0])
 
     def get_by_hash(self, image_hash: str) -> ReceiptRow | None:
         row = self._connection.execute(
