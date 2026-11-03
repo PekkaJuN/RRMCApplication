@@ -1,9 +1,12 @@
 """Receipt list, receipt view, image, category choice and review state (receipt-review spec);
 line and receipt edits (line-editing spec)."""
 
+import hashlib
 import logging
 import sqlite3
+import threading
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,12 +14,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.categorization.names import normalize_key
+from app.engines.factory import Engines
+from app.engines.model import FakeReceiptModel
+from app.engines.ocr import FakeOcrEngine, Oriented
 from app.main import create_app
+from app.review.failed_images import FailedFolder
 from app.settings import Settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.migrate import MIGRATIONS_DIR, migrate
 from app.storage.receipt_repository import LineCategory, ReceiptRepository
+from tests.receipt_import_data import jpeg, png
 
 TIME = "2026-10-28T10:00:01Z"
 JPEG = b"\xff\xd8\xff\xe0synthetic jpeg"
@@ -497,11 +505,12 @@ def test_ac19_migration_keeps_existing_receipts(settings: Settings, tmp_path: Pa
     with TestClient(create_app(settings)) as api:
         listed = api.get("/api/receipts").json()
 
-    # Then the schema version is 5 and both receipts are unreviewed
+    # Then migration 5 is applied and both receipts are unreviewed; later migrations raise
+    # the newest version
     connection = connect(settings.db_path)
-    version = connection.execute("SELECT max(version) FROM schema_version").fetchone()[0]
+    applied = connection.execute("SELECT 1 FROM schema_version WHERE version = 5").fetchone()
     connection.close()
-    assert version == 5
+    assert applied is not None
     assert [item["reviewed"] for item in listed] == [False, False]
 
 
@@ -1029,3 +1038,466 @@ def test_pc16_no_names_in_the_logs_of_edits(
     logged = "\n".join(record.getMessage() for record in caplog.records)
     for name in ("Kivennäisvesi", "Banaani", "Uusi kauppa", "Limu", "Maito", "Testikauppa"):
         assert name not in logged
+
+
+# Receipt management spec: delete a receipt (T7).
+
+
+def reviewed_receipt_r(db: sqlite3.Connection) -> tuple[int, list[int]]:
+    """Receipt R: like A but reviewed, dated in the same week."""
+    r, lines = add_receipt(db, [("Maito", 125, None)], number=9, purchase_date="2026-10-06")
+    ReceiptRepository(db).set_reviewed(r, reviewed=True)
+    return r, lines
+
+
+def test_ac1_delete_an_unreviewed_receipt(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    r, _ = reviewed_receipt_r(db)
+    before_r = api.get(f"/api/receipts/{r}").json()
+
+    response = api.delete(f"/api/receipts/{a}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert api.get(f"/api/receipts/{a}").json()["error"] == "not_found"
+    assert [item["id"] for item in api.get("/api/receipts").json()] == [r]
+    lines = db.execute("SELECT COUNT(*) FROM receipt_lines WHERE receipt_id = ?", (a,))
+    assert lines.fetchone()[0] == 0
+    products = api.get("/api/products").json()
+    assert [(item["name"], item["category_name"]) for item in products] == [
+        ("Maito", "Maitotuotteet")
+    ]
+    assert api.get(f"/api/receipts/{r}").json() == before_r
+
+
+def test_ac2_deletion_changes_the_totals(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+    reviewed_receipt_r(db)
+
+    api.delete(f"/api/receipts/{a}")
+    totals = api.get("/api/totals?unit=week&from=2026-W41&to=2026-W41").json()
+
+    assert totals["unreviewed_receipts"] == 0
+    assert totals["week_totals"] == [125]
+
+
+def test_ac3_reviewed_receipt_cannot_be_deleted(api: TestClient, db: sqlite3.Connection) -> None:
+    r, _ = reviewed_receipt_r(db)
+    before = api.get(f"/api/receipts/{r}").json()
+
+    response = api.delete(f"/api/receipts/{r}")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": "receipt_reviewed",
+        "message": "Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.",
+    }
+    assert api.get(f"/api/receipts/{r}").json() == before
+
+
+def test_ac4_delete_after_cancelling_the_confirmation(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    r, _ = reviewed_receipt_r(db)
+
+    unconfirm = api.patch(f"/api/receipts/{r}", json={"reviewed": False})
+    delete = api.delete(f"/api/receipts/{r}")
+
+    assert (unconfirm.status_code, delete.status_code) == (200, 204)
+    assert api.get(f"/api/receipts/{r}").status_code == 404
+
+
+def test_ac5_delete_an_unknown_receipt(api: TestClient, db: sqlite3.Connection) -> None:
+    a, _ = receipt_a(db)
+
+    for path in ("/api/receipts/999", "/api/receipts/9223372036854775808"):
+        response = api.delete(path)
+        assert response.status_code == 404
+        assert response.json()["error"] == "not_found"
+    assert api.get(f"/api/receipts/{a}").status_code == 200
+
+
+def finished_import(api: TestClient) -> dict[str, Any]:
+    assert api.post("/api/import").status_code == 202
+    for _ in range(500):
+        state = api.get("/api/import").json()
+        if state["state"] == "finished":
+            return state
+        threading.Event().wait(0.01)
+    raise AssertionError("the run did not finish")
+
+
+def test_ac6_deleted_image_can_be_imported_again(api: TestClient, settings: Settings) -> None:
+    # Given receipt A imported from a.jpg (fake engines)
+    for folder in (settings.import_dir, settings.done_dir, settings.failed_dir):
+        folder.mkdir(exist_ok=True)
+    (settings.import_dir / "a.jpg").write_bytes(JPEG)
+    finished_import(api)
+    (first,) = api.get("/api/receipts").json()
+
+    # When A is deleted, a.jpg is copied to the import folder and an import run finishes
+    assert api.delete(f"/api/receipts/{first['id']}").status_code == 204
+    kept = (settings.done_dir / "a.jpg").read_bytes()
+    (settings.import_dir / "a.jpg").write_bytes(kept)
+    state = finished_import(api)
+
+    # Then the done file stayed, and the image is imported as a new receipt with hash H
+    assert kept == JPEG
+    assert state["imported"] == 1
+    assert state["duplicates"] == []
+    (second,) = api.get("/api/receipts").json()
+    assert second["id"] != first["id"]
+    connection = connect(settings.db_path)
+    stored = connection.execute("SELECT image_hash FROM receipts").fetchone()[0]
+    connection.close()
+    assert stored == hashlib.sha256(JPEG).hexdigest()
+
+
+def manual_receipt(db: sqlite3.Connection, total: int = 349) -> int:
+    """A receipt without an image, as `POST /api/receipts` stores it."""
+    receipts = ReceiptRepository(db)
+    with receipts.transaction():
+        row = receipts.add(
+            None, None, TIME, store="Testikauppa", purchase_date="2026-10-05", total_cents=total
+        )
+    return row.id
+
+
+def test_ac13_no_image_for_a_receipt_without_one(api: TestClient, db: sqlite3.Connection) -> None:
+    m = manual_receipt(db)
+
+    response = api.get(f"/api/receipts/{m}/image")
+
+    assert response.status_code == 404
+    assert response.json() == {"error": "no_image", "message": "Kuitilla ei ole kuvaa."}
+    assert api.get(f"/api/receipts/{m}").json()["file_name"] is None
+
+
+# Receipt management spec: create a receipt (T10).
+
+CREATED = datetime(2026, 11, 2, 10, 0, 0, tzinfo=UTC)
+NEW_BODY = {"store": "Testikauppa", "purchase_date": "2026-10-05", "total_cents": 349}
+
+
+class CountingModel(FakeReceiptModel):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def generate(self, prompt: str, schema: dict[str, Any]) -> str:
+        self.calls += 1
+        return super().generate(prompt, schema)
+
+
+class CountingOcr(FakeOcrEngine):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def orient(self, image: bytes) -> Oriented:
+        self.calls += 1
+        return super().orient(image)
+
+    def read(self, image: bytes) -> str:
+        self.calls += 1
+        return super().read(image)
+
+
+@pytest.fixture
+def engines() -> Engines:
+    return Engines(ocr=CountingOcr(), model=CountingModel())
+
+
+@pytest.fixture
+def made(settings: Settings, engines: Engines) -> Iterator[TestClient]:
+    """A started client with counting fake engines and the clock fixed at CREATED."""
+    app = create_app(settings, engines=engines, clock=lambda: CREATED)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
+
+
+def engine_calls(engines: Engines) -> int:
+    assert isinstance(engines.ocr, CountingOcr)
+    assert isinstance(engines.model, CountingModel)
+    return engines.ocr.calls + engines.model.calls
+
+
+def test_ac7_create_a_manual_receipt_without_an_image(made: TestClient, settings: Settings) -> None:
+    body = {"store": "  Testi   kauppa ", "purchase_date": "2026-10-05", "total_cents": 349}
+
+    response = made.post("/api/receipts", json=body)
+
+    assert response.status_code == 201
+    receipt = response.json()
+    assert {key: receipt[key] for key in ("store", "purchase_date", "total_cents")} == {
+        "store": "Testi kauppa",
+        "purchase_date": "2026-10-05",
+        "total_cents": 349,
+    }
+    assert receipt["file_name"] is None
+    assert receipt["imported_at"] == "2026-11-02T10:00:00Z"
+    assert receipt["reviewed"] is False
+    assert receipt["lines"] == []
+    assert (receipt["line_sum_cents"], receipt["difference_cents"], receipt["warning"]) == (
+        0,
+        349,
+        True,
+    )
+    connection = connect(settings.db_path)
+    row = connection.execute(
+        "SELECT image_hash, ocr_text FROM receipts WHERE id = ?", (receipt["id"],)
+    ).fetchone()
+    connection.close()
+    assert tuple(row) == (None, None)
+
+
+def test_ac8_store_may_be_empty_and_total_zero(made: TestClient) -> None:
+    body = {"store": "", "purchase_date": "2026-10-05", "total_cents": 0}
+
+    response = made.post("/api/receipts", json=body)
+
+    assert response.status_code == 201
+    receipt = response.json()
+    assert (receipt["store"], receipt["total_cents"], receipt["warning"]) == ("", 0, False)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"store": "Testikauppa", "purchase_date": "2026-10-05"},
+        {**NEW_BODY, "total_cents": "349"},
+        {**NEW_BODY, "total_cents": None},
+        {**NEW_BODY, "image_file_name": None},
+        {**NEW_BODY, "image_file_name": 5},
+        {**NEW_BODY, "reviewed": True},
+    ],
+)
+def test_ac10_strict_body(made: TestClient, body: dict[str, Any]) -> None:
+    response = made.post("/api/receipts", json=body)
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_request"
+    assert made.get("/api/receipts").json() == []
+
+
+def test_ac10_body_that_is_not_json(made: TestClient) -> None:
+    response = made.post(
+        "/api/receipts", content=b"store=x", headers={"Content-Type": "application/json"}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_request"
+    assert made.get("/api/receipts").json() == []
+
+
+def created_m(made: TestClient) -> int:
+    response = made.post("/api/receipts", json=NEW_BODY)
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def test_ac11_lines_on_a_manual_receipt(
+    made: TestClient, engines: Engines, db: sqlite3.Connection
+) -> None:
+    dairy = category_id(db, "Maitotuotteet")
+    catalog = CatalogRepository(db)
+    with catalog.transaction():
+        milk = catalog.add_product("Maito", "maito", dairy)
+    m = created_m(made)
+
+    first = made.post(f"/api/receipts/{m}/lines", json={"name": "Maito", "amount_cents": 125})
+    second = made.post(f"/api/receipts/{m}/lines", json={"name": "Limu", "amount_cents": 224})
+
+    assert (first.status_code, second.status_code) == (201, 201)
+    receipt = second.json()
+    maito, limu = receipt["lines"]
+    assert (maito["category_id"], maito["category_source"]) == (dairy, "remembered")
+    assert (
+        db.execute("SELECT product_id FROM receipt_lines WHERE id = ?", (maito["id"],)).fetchone()[
+            0
+        ]
+        == milk
+    )
+    assert limu["category_id"] is None
+    assert (receipt["line_sum_cents"], receipt["warning"]) == (349, False)
+    assert engine_calls(engines) == 0
+
+
+def test_ac12_a_manual_receipt_is_counted_like_any_other(
+    made: TestClient, db: sqlite3.Connection
+) -> None:
+    dairy = category_id(db, "Maitotuotteet")
+    catalog = CatalogRepository(db)
+    with catalog.transaction():
+        catalog.add_product("Maito", "maito", dairy)
+    m = created_m(made)
+    made.post(f"/api/receipts/{m}/lines", json={"name": "Maito", "amount_cents": 125})
+    made.post(f"/api/receipts/{m}/lines", json={"name": "Limu", "amount_cents": 224})
+    made.patch(f"/api/receipts/{m}", json={"reviewed": True})
+
+    totals = made.get("/api/totals?unit=month&from=2026-10&to=2026-10").json()
+    lines = made.get("/api/export/lines?unit=month&from=2026-10&to=2026-10")
+
+    flat = [row for top in totals["rows"] for row in [top, *top["categories"]]]
+    assert [row["months"] for row in flat if row["name"] == "Maitotuotteet"] == [[125]]
+    assert [row["months"] for row in flat if row["kind"] == "none"] == [[224]]
+    text = lines.content.decode("utf-8-sig")
+    assert text.count("Vahvistettu") == 2
+
+
+def test_ac14_manual_receipts_without_an_image_are_not_duplicates(made: TestClient) -> None:
+    created_m(made)
+    created_m(made)
+
+    assert len(made.get("/api/receipts").json()) == 2
+
+
+# Receipt management spec: create a receipt with an image (T16).
+
+
+def folder_f(settings: Settings) -> Path:
+    """Folder F of the spec and an empty done folder; synthetic images only."""
+    failed = settings.failed_dir
+    failed.mkdir(exist_ok=True)
+    settings.done_dir.mkdir(exist_ok=True)
+    (failed / "b.png").write_bytes(png("b"))
+    (failed / "IMG_2.jpg").write_bytes(jpeg("img2"))
+    (failed / "notes.txt").write_bytes(b"notes")
+    (failed / "fake.jpg").write_bytes(b"not an image")
+    (failed / "sub").mkdir()
+    return failed
+
+
+def receipt_count(settings: Settings) -> int:
+    connection = connect(settings.db_path)
+    try:
+        return connection.execute("SELECT COUNT(*) FROM receipts").fetchone()[0]
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"store": "x" * 101}, "invalid_store"),
+        ({"purchase_date": "2026-02-30"}, "invalid_date"),
+        ({"purchase_date": "5.10.2026"}, "invalid_date"),
+        ({"total_cents": -1}, "invalid_amount"),
+        ({"total_cents": 100_000_000}, "invalid_amount"),
+    ],
+)
+def test_ac9_invalid_fields_with_an_image(
+    made: TestClient, settings: Settings, change: dict[str, Any], error: str
+) -> None:
+    failed = folder_f(settings)
+
+    response = made.post("/api/receipts", json={**NEW_BODY, "image_file_name": "b.png", **change})
+
+    assert response.status_code == 422
+    assert response.json()["error"] == error
+    assert (failed / "b.png").exists()
+    assert receipt_count(settings) == 0
+
+
+def test_ac20_create_a_manual_receipt_with_an_image(
+    made: TestClient, settings: Settings, engines: Engines
+) -> None:
+    failed = folder_f(settings)
+
+    response = made.post("/api/receipts", json={**NEW_BODY, "image_file_name": "IMG_2.jpg"})
+
+    assert response.status_code == 201
+    receipt = response.json()
+    assert receipt["file_name"] == "IMG_2.jpg"
+    connection = connect(settings.db_path)
+    stored = connection.execute(
+        "SELECT image_hash FROM receipts WHERE id = ?", (receipt["id"],)
+    ).fetchone()[0]
+    connection.close()
+    assert stored == hashlib.sha256(jpeg("img2")).hexdigest()
+    assert (settings.done_dir / "IMG_2.jpg").read_bytes() == jpeg("img2")
+    assert not (failed / "IMG_2.jpg").exists()
+    image = made.get(f"/api/receipts/{receipt['id']}/image")
+    assert (image.status_code, image.content) == (200, jpeg("img2"))
+    assert "IMG_2.jpg" not in made.get("/api/failed-images").json()["file_names"]
+    assert engine_calls(engines) == 0
+
+
+def test_ac21_the_done_name_gets_a_free_suffix(made: TestClient, settings: Settings) -> None:
+    folder_f(settings)
+    (settings.done_dir / "b.png").write_bytes(png("older"))
+
+    response = made.post("/api/receipts", json={**NEW_BODY, "image_file_name": "b.png"})
+
+    assert response.status_code == 201
+    assert response.json()["file_name"] == "b (2).png"
+    assert sorted(path.name for path in settings.done_dir.iterdir()) == ["b (2).png", "b.png"]
+
+
+def test_ac22_image_already_in_a_receipt(
+    made: TestClient, settings: Settings, db: sqlite3.Connection
+) -> None:
+    failed = folder_f(settings)
+    receipts = ReceiptRepository(db)
+    with receipts.transaction():
+        receipts.add(hashlib.sha256(jpeg("a")).hexdigest(), "a.jpg", TIME)
+    (failed / "copy.jpg").write_bytes(jpeg("a"))
+
+    response = made.post("/api/receipts", json={**NEW_BODY, "image_file_name": "copy.jpg"})
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": "duplicate_image",
+        "message": "Kuva on jo tuotu toiseen kuittiin.",
+    }
+    assert (failed / "copy.jpg").exists()
+    assert receipt_count(settings) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "error"),
+    [
+        ("missing.png", "image_not_found"),
+        ("../import_done/a.jpg", "image_not_found"),
+        ("sub", "image_not_found"),
+        ("notes.txt", "image_not_found"),
+        ("a\x00.jpg", "image_not_found"),
+        ("fake.jpg", "unsupported_format"),
+    ],
+)
+def test_ac23_image_that_cannot_be_used(
+    made: TestClient, settings: Settings, name: str, error: str
+) -> None:
+    folder_f(settings)
+    (settings.done_dir / "a.jpg").write_bytes(jpeg("a"))
+
+    response = made.post("/api/receipts", json={**NEW_BODY, "image_file_name": name})
+
+    assert response.status_code == 422
+    assert response.json()["error"] == error
+    if error == "unsupported_format":
+        assert response.json()["message"] == "Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa."
+    assert receipt_count(settings) == 0
+    assert (settings.done_dir / "a.jpg").exists()
+
+
+def test_ac24_move_to_the_done_folder_fails(settings: Settings) -> None:
+    # Tests run as root, so a read-only done folder would not fail; the move raises instead.
+    failed = folder_f(settings)
+
+    def failing_move(source: Path, target: Path) -> None:
+        raise OSError("simulated")
+
+    folder = FailedFolder(settings.failed_dir, settings.done_dir, failing_move)
+    app = create_app(settings, failed_folder=folder)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/api/receipts", json={**NEW_BODY, "image_file_name": "b.png"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": "image_move_failed",
+        "message": "Kuvaa ei voitu siirtää valmiiden kansioon. Kuittia ei luotu.",
+    }
+    assert receipt_count(settings) == 0
+    assert (failed / "b.png").exists()

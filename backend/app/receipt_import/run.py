@@ -11,7 +11,8 @@ from typing import Literal, Protocol
 
 from app.categorization.line_categorizer import Suggestions
 from app.engines.model import ModelUnavailableError
-from app.receipt_import.files import FileStore, check_format, free_target_name, image_identifier
+from app.image_files import check_format, free_target_name, image_identifier
+from app.receipt_import.files import FileStore
 from app.receipt_reading.reader import ReceiptReader
 from app.receipt_reading.receipt import ReadFailedError, ReadLine, ReadReceipt
 from app.storage.receipt_repository import LineCategory, ReceiptRepository

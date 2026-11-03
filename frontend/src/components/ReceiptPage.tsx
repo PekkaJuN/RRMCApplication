@@ -4,6 +4,7 @@ import type { ApiResult } from "../api/client";
 import {
   addLine,
   deleteLine,
+  deleteReceipt,
   editLine,
   editReceipt,
   getReceipt,
@@ -52,6 +53,8 @@ export function ReceiptPage({ id, onBack }: Props) {
   // (line-editing PC12).
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +98,22 @@ export function ReceiptPage({ id, onBack }: Props) {
     queue.current = result;
     return result;
   };
+
+  /** Deletes after any waiting change; the list opens when it is gone (receipt-management PC10). */
+  function removeReceipt() {
+    setDeleteError(null);
+    setIsDeleting(true);
+    const result = queue.current.then(() => deleteReceipt(id));
+    queue.current = result;
+    void result.then((answer) => {
+      if (answer.ok) {
+        onBack();
+      } else {
+        setIsDeleting(false);
+        setDeleteError(answer.error.message);
+      }
+    });
+  }
 
   return (
     <section aria-labelledby="receipt-heading">
@@ -150,11 +169,24 @@ export function ReceiptPage({ id, onBack }: Props) {
               {receipt.reviewed ? fi.receipt.cancelConfirmation : fi.receipt.confirm}
             </button>
             {reviewError && <span role="alert"> {reviewError}</span>}
+            {!receipt.reviewed && (
+              <>
+                {" "}
+                <ConfirmDelete
+                  label={fi.receipt.deleteReceipt}
+                  disabled={isDeleting}
+                  onConfirm={removeReceipt}
+                />
+              </>
+            )}
+            {deleteError && <span role="alert"> {deleteError}</span>}
           </p>
           <Warning receipt={receipt} />
           <div className="receipt-columns">
             <div className="receipt-image">
-              {imageMissing ? (
+              {receipt.file_name === null ? (
+                <p>{fi.receipt.noImage}</p>
+              ) : imageMissing ? (
                 <p>{fi.receipt.imageMissing}</p>
               ) : (
                 <a href={receiptImageUrl(receipt.id)} target="_blank" rel="noreferrer">

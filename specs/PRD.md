@@ -101,6 +101,8 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-19 | Category subtotals for the receipt update immediately after any edit. |
 | FR-20 | A warning shows when the sum of the line amounts (including deposit refunds) differs from the receipt total, with the difference. Deposit refunds are part of this check because the printed total already has them deducted. |
 | FR-21 | A list view shows all receipts with date, store, total, warning state and review state (unreviewed / confirmed). |
+| FR-46 | The user can delete an unreviewed receipt and its lines, after a confirmation. A reviewed receipt must be made unreviewed first. Products, categories and the image file are kept; the image is no longer a duplicate, so it can be imported again. |
+| FR-47 | The user can create a receipt by hand with store, purchase date and total, and then add its lines in the receipt view. When it is created, an image from the failed folder can be attached to it; the image then moves to the done folder and is not read by OCR or the model. A typed-in receipt is counted, reviewed, deleted and exported like an imported one. |
 
 ### 6.5 Totals
 
@@ -237,7 +239,7 @@ category, category source, product). The data model is defined in `docs/datamode
 
 | Release | Scope |
 |---|---|
-| MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-45, all NFRs except NFR-5 |
+| MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-28 Google Sheets export (with NFR-5) |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
@@ -297,6 +299,9 @@ Resolved:
 - Deposit refunds do not reduce spending totals: FR-44 (2026-10-21).
 - A deposit (pantti) is part of the item's price and is merged into the item's line: FR-9 (2026-10-22).
 - Import is started with a button; the folder is not watched: FR-45 (2026-10-21).
+- Only an unreviewed receipt can be deleted, and its image stays in the done folder; a
+  receipt can be typed in, with an optional image from the failed folder chosen when it is
+  created: FR-46, FR-47 (2026-11-02).
 - CSV export: two files (lines, and totals in long format), `;` separator, decimal comma, UTF-8 with BOM, Finnish headers: FR-26, open question 7 (2026-11-02).
 - Totals and CSV export are limited to a period (one month, a range of months, one ISO week or a range of weeks); the default is the current month; ISO weeks at the period's edges count only their days inside it: FR-25, FR-26 (2026-11-02).
 - Failed images move to `source/import_failed` and can be retried: FR-4 (2026-10-21).

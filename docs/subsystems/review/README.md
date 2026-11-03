@@ -6,8 +6,9 @@ Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../.
 
 Review serves the receipt endpoints the review UI uses: the receipt list, one receipt with
 its lines and sums, the receipt image, line edits (name, amount, deposit refund flag,
-category), added and deleted lines, the store, date and total, and the review state
-(PRD FR-16–FR-21, FR-18, FR-43). It builds what the UI shows from three subsystems and holds no rule of
+category), added and deleted lines, the store, date and total, the review state, deleting a
+receipt, and creating one by hand with an optional image from the failed folder (PRD
+FR-16–FR-21, FR-18, FR-43, FR-46, FR-47). It builds what the UI shows from three subsystems and holds no rule of
 its own beyond finding the right rows:
 
 - [storage](../storage/README.md) reads and writes the receipts, lines and review state;
@@ -23,11 +24,15 @@ transaction.
 
 ## Key Files and Entry Points
 
-- @backend/app/review/routes.py — `create_review_router(settings)`: the seven `/api/receipts`
-  endpoints, one connection per request
+- @backend/app/review/routes.py — `create_review_router(settings, clock, failed_folder)`: the
+  nine `/api/receipts` endpoints and the two `/api/failed-images` endpoints, one connection
+  per request. `clock` and `failed_folder` are for tests (a fixed time, a failing move)
 - @backend/app/review/service.py — `ReviewService`: `summaries`, `receipt`, `edit_line`,
-  `add_line`, `delete_line`, `update_receipt`, `image`; the edit types `LineEdit` and
-  `ReceiptEdit`; the view types `ReceiptSummary`, `ReceiptView`, `LineView`, `SubtotalView`
+  `add_line`, `delete_line`, `update_receipt`, `create_receipt`, `delete_receipt`, `image`;
+  the input types `LineEdit`, `ReceiptEdit` and `NewReceipt`; the view types
+  `ReceiptSummary`, `ReceiptView`, `LineView`, `SubtotalView`
+- @backend/app/review/failed_images.py — `FailedFolder`: the failed images' names, a
+  preview, and `take` and `move_to_done` for a new receipt's image (`TakenImage`)
 - @backend/app/review/fields.py — `check_amount`, `check_total`, `check_store`, `check_date`:
   the edited values, no I/O
 - @backend/app/review/images.py — `read_image(done_dir, file_name)`: the image file and its
@@ -35,7 +40,10 @@ transaction.
 - @backend/app/review/schemas.py — the API shapes; strict request bodies
 - @backend/app/review/errors.py — `ImageMissingError` (404 `image_missing`),
   `InvalidAmountError`, `DepositRefundAmountError`, `InvalidDateError`, `InvalidStoreError`
-  (422)
+  (422), and for receipt management `NoImageError`, `ReceiptReviewedError`,
+  `ImageNotFoundError`, `UnsupportedFormatError`, `DuplicateImageError`,
+  `ImageMoveFailedError`, `FoldersUnavailableError` (the import's code and text; review must
+  not import from import)
 
 ## Interfaces
 
@@ -93,6 +101,23 @@ neither the JPEG nor the PNG signature. Each gives `image_missing`. The media ty
 the signature, not the name. The response has `Cache-Control: no-store`, so a replaced file
 is not shown from the browser cache.
 
+### Deleting and creating a receipt
+
+`delete_receipt` refuses a reviewed receipt (`receipt_reviewed`) and deletes the row in one
+transaction; the lines go with it (`ON DELETE CASCADE`). It never touches the image file.
+
+`create_receipt` checks the store, date and total first, so a bad field never moves a file.
+With an image it then follows the import's order: `FailedFolder.take` finds and reads the
+file, checks its signature, hashes it and chooses the done name; a hash already stored is
+`duplicate_image`. The row is committed (a `UNIQUE` failure, from an import that stored the
+same image meanwhile, is also `duplicate_image`), then the file moves. If the move fails,
+the row is deleted again and the answer is `image_move_failed`; the file is still in the
+failed folder. If that delete fails too, only the error type is logged.
+
+`FailedFolder` accepts a plain name only: not `""`, `.` or `..`, no separator, a `.jpg`,
+`.jpeg` or `.png` suffix, a regular file whose resolved path is directly in the failed
+folder. The same check serves the preview (404) and a create (422).
+
 ## Data Flow
 
 A line edit:
@@ -120,7 +145,8 @@ sequenceDiagram
 
 - Uses: [storage](../storage/README.md), [calculation](../calculation/README.md),
   [categorization](../categorization/README.md) (`CategoryService`, `LineCategoryService`,
-  `NotFoundError`), the settings (the done folder).
+  `NotFoundError`), the shared image file rules (@backend/app/image_files.py), the settings
+  (the done and failed folders).
 - Used by: [UI](../ui/README.md) through the API. No subsystem depends on review.
 
 ## Modules
@@ -129,8 +155,6 @@ None yet.
 
 ## Known Issues and Gotchas
 
-- The JPEG and PNG signatures are written in both @backend/app/review/images.py and
-  @backend/app/receipt_import/files.py: review must not import from import.
 - Request bodies use strict types and `extra="forbid"`, so `"12"` or `true` for a number,
   `"yes"` for a boolean and a misspelled field give `invalid_request` instead of being
   converted or ignored. A partial update refuses an empty body and a sent `null`, so `None`
@@ -142,4 +166,6 @@ None yet.
 
 - [Receipt review spec](../../../specs/features/receipt-review.md)
 - [Line editing spec](../../../specs/features/line-editing.md)
-- [Data model](../../datamodel.md#receipts): the `reviewed` column
+- [Receipt management spec](../../../specs/features/receipt-management.md)
+- [Data model](../../datamodel.md#receipts): the `reviewed` column; nullable `image_hash`
+  and `file_name`

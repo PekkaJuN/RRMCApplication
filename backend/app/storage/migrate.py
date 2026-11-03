@@ -49,10 +49,17 @@ def migrate(connection: sqlite3.Connection, migrations_dir: Path) -> list[int]:
 
 
 def _apply(connection: sqlite3.Connection, path: Path, version: int) -> None:
+    # A table rebuild drops the old table; with foreign keys on, that DROP would cascade-delete
+    # the rows that reference it. The pragma is a no-op inside a transaction, so it is set
+    # here, and the key check before the commit catches any reference the migration broke
+    # (https://www.sqlite.org/lang_altertable.html#otheralter).
+    connection.execute("PRAGMA foreign_keys = OFF")
     # executescript() runs statements one by one without a transaction of its own, so the
     # BEGIN is part of the script; the version row then commits together with the DDL.
     try:
         connection.executescript("BEGIN;\n" + path.read_text(encoding="utf-8"))
+        if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+            raise sqlite3.IntegrityError("foreign key check failed")
         connection.execute(
             "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
             (version, datetime.now(UTC).isoformat()),
@@ -62,6 +69,8 @@ def _apply(connection: sqlite3.Connection, path: Path, version: int) -> None:
         if connection.in_transaction:
             connection.execute("ROLLBACK")
         raise MigrationError(f"Migration {path.name} failed") from error
+    finally:
+        connection.execute("PRAGMA foreign_keys = ON")
 
 
 def current_version(connection: sqlite3.Connection) -> int:

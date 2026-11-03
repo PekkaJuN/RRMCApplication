@@ -47,6 +47,26 @@ class ReceiptUpdate(_PartialBody):
     reviewed: StrictBool | None = None
 
 
+class NewReceiptBody(_Body):
+    """A receipt typed in by the user (receipt-management PC3). Leave `image_file_name` out
+    for no image; a sent null is refused, as in a partial update."""
+
+    store: StrictStr
+    purchase_date: StrictStr
+    total_cents: StrictInt
+    image_file_name: StrictStr | None = None
+
+    @model_validator(mode="after")
+    def _image_name_is_not_null(self) -> Self:
+        if "image_file_name" in self.model_fields_set and self.image_file_name is None:
+            raise ValueError("null field")
+        return self
+
+
+class FailedImagesOut(BaseModel):
+    file_names: list[str]
+
+
 class ReceiptSummaryOut(BaseModel):
     id: int
     purchase_date: str | None
@@ -113,7 +133,7 @@ class ReceiptOut(BaseModel):
     """A receipt with its lines and sums. The OCR text is left out: no view shows it."""
 
     id: int
-    file_name: str
+    file_name: str | None
     imported_at: str
     store: str | None
     purchase_date: str | None

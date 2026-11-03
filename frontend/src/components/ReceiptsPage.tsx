@@ -3,6 +3,7 @@ import { listReceipts, type ReceiptSummary } from "../api/receipts";
 import { formatCents, formatDate } from "../format";
 import { fi } from "../i18n/fi";
 import { isPlainLeftClick, receiptPath } from "../navigation";
+import { NewReceiptForm } from "./NewReceiptForm";
 
 interface Props {
   onOpen: (id: number) => void;
@@ -12,6 +13,7 @@ interface Props {
 export function ReceiptsPage({ onOpen }: Props) {
   const [receipts, setReceipts] = useState<ReceiptSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +35,16 @@ export function ReceiptsPage({ onOpen }: Props) {
   return (
     <section aria-labelledby="receipts-heading">
       <h2 id="receipts-heading">{fi.receipts.heading}</h2>
+      {/* Closing the form unmounts it, so it opens empty again (receipt-management AC34). */}
+      {isCreating ? (
+        <NewReceiptForm onCreated={onOpen} onCancel={() => setIsCreating(false)} />
+      ) : (
+        <p>
+          <button type="button" onClick={() => setIsCreating(true)}>
+            {fi.newReceipt.open}
+          </button>
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {receipts?.length === 0 && <p>{fi.receipts.empty}</p>}
       {receipts && receipts.length > 0 && (

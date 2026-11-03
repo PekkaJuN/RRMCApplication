@@ -17,6 +17,7 @@ gives the Finnish word the user sees.
 | Display name | — | A name as shown: Unicode NFC, trimmed, inner whitespace collapsed to one space |
 | Normalized name | — | The display name, case-folded; stored as `name_key` and used for every comparison ([names](subsystems/categorization/README.md#names)) |
 | Receipt | kuitti | One purchase, recorded from one image: the image identifier, the file name, the import time and the read data with its lines ([datamodel](datamodel.md#receipts)) |
+| Manual receipt | käsin luotu kuitti | A receipt the user types in on the Kuitit page instead of importing it: store, date and total, and optionally a failed image. Without an image it has no image identifier and no file name (FR-47, [review](subsystems/review/README.md#deleting-and-creating-a-receipt)) |
 | Read receipt | — | What reading one image gives: store, purchase date, total in cents, lines and the raw OCR text ([receipt-reading](subsystems/receipt-reading/README.md)) |
 | Receipt reader | — | The one interface import uses to read an image; today the OCR reader (Tesseract, then the text model) |
 | Receipt line | kuittirivi | One item of a receipt in printed order: name as read, amount in cents after any discount and including any deposit, and whether it is a deposit refund ([datamodel](datamodel.md#receipt_lines)) |
@@ -34,6 +35,7 @@ gives the Finnish word the user sees.
 | Import run | tuonti, tuontiajo | One press of "Tuo kuitit": the files in the import folder at that moment are processed in the background ([import](subsystems/import/README.md)) |
 | Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |
 | Image identifier | — | SHA-256 of an image file's bytes, 64 lowercase hex characters; stored as `image_hash` |
+| Failed image | epäonnistunut kuva | A `.jpg`, `.jpeg` or `.png` file in the failed folder; offered for a manual receipt, which moves it to the done folder (FR-47) |
 | Duplicate | kaksoiskappale | A file whose image identifier is already stored for a receipt; it is not imported again and stays in the import folder |
 | Evaluation folder | — | Where the user keeps receipts for the model evaluation tool, with their truth files and run results (setting `RRMC_EVAL_DIR`; [development.md](development.md#model-evaluation)) |
 | Truth file | — | `<image>.truth.json`: the values the user reads from a paper receipt, against which the evaluation scores a variant |

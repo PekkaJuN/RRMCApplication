@@ -2,7 +2,7 @@
 
 - **Status:** In Progress (catalog, receipts with their read data and review state, and
   receipt lines with their categories implemented)
-- **Updated:** 2026-10-31
+- **Updated:** 2026-11-03
 
 ## Overview
 
@@ -72,20 +72,22 @@ One-time facts about the database, as key and value text.
 
 ### receipts
 
-One row per imported receipt image ([import](subsystems/import/README.md)), with what
-[receipt reading](subsystems/receipt-reading/README.md) read from it. The read columns are
-`NULL` for receipts imported before reading existed (migration `0003`).
+One row per receipt: an imported image ([import](subsystems/import/README.md)) with what
+[receipt reading](subsystems/receipt-reading/README.md) read from it, or a receipt the user
+typed in ([review](subsystems/review/README.md), FR-47). The read columns are `NULL` for
+receipts imported before reading existed (migration `0003`). Migration `0006` rebuilt the
+table so that a typed-in receipt can have no image.
 
 | Column | Type | Meaning |
 |---|---|---|
-| `id` | `INTEGER PRIMARY KEY` | Stable id; its receipt lines reference it |
-| `image_hash` | `TEXT NOT NULL UNIQUE`, `CHECK (length = 64)` | The image identifier: SHA-256 of the file's bytes, lowercase hex. The `UNIQUE` index is the duplicate lookup (FR-3) |
-| `file_name` | `TEXT NOT NULL` | The file's name in the done folder, after any numbered suffix |
-| `imported_at` | `TEXT NOT NULL` | When the receipt was stored, UTC ISO 8601 with seconds (`2026-10-28T10:00:01Z`) |
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Stable id; its receipt lines reference it. Never reused after a delete, so an old link cannot open another receipt |
+| `image_hash` | `TEXT UNIQUE`, `CHECK (NULL or length = 64)` | The image identifier: SHA-256 of the file's bytes, lowercase hex. The `UNIQUE` index is the duplicate lookup (FR-3). `NULL` for a typed-in receipt without an image; many may be `NULL` |
+| `file_name` | `TEXT` | The file's name in the done folder, after any numbered suffix; `NULL` exactly when `image_hash` is `NULL` (`CHECK`) |
+| `imported_at` | `TEXT NOT NULL` | When the receipt was stored or typed in, UTC ISO 8601 with seconds (`2026-10-28T10:00:01Z`) |
 | `store` | `TEXT` | Store name as read, trimmed; `''` when the model found none |
 | `purchase_date` | `TEXT`, `CHECK` shape `YYYY-MM-DD` | Purchase date; `NULL` when the model's date was not a real date (the user fixes it in review) |
 | `total_cents` | `INTEGER` | Receipt total in integer cents (NFR-6) |
-| `ocr_text` | `TEXT` | The raw Tesseract output, so the receipt can be re-parsed without OCR (FR-10) |
+| `ocr_text` | `TEXT` | The raw Tesseract output, so the receipt can be re-parsed without OCR (FR-10); `NULL` for a typed-in receipt |
 | `reviewed` | `INTEGER NOT NULL DEFAULT 0`, `0` or `1` | Review state (FR-21): 0 unreviewed, 1 confirmed by the user. Receipts stored before migration `0005` are unreviewed ([review](subsystems/review/README.md)) |
 
 A failed import stores no row, so the image can be retried (FR-4).
@@ -130,15 +132,19 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are five, `0001_catalog.sql`,
-  `0002_receipts.sql`, `0003_receipt_reading.sql`, `0004_line_categories.sql` and
-  `0005_receipt_review.sql`, so the schema version is 5.
+  (four digits, then a short name). Today there are six, `0001_catalog.sql`,
+  `0002_receipts.sql`, `0003_receipt_reading.sql`, `0004_line_categories.sql`,
+  `0005_receipt_review.sql` and `0006_manual_receipts.sql`, so the schema version is 6.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
   that transaction is rolled back, the backend does not start, and the database stays at the
   previous version.
 - A migration file must not contain `BEGIN` or `COMMIT`; the runner owns the transaction.
+- The runner turns foreign keys off around each migration and runs `PRAGMA foreign_key_check`
+  before the commit, so a table rebuild (create, copy, drop, rename) keeps the rows that
+  reference the table instead of cascade-deleting them; a broken reference fails the
+  migration.
 - A committed migration is never edited. A change is a new migration.
 - A feature spec that adds tables lists its migration in "Files to Modify" and documents the
   new entities in this file.

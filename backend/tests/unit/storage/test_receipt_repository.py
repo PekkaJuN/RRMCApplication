@@ -480,3 +480,18 @@ def test_export_ac11_lines_order(db: sqlite3.Connection) -> None:
     lines = repository.export_lines("2026-10-01", "2026-10-31")
 
     assert [line.name for line in lines] == ["A1", "B1", "B2", "D1", "D3"]
+
+
+def test_ac7_receipt_without_an_image(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+
+    added = repository.add(
+        None, None, TIME, store="Testikauppa", purchase_date="2026-10-05", total_cents=349
+    )
+
+    stored = repository.get(added.id)
+    assert stored == added
+    assert stored is not None
+    assert stored.image_hash is None
+    assert stored.file_name is None
+    assert stored.ocr_text is None

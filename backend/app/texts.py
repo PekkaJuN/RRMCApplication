@@ -47,6 +47,11 @@ MODEL_LOST = (
     "Kielimalli ei vastaa. Tuonti pysäytettiin; jäljellä olevat kuvat jäivät tuontikansioon."
 )
 IMAGE_MISSING = "Kuvaa ei löydy valmiiden kansiosta."
+NO_IMAGE = "Kuitilla ei ole kuvaa."
+RECEIPT_REVIEWED = "Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin."
+FAILED_IMAGE_NOT_FOUND = "Kuvaa ei löydy epäonnistuneiden kansiosta."
+DUPLICATE_IMAGE = "Kuva on jo tuotu toiseen kuittiin."
+IMAGE_MOVE_FAILED = "Kuvaa ei voitu siirtää valmiiden kansioon. Kuittia ei luotu."
 INVALID_AMOUNT = "Summa ei kelpaa."
 DEPOSIT_REFUND_AMOUNT = "Pantinpalautuksen summan on oltava negatiivinen."
 INVALID_DATE = "Päivämäärä ei kelpaa."

@@ -74,8 +74,8 @@ class FailingRepository(ReceiptRepository):
 
     def add(
         self,
-        image_hash: str,
-        file_name: str,
+        image_hash: str | None,
+        file_name: str | None,
         imported_at: str,
         *,
         store: str | None = None,
