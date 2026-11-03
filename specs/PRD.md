@@ -112,6 +112,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-23 | Totals group by the receipt's purchase date, not by the import date. |
 | FR-24 | Totals update when a receipt is edited. |
 | FR-25 | The user chooses the period shown: one calendar month, a range of months, one ISO week or a range of ISO weeks. The default is the current calendar month. Only receipts whose purchase date falls inside the period are counted. An ISO week that crosses the period's start or end counts only its days inside the period, so it shows a partial total (e.g. ISO week 1 of 2026, Mon 29 Dec 2025 – Sun 4 Jan 2026, shown for January 2026 counts only 1–4 January). |
+| FR-49 | *Next release:* the user can also choose the period as a free date range, from a start date to an end date, in addition to the options in FR-25. The same rules apply: only receipts whose purchase date falls inside the range are counted, and weeks and months at the range's edges count only their days inside it. [NEEDS CLARIFICATION: does the CSV export (FR-26) use the same date range option?] |
 | FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
@@ -121,6 +122,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-26 | The user can export to CSV, generated from the database: receipt lines with group, category and date, and the weekly and monthly totals per group and category. The export covers one period, chosen with the same options and the same rules as the totals view (FR-25), including partial weeks at the period's edges; the period shown in the totals view is preselected. Receipt lines are included by their receipt's purchase date. The export gives two kinds of CSV file, both for Finnish Excel (`;` separator, UTF-8 with BOM, a header row in Finnish): **lines**, one row per receipt line with the columns Päivä, Viikko, Kuukausi, Kauppa, Tuote, Summa, Ryhmä, Kategoria, Pantinpalautus, Kuitin tila (deposit refunds included and marked); and **totals** in long format, by week or by month as the user chooses before the export (one file holds only one of them), one row per week or month column and category that has lines, with the columns Jakso, Alkaa, Päättyy, Osittainen, Ryhmä, Kategoria, Summa (no rows for group sums or zeros; lines without a category as `Ei kategoriaa`; deposit refunds left out, FR-44). Amounts have a decimal comma and no euro sign or thousands separator (`1,25`, `-0,40`); dates are `YYYY-MM-DD`. |
 | FR-27 | Exporters implement one common interface, so new targets can be added without changing the rest of the app. |
 | FR-28 | *Later release:* export to a private Google Sheet with gspread and a service account. |
+| FR-48 | *Next release:* the user can export the totals summary to a PDF file, for the period chosen in the totals view (FR-25, FR-49), through the common exporter interface (FR-27). [NEEDS CLARIFICATION: content (weekly, monthly or both; groups expanded or not), layout, and whether receipt lines are included.] |
 
 ### 6.7 Model and settings
 
@@ -240,7 +242,7 @@ category, category source, product). The data model is defined in `docs/datamode
 | Release | Scope |
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
-| Next | FR-28 Google Sheets export (with NFR-5) |
+| Next | FR-28 Google Sheets export (with NFR-5), FR-48 PDF export of the totals summary, FR-49 free date range for totals |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
 
