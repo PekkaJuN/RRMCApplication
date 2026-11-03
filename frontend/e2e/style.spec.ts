@@ -336,6 +336,25 @@ test("styling AC14, AC15: the receipt image beside the lines, or above them", as
   expect(narrowImage.y + narrowImage.height).toBeLessThanOrEqual(narrowLines.y);
 });
 
+// Regression (docs/learnings.md 2026-11-02): the line table scrolled sideways beside the
+// image, so each line's delete button was out of sight.
+test("styling AC14: every line's delete button is in sight beside the image", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openReceipt(page);
+  const lines = page.getByRole("table", { name: "Kuittirivit" });
+  const tableBox = page.locator(".receipt-lines .table-box");
+
+  const overflow = await tableBox.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  const visible = await box(tableBox);
+  const buttons = lines.getByRole("button", { name: "Poista" });
+  expect(await buttons.count()).toBeGreaterThan(0);
+  for (const button of await buttons.all()) {
+    const target = await box(button);
+    expect(target.x + target.width).toBeLessThanOrEqual(visible.x + visible.width);
+  }
+});
+
 /** The axe violations of the page: rule id, impact and the first targets of each. */
 async function axeViolations(page: Page): Promise<string[]> {
   const results = await new AxeBuilder({ page })

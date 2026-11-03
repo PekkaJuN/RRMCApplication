@@ -2,6 +2,22 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-02: A line's delete button was out of sight on the receipt page
+
+- **Context:** Using the receipt page on a wide window (line editing, styling specs).
+- **Symptom:** the user could not see a line's `Poista` button together with the rest of
+  the line; it showed only after scrolling the line table sideways.
+- **Root cause:** beside the image the lines got 3/5 of the content width (about 700 px at
+  1280 px). The name input, amount input, checkbox, category select and delete button kept
+  their natural widths, so the table was 74 px wider than its box and the `.table-box`
+  scrolled, hiding the last column.
+- **Solution:** the lines get 2/3 of the width (`minmax(0, 1fr) minmax(0, 2fr)`), and the
+  inputs and the select in the line table shrink with their column (`width: 100%`), the
+  amount input keeping at least `6em` (@frontend/src/styles.css); regression test
+  `styling AC14: every line's delete button is in sight beside the image`.
+- **Prevention:** a layout test of a table with controls must check that its box does not
+  overflow at a common window width (1280 px), not only where the table starts.
+
 ## 2026-11-02: E2E download canceled with a new endpoint
 
 - **Context:** CSV export spec, E2E test of the download links (T10).

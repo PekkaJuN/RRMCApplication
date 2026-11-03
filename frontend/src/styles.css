@@ -246,10 +246,26 @@ span[role="alert"] {
   margin-bottom: var(--space-3);
 }
 
+/* The line fields shrink with their column, so the table fits beside the image and each
+   line's delete button stays in sight without scrolling sideways (docs/learnings.md). */
+.receipt-lines table {
+  width: 100%;
+}
+
+.receipt-lines td input:not([type="checkbox"]),
+.receipt-lines td select {
+  width: 100%;
+  min-width: 0;
+}
+
+.receipt-lines td input.amount {
+  min-width: 6em;
+}
+
 @media (min-width: 900px) {
   .receipt-columns {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     gap: var(--space-3);
     align-items: start;
   }

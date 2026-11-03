@@ -366,7 +366,7 @@ WCAG formula; axe checks the text colors in AC16).
   button style.
 - `ReceiptPage`: `.receipt-columns` holds `.receipt-image` and `.receipt-lines`. By
   default they stack (`display: block`, the image column with a bottom margin); on
-  `min-width: 900px` the holder is a grid `minmax(0, 2fr) minmax(0, 3fr)` with
+  `min-width: 900px` the holder is a grid `minmax(0, 1fr) minmax(0, 2fr)` (was `2fr 3fr`, changed 2026-11-02, see `docs/learnings.md`) with
   `align-items: start` (AC14, AC15). The image's inline `maxWidth` moves to the `img`
   rule.
 - `TotalsPage`: the three download links get the `button` class; the inline style object
