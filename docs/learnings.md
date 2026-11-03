@@ -2,6 +2,22 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-03: A line's delete confirmation wrapped on the receipt page
+
+- **Context:** Deleting a line on the receipt page on a wide window (line editing, styling
+  specs).
+- **Symptom:** after the line's `Poista`, the question `Poistetaanko?` and the buttons
+  `Poista` and `Peruuta` were not on one row.
+- **Root cause:** the line table is fitted to its box (2026-11-02 fix below), so its last
+  column is narrow; the confirmation is inline text and buttons, and the browser wrapped it
+  at its spaces.
+- **Solution:** the confirmation `span` has the class `confirm-delete` with
+  `white-space: nowrap` (@frontend/src/components/ConfirmDelete.tsx,
+  @frontend/src/styles.css); the name field shrinks instead. Regression test
+  `styling AC14: a line's delete confirmation stays on one row and in sight`.
+- **Prevention:** a layout test of a control that changes its content (a confirmation, an
+  error) must check the changed state too, not only the first render.
+
 ## 2026-11-03: A failed image name with a NUL character gave a server error
 
 - **Context:** receipt-management audit (T26), failed images preview and manual receipts.

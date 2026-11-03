@@ -240,6 +240,12 @@ span[role="alert"] {
   color: var(--color-error-text);
 }
 
+/* The question and its two buttons stay on one row; in a narrow table cell they wrapped
+   (docs/learnings.md). */
+.confirm-delete {
+  white-space: nowrap;
+}
+
 /* New receipt form (receipt-management PC11): the preview stays small enough to keep the
    form's buttons in sight on a narrow window. */
 .new-receipt-preview {

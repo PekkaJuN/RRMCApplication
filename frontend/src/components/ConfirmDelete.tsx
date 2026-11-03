@@ -21,7 +21,7 @@ export function ConfirmDelete({ label = fi.actions.delete, disabled = false, onC
     );
   }
   return (
-    <span>
+    <span className="confirm-delete">
       {fi.actions.confirmDelete}{" "}
       <button
         type="button"

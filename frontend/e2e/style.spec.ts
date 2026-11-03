@@ -355,6 +355,29 @@ test("styling AC14: every line's delete button is in sight beside the image", as
   }
 });
 
+// Regression (docs/learnings.md 2026-11-03): a line's delete confirmation wrapped, so its
+// `Poista` and `Peruuta` buttons were not on one row.
+test("styling AC14: a line's delete confirmation stays on one row and in sight", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openReceipt(page);
+  const lines = page.getByRole("table", { name: "Kuittirivit" });
+  await lines.getByRole("button", { name: "Poista" }).first().click();
+
+  const question = lines.getByText("Poistetaanko?");
+  const parts = [
+    await box(question),
+    await box(question.getByRole("button", { name: "Poista" })),
+    await box(question.getByRole("button", { name: "Peruuta" })),
+  ];
+  const middles = parts.map((part) => part.y + part.height / 2);
+  expect(Math.max(...middles) - Math.min(...middles)).toBeLessThanOrEqual(2);
+  const tableBox = page.locator(".receipt-lines .table-box");
+  const overflow = await tableBox.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
 /** The axe violations of the page: rule id, impact and the first targets of each. */
 async function axeViolations(page: Page): Promise<string[]> {
   const results = await new AxeBuilder({ page })
