@@ -2,14 +2,8 @@
 
 from pathlib import Path, PurePath
 
+from app.image_files import media_type
 from app.review.errors import ImageMissingError
-
-# The import accepts only these signatures (@backend/app/receipt_import/files.py); review must
-# not import from import, and two constants do not justify a shared module.
-_TYPES = (
-    (b"\xff\xd8\xff", "image/jpeg"),
-    (b"\x89PNG\r\n\x1a\n", "image/png"),
-)
 
 
 def read_image(done_dir: Path, file_name: str) -> tuple[bytes, str]:
@@ -28,7 +22,7 @@ def read_image(done_dir: Path, file_name: str) -> tuple[bytes, str]:
         data = path.read_bytes()
     except OSError as error:
         raise ImageMissingError() from error
-    for signature, media_type in _TYPES:
-        if data.startswith(signature):
-            return data, media_type
-    raise ImageMissingError()
+    media = media_type(data)
+    if media is None:
+        raise ImageMissingError()
+    return data, media

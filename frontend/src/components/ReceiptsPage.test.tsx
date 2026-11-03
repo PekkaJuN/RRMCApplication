@@ -1,9 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { expect, it, vi } from "vitest";
 import type { ReceiptSummary } from "../api/receipts";
-import { SUMMARY_A, SUMMARY_B } from "../test/receipts";
+import { FAILED_IMAGES, SUMMARY_A, SUMMARY_B } from "../test/receipts";
 import { server } from "../test/server";
 import { ReceiptsPage } from "./ReceiptsPage";
 
@@ -82,4 +82,25 @@ it("AC29: a list that cannot be loaded shows the error", async () => {
   render(<ReceiptsPage onOpen={() => {}} />);
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Taustapalveluun ei saada yhteyttä.");
+});
+
+it("receipt-management AC34: the new receipt form opens empty again after cancel", async () => {
+  server.use(
+    http.get("/api/receipts", () => HttpResponse.json([SUMMARY_A])),
+    http.get("/api/failed-images", () => HttpResponse.json({ file_names: FAILED_IMAGES })),
+  );
+  const user = userEvent.setup();
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
+  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  const select = screen.getByLabelText("Kuva");
+  await waitFor(() => expect(within(select).getAllByRole("option")).toHaveLength(4));
+  await user.selectOptions(select, "IMG_2.jpg");
+  await user.click(screen.getByRole("button", { name: "Peruuta" }));
+
+  expect(screen.queryByRole("form", { name: "Uusi kuitti" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
+  expect(screen.getByLabelText("Kauppa")).toHaveValue("");
+  expect(screen.getByLabelText("Kuva")).toHaveDisplayValue("Ei kuvaa");
 });

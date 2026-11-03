@@ -22,7 +22,7 @@ from app.engines.model import (
     ReceiptModel,
 )
 from app.engines.ocr import FakeOcrEngine, OcrCheckResult, OcrEngine, OcrError
-from app.receipt_import.files import image_identifier
+from app.image_files import image_identifier
 from app.receipt_import.service import ImportService
 from app.receipt_reading.fake import FAKE_PARSE_FAILED_IMAGE
 from app.receipt_reading.reader import OcrReceiptReader

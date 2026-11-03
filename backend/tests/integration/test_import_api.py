@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.receipt_import.files import LocalFileStore, image_identifier
+from app.image_files import image_identifier
+from app.receipt_import.files import LocalFileStore
 from app.receipt_import.service import ImportService, RunHooks
 from app.settings import Settings
 from app.storage.db import connect

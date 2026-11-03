@@ -22,9 +22,10 @@ and the [receipt-reading spec](../../../specs/features/receipt-reading.md).
 
 ## Key Files and Entry Points
 
-- @backend/app/receipt_import/files.py — the file rules (`image_identifier`, `check_format`,
-  `is_ignored`, `free_target_name`) and `FileStore` with its disk implementation
-  `LocalFileStore`
+- @backend/app/receipt_import/files.py — `is_ignored` and `FileStore` with its disk
+  implementation `LocalFileStore`. The rules shared with review (`image_identifier`,
+  `check_format`, `free_target_name`, the safe move `move_file`) are in
+  @backend/app/image_files.py
 - @backend/app/receipt_import/run.py — `process_file`: the steps of one file and their
   failure reasons; `FileResult`, `ImportFolders`
 - @backend/app/receipt_import/service.py — `ImportService`: start checks, the background
@@ -87,7 +88,12 @@ Steps of one file (`process_file`):
   later run imports the file instead of calling it a duplicate.
 - A failed file stores nothing, so the user can move it back from the failed folder and
   retry. If moving it to the failed folder fails too, it stays in the import folder with its
-  original reason.
+  original reason. A failed image can also leave the failed folder through a receipt the
+  user types in: [review](../review/README.md#deleting-and-creating-a-receipt) moves it to
+  the done folder with the same name rule (FR-47).
+- A deleted receipt's image stays in the done folder, but its hash is gone with the row, so
+  the same image is no longer a duplicate: copied back to the import folder, it is imported
+  as a new receipt (FR-46).
 - One file's failure never stops the run. If the run itself fails (for example the database
   cannot be opened), the files not yet handled are reported as `internal_error` and are not
   moved.

@@ -1,18 +1,31 @@
 """The receipt list and the receipt view (receipt-review PC1, PC2)."""
 
+import logging
+import sqlite3
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.calculation.receipt_check import SubtotalLine, category_subtotals, check_receipt
 from app.categorization.errors import NotFoundError, UnknownCategoryError
 from app.categorization.names import validate_product_name
 from app.categorization.service import CategoryService, LineCategoryService
-from app.review.errors import DepositRefundAmountError
+from app.review.errors import (
+    DepositRefundAmountError,
+    DuplicateImageError,
+    ImageMoveFailedError,
+    ImageNotFoundError,
+    NoImageError,
+    ReceiptReviewedError,
+)
+from app.review.failed_images import FailedFolder, TakenImage
 from app.review.fields import check_amount, check_date, check_store, check_total
 from app.review.images import read_image
 from app.storage.catalog_repository import CatalogRepository, CategoryRow
 from app.storage.db import fits_integer
 from app.storage.receipt_repository import CategorySource, ReceiptRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,6 +47,17 @@ class ReceiptEdit:
     purchase_date: str | None = None
     total_cents: int | None = None
     reviewed: bool | None = None
+
+
+@dataclass(frozen=True)
+class NewReceipt:
+    """The fields of a receipt typed in by the user (receipt-management PC3);
+    `image_file_name` is a failed image's name, or None for no image."""
+
+    store: str
+    purchase_date: str
+    total_cents: int
+    image_file_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -70,7 +94,7 @@ class SubtotalView:
 @dataclass(frozen=True)
 class ReceiptView:
     id: int
-    file_name: str
+    file_name: str | None  # None for a receipt without an image
     imported_at: str
     store: str | None
     purchase_date: str | None
@@ -214,12 +238,86 @@ class ReviewService:
                 self._receipts.set_reviewed(receipt_id, reviewed=edit.reviewed)
         return self.receipt(receipt_id)
 
+    def create_receipt(
+        self, new: NewReceipt, now: datetime, folder: FailedFolder | None = None
+    ) -> ReceiptView:
+        """Create an unreviewed receipt without lines (receipt-management PC3), with a failed
+        image from `folder` when `new` names one (PC4). `now` is stored as `imported_at`.
+        The fields are checked before any file is touched; on any error no receipt exists
+        and the image is still in the failed folder.
+
+        Raises: InvalidStoreError, InvalidDateError, InvalidAmountError, ImageNotFoundError,
+        UnsupportedFormatError, DuplicateImageError, ImageMoveFailedError.
+        """
+        store = check_store(new.store)
+        purchase_date = check_date(new.purchase_date)
+        total_cents = check_total(new.total_cents)
+        image: TakenImage | None = None
+        if new.image_file_name is not None:
+            if folder is None:
+                raise ImageNotFoundError(422)
+            image = folder.take(new.image_file_name)
+            if self._receipts.get_by_hash(image.image_hash) is not None:
+                raise DuplicateImageError()
+        try:
+            with self._receipts.transaction():
+                row = self._receipts.add(
+                    image.image_hash if image else None,
+                    image.done_name if image else None,
+                    now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    store=store,
+                    purchase_date=purchase_date,
+                    total_cents=total_cents,
+                )
+        except sqlite3.IntegrityError as error:
+            # An import or another create stored the same image after the check above.
+            raise DuplicateImageError() from error
+        if image is not None and folder is not None:
+            try:
+                folder.move_to_done(image)
+            except OSError as error:
+                self._delete_unmoved(row.id)
+                raise ImageMoveFailedError() from error
+        return self.receipt(row.id)
+
+    def _delete_unmoved(self, receipt_id: int) -> None:
+        """Remove a new receipt whose image did not reach the done folder (PC4 step 6)."""
+        try:
+            with self._receipts.transaction():
+                self._receipts.delete(receipt_id)
+        except sqlite3.Error as error:
+            # Only the type: file names stay out of the log (NFR-3).
+            logger.error(
+                "Could not delete a receipt whose image was not moved: %s",
+                type(error).__name__,
+            )
+
+    def delete_receipt(self, receipt_id: int) -> None:
+        """Delete an unreviewed receipt and its lines (receipt-management PC1). Products,
+        categories and the image file stay (PC2).
+
+        Raises: NotFoundError, ReceiptReviewedError.
+        """
+        _require_ids(receipt_id)
+        with self._receipts.transaction():
+            row = self._receipts.get(receipt_id)
+            if row is None:
+                raise NotFoundError()
+            if row.reviewed:
+                raise ReceiptReviewedError()
+            self._receipts.delete(receipt_id)
+
     def image(self, receipt_id: int, done_dir: Path) -> tuple[bytes, str]:
-        """The receipt's image and media type. Raises: NotFoundError, ImageMissingError."""
+        """The receipt's image and media type.
+
+        Raises: NotFoundError, NoImageError (a receipt without an image), ImageMissingError.
+        """
         _require_ids(receipt_id)
         row = self._receipts.get(receipt_id)
         if row is None:
             raise NotFoundError()
+        if row.file_name is None:
+            raise NoImageError()
         return read_image(done_dir, row.file_name)
 
     def receipt(self, receipt_id: int) -> ReceiptView:

@@ -17,14 +17,15 @@ _RECEIPT_SELECT = (
 
 @dataclass(frozen=True)
 class ReceiptRow:
-    """An imported receipt image and what was read from it.
+    """A receipt: an imported image and what was read from it, or a manual receipt.
 
-    The read fields are None for receipts imported before reading existed.
+    The read fields are None for receipts imported before reading existed. `image_hash` and
+    `file_name` are both None for a manual receipt without an image.
     """
 
     id: int
-    image_hash: str
-    file_name: str
+    image_hash: str | None
+    file_name: str | None
     imported_at: str
     store: str | None = None
     purchase_date: str | None = None
@@ -136,8 +137,8 @@ class ReceiptRepository:
 
     def add(
         self,
-        image_hash: str,
-        file_name: str,
+        image_hash: str | None,
+        file_name: str | None,
         imported_at: str,
         *,
         store: str | None = None,
@@ -145,7 +146,8 @@ class ReceiptRepository:
         total_cents: int | None = None,
         ocr_text: str | None = None,
     ) -> ReceiptRow:
-        """Store a receipt. Raises `sqlite3.IntegrityError` when the hash exists."""
+        """Store a receipt; hash and name are both None for a receipt without an image.
+        Raises `sqlite3.IntegrityError` when the hash exists."""
         cursor = self._connection.execute(
             "INSERT INTO receipts"
             " (image_hash, file_name, imported_at, store, purchase_date, total_cents, ocr_text)"

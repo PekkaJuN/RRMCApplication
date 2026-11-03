@@ -210,14 +210,30 @@ Implemented in @backend/app/review/routes.py. The rules are in
 |---|---|---|---|
 | `GET /api/receipts` | | 200, list of receipt summaries: receipts without a purchase date first, then the newest date first; the newest import first within a date | |
 | `GET /api/receipts/{id}` | | 200, the receipt | 404 `not_found` |
-| `GET /api/receipts/{id}/image` | | 200, the image bytes as `image/jpeg` or `image/png`, `Cache-Control: no-store` | 404 `not_found`, `image_missing` |
+| `GET /api/receipts/{id}/image` | | 200, the image bytes as `image/jpeg` or `image/png`, `Cache-Control: no-store` | 404 `not_found`, `image_missing`, `no_image` |
+| `POST /api/receipts` | `store`, `purchase_date`, `total_cents`, optional `image_file_name` (a failed image; leave it out for no image) | 201, the new receipt: unreviewed, no lines, `imported_at` the creation time | 409 `duplicate_image`; 422 `invalid_store`, `invalid_date`, `invalid_amount`, `image_not_found`, `unsupported_format`, `invalid_request`; 503 `image_move_failed` |
+| `DELETE /api/receipts/{id}` | | 204, no body; the receipt and its lines are deleted; products, categories and the image file stay | 404 `not_found`; 409 `receipt_reviewed` |
 | `PATCH /api/receipts/{id}` | One or more of `store`, `purchase_date`, `total_cents`, `reviewed`; `reviewed` `true` confirms, `false` makes it unreviewed again, always allowed | 200, the receipt | 404 `not_found`; 422 `invalid_store`, `invalid_date`, `invalid_amount`, `invalid_request` |
 | `PATCH /api/receipts/{id}/lines/{line_id}` | One or more of `name`, `amount_cents`, `is_deposit_refund`, `category_id` | 200, the receipt | 404 `not_found` (also a line on another receipt); 422 `invalid_name`, `invalid_amount`, `deposit_refund_amount`, `unknown_category`, `not_a_category`, `deposit_refund_line`, `invalid_request` |
 | `POST /api/receipts/{id}/lines` | `name`, `amount_cents`, optional `is_deposit_refund` (default `false`) | 201, the receipt; the line is added after the last one | 404 `not_found`; 422 `invalid_name`, `invalid_amount`, `deposit_refund_amount`, `invalid_request` |
 | `DELETE /api/receipts/{id}/lines/{line_id}` | | 200, the receipt; the other lines keep their positions | 404 `not_found` (also a line on another receipt) |
 
-Every write answers with the whole receipt, because a change can move other lines of the
+Every edit answers with the whole receipt, because a change can move other lines of the
 same product (FR-36) and changes the sums. No edit changes the review state.
+
+**Creating a receipt by hand** (FR-47) checks `store`, `purchase_date` and `total_cents` by
+the rules in the table below before any file is touched. With `image_file_name`, the file
+must be a failed image (see [Failed images](#failed-images)) with a JPEG or PNG signature;
+an image already in a receipt is refused. Its name in the done folder is chosen as at import
+(the first free numbered suffix). The receipt is committed first, then the file moves from
+the failed folder to the done folder; if the move fails, the receipt is deleted again and
+the file stays in the failed folder. The image is not read by OCR or the model. A receipt
+without an image has `file_name` `null`, and any number of them may have the same fields.
+
+**Deleting a receipt** (FR-46) is allowed only while it is unreviewed; make it unreviewed
+first with `PATCH` and `{"reviewed": false}`. Its file stays in the done folder and is no
+longer a duplicate, so the next import of the same image creates a new receipt. Receipt ids
+are never reused.
 
 A line edit runs in one transaction in this order: the deposit refund flag and amount, then
 the name, then the category; if any rule fails, nothing changes. The rules are in
@@ -275,6 +291,7 @@ A **receipt**:
 
 | Field | Meaning |
 |---|---|
+| `file_name` | The image's name in the done folder; `null` for a receipt typed in without an image |
 | `store`, `purchase_date`, `total_cents` | `null` for a receipt imported before reading existed; `store` is `""` when the model found none |
 | `lines` | In printed order. `category_source` is `remembered`, `model`, `user` or `null` (FR-15); `group_name` is `null` for a category without a group |
 | `line_sum_cents` | Sum of every line amount, deposit refunds included |
@@ -287,10 +304,30 @@ The OCR text is not returned.
 | Status | `error` | `message` | When |
 |---|---|---|---|
 | 404 | `image_missing` | `Kuvaa ei löydy valmiiden kansiosta.` | The receipt exists, but its file is missing from the done folder, cannot be read, is not JPEG or PNG, or its stored name points outside the folder |
+| 404 | `no_image` | `Kuitilla ei ole kuvaa.` | The image of a receipt typed in without one |
+| 409 | `receipt_reviewed` | `Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.` | Delete of a reviewed receipt |
+| 409 | `duplicate_image` | `Kuva on jo tuotu toiseen kuittiin.` | The chosen image is already some receipt's image |
+| 422 | `image_not_found` | `Kuvaa ei löydy epäonnistuneiden kansiosta.` | The chosen name is not a failed image: missing, a path, a folder, another suffix, or unreadable |
+| 422 | `unsupported_format` | `Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa.` | The chosen file has neither the JPEG nor the PNG signature |
+| 503 | `image_move_failed` | `Kuvaa ei voitu siirtää valmiiden kansioon. Kuittia ei luotu.` | The file could not move to the done folder, or the done folder cannot be listed; no receipt was created |
 | 422 | `invalid_amount` | `Summa ei kelpaa.` | A line amount or total outside its range |
 | 422 | `deposit_refund_amount` | `Pantinpalautuksen summan on oltava negatiivinen.` | A deposit refund whose resulting amount is 0 or more |
 | 422 | `invalid_date` | `Päivämäärä ei kelpaa.` | Not a real date as `YYYY-MM-DD` |
 | 422 | `invalid_store` | `Kaupan nimi saa olla enintään 100 merkkiä.` | A store longer than 100 characters |
+
+### Failed images
+
+Implemented in @backend/app/review/routes.py and @backend/app/review/failed_images.py. They
+serve the new receipt form (receipt-management spec). A **failed image** is a regular file
+directly in the failed folder whose name ends in `.jpg`, `.jpeg` or `.png` (any case).
+
+| Method and path | Success | Errors |
+|---|---|---|
+| `GET /api/failed-images` | 200, `{"file_names": ["a.png", "IMG_2.jpg"]}`, sorted by name ignoring case | 503 `folders_unavailable` |
+| `GET /api/failed-images/image?name=<file name>` | 200, the image bytes as `image/jpeg` or `image/png` (from the signature), `Cache-Control: no-store` | 404 `image_not_found` (not a failed image, a path, unreadable, or no JPEG or PNG signature); 422 `invalid_request` without `name` |
+
+The name is a query parameter, because the request log writes the path only; file names stay
+out of the log (NFR-3).
 
 ### Totals
 

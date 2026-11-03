@@ -166,3 +166,12 @@ export const SUMMARY_B: ReceiptSummary = {
   warning: true,
   reviewed: false,
 };
+
+/** A receipt typed in without an image (receipt-management AC7, AC29). */
+export const RECEIPT_MANUAL: Receipt = receipt(7, {
+  file_name: null,
+  imported_at: "2026-11-02T10:00:00Z",
+});
+
+/** The failed images of folder F (receipt-management AC16, AC30). */
+export const FAILED_IMAGES = ["b.png", "fake.jpg", "IMG_2.jpg"];

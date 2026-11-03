@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { App } from "./App";
 import { fi } from "./i18n/fi";
 import { defaultItems, fakeCatalog } from "./test/catalog";
 import { IDLE } from "./test/imports";
-import { RECEIPT_A, SUMMARY_A, SUMMARY_B } from "./test/receipts";
+import { RECEIPT_A, RECEIPT_MANUAL, SUMMARY_A, SUMMARY_B } from "./test/receipts";
 import { server } from "./test/server";
 import { answerTotals } from "./test/totals";
 
@@ -191,6 +191,68 @@ it("AC22: a reload at /kuitit/<id> shows the receipt", async () => {
   expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
   // The store is an input since line editing (line-editing PC12).
   expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
+});
+
+// Receipt management spec: delete a receipt, and type one in.
+
+it("receipt-management AC25: a deleted receipt is gone from the list that opens", async () => {
+  let deleted = false;
+  server.use(
+    http.get("/api/receipts", () =>
+      HttpResponse.json(deleted ? [{ ...SUMMARY_B, reviewed: true }] : [SUMMARY_B, SUMMARY_A]),
+    ),
+    http.get("/api/receipts/3", () => HttpResponse.json(RECEIPT_A)),
+    http.delete("/api/receipts/3", () => {
+      deleted = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  window.history.replaceState(null, "", "/kuitit/3");
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(await screen.findByRole("button", { name: "Poista kuitti" }));
+  const review = screen.getByRole("button", { name: "Vahvista" });
+  await user.click(within(review.parentElement!).getByRole("button", { name: "Poista" }));
+
+  expect(await screen.findByRole("table", { name: "Kuittilista" })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/kuitit");
+  expect(deleted).toBe(true);
+  expect(await screen.findByRole("link", { name: "6.10.2026" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "5.10.2026" })).toBeNull();
+});
+
+it("receipt-management AC29: a receipt typed in on the Kuitit page opens without an image", async () => {
+  let body: unknown;
+  let imageAsked = false;
+  server.use(
+    http.get("/api/receipts", () => HttpResponse.json([SUMMARY_A])),
+    http.get("/api/failed-images", () => HttpResponse.json({ file_names: [] })),
+    http.post("/api/receipts", async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json(RECEIPT_MANUAL, { status: 201 });
+    }),
+    http.get("/api/receipts/7", () => HttpResponse.json(RECEIPT_MANUAL)),
+    http.get("/api/receipts/7/image", () => {
+      imageAsked = true;
+      return new HttpResponse(null, { status: 404 });
+    }),
+  );
+  window.history.replaceState(null, "", "/kuitit");
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
+  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  fireEvent.change(screen.getByLabelText("Päivä"), { target: { value: "2026-10-05" } });
+  await user.type(screen.getByLabelText("Loppusumma"), "3,49");
+  await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
+
+  expect(await screen.findByText("Ei kuvaa.")).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/kuitit/7");
+  expect(body).toEqual({ store: "Testikauppa", purchase_date: "2026-10-05", total_cents: 349 });
+  expect(screen.queryByRole("img")).toBeNull();
+  expect(imageAsked).toBe(false);
 });
 
 // Totals spec: the Yhteenveto page.

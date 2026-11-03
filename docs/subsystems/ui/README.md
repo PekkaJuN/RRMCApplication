@@ -32,10 +32,14 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/navigation.ts — `usePage()`, `pageFromPath()`, `PAGE_PATHS`
 - @frontend/src/components/ImportPage.tsx — the Tuonti page: the "Tuo kuitit" button,
   progress, and the report of the latest run
-- @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the receipt list
+- @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the `Uusi kuitti` button and
+  form, and the receipt list
+- @frontend/src/components/NewReceiptForm.tsx — the `Uusi kuitti` form: store, date, total
+  and a failed image with its preview
 - @frontend/src/components/ReceiptPage.tsx — one receipt: editable store, date and total,
-  review state, warning, image beside the editable line table (name, amount, deposit refund,
-  category, delete), the add form, line sum and subtotals; one save queue
+  review state, the `Poista kuitti` button of an unreviewed receipt, warning, image (or
+  `Ei kuvaa.`) beside the editable line table (name, amount, deposit refund, category,
+  delete), the add form, line sum and subtotals; one save queue
 - @frontend/src/components/EditableField.tsx — an input that saves when it is left or on
   Enter, only when changed; Esc puts back the saved value; a refused save keeps the typed
   text and shows its message
@@ -58,7 +62,8 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/components/CategorySelect.tsx — category dropdown with groups as `optgroup`
   headings that cannot be chosen; the filter variant adds `Kaikki` and whole groups
 - @frontend/src/components/ConfirmDelete.tsx — delete button that asks `Poistetaanko?` in
-  place; no browser dialog
+  place; no browser dialog; an optional `label` names the first button (`Poista kuitti`)
+  and `disabled` turns it off
 - @frontend/src/api/client.ts — shared API client (`apiGet`, `apiPost`, `apiPatch`,
   `apiDelete`)
 - @frontend/src/api/health.ts — `getHealth()` and the `Health` type
@@ -111,6 +116,15 @@ backend's message, so new reasons need no UI change. The texts are in the
 On the Kuitit page the list is loaded when the page opens; missing date, store and total
 show `–`. A list that cannot be loaded shows the error with `role="alert"`.
 
+The `Uusi kuitti` button above the list opens the new receipt form (receipt-management
+PC11). The form loads the failed images when it opens; the `Kuva` select offers `Ei kuvaa`
+and then each failed image, and a chosen image shows its preview (`Valittu kuva`) from
+`/api/failed-images/image?name=...`, or `Kuvaa ei voitu näyttää.` when it does not load. An
+empty date or an unreadable total is refused without a request. A failed create keeps every
+value and shows the backend's message. `Luo kuitti` is disabled while the request runs,
+because a receipt without an image has no duplicate check. `Peruuta` unmounts the form, so it opens empty again.
+After a create the new receipt's page opens.
+
 The receipt page loads the receipt and the categories in parallel. The backend computes the
 line sum, warning and subtotals; the page only shows them. The store, date (a date input)
 and total, and each line's name and amount, are `EditableField`s; a missing value is an empty
@@ -119,9 +133,16 @@ asks first (`ConfirmDelete`); the `Uusi rivi` form under the table adds a line. 
 sends one request, and the page shows the receipt from the answer, so subtotals, marks,
 warning and other lines of the same product update without a reload (FR-19).
 
+An unreviewed receipt has a `Poista kuitti` button next to the review button; it asks
+first (`ConfirmDelete`), runs in the save queue after any waiting change, and on success
+calls `onBack`, which opens the list. The button is disabled until the answer arrives. A
+failed delete keeps the page and shows the message
+by the button. A receipt without an image (`file_name` `null`) shows `Ei kuvaa.` and the
+page never requests its image.
+
 Changes go through one queue (a promise chain in a `useRef`): each request starts after the
-previous answer, so answers cannot arrive out of order, and no control is disabled, so the
-user keeps the focus while a save waits. An amount field accepts `1,25`, `1.25`, `-0,40` or
+previous answer, so answers cannot arrive out of order, and no edit control is disabled, so
+the user keeps the focus while a save waits; only `Poista kuitti` is, while the delete runs. An amount field accepts `1,25`, `1.25`, `-0,40` or
 `3`; anything else shows `Anna summa muodossa 1,25.` without a request. A refused change
 shows its message next to its field, checkbox, dropdown, delete button, the add button or
 the confirmation button (`role="alert"`); a text field keeps the typed text until Esc, the

@@ -36,4 +36,21 @@ describe("ConfirmDelete", () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
+
+  it("receipt-management AC25: a label names the first button; the confirmation stays", async () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDelete label="Poista kuitti" onConfirm={onConfirm} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Poista kuitti" }));
+
+    expect(screen.getByText("Poistetaanko?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Poista" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("receipt-management AC37: a disabled delete cannot be started", () => {
+    render(<ConfirmDelete label="Poista kuitti" disabled onConfirm={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Poista kuitti" })).toBeDisabled();
+  });
 });

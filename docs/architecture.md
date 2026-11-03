@@ -51,6 +51,8 @@ backend/                 FastAPI app and all processing
     settings.py          settings from RRMC_* environment variables (.env)
     errors.py            AppError and the API error format
     texts.py             Finnish texts of the backend (error messages)
+    image_files.py       receipt image file rules shared by import and review: signature,
+                         hash, free done name, the safe move
     logging_setup.py     logging to stdout and one log line per request
     storage/             SQLite connection, transactions, migrations/, repositories
     categorization/      catalog: names, rules, default list, routes
@@ -59,7 +61,8 @@ backend/                 FastAPI app and all processing
     health/              GET /api/health and loading the model at start
     calculation/         sums in integer cents: the receipt check, category subtotals, periods
                          and period totals
-    review/              receipt endpoints: list, receipt view, image, category choice, review state
+    review/              receipt endpoints: list, receipt view, image, category choice, review state,
+                         create and delete a receipt, the failed images
     totals/              GET /api/totals: category totals per week and month of a period
     export/              CSV downloads of a period's lines and totals behind the Exporter interface
     <subsystem>/         one package per feature subsystem (see Component map)
@@ -131,13 +134,15 @@ flowchart LR
 | **receipt-reading** | Preprocess the image, run OCR, turn the OCR text into a validated structured receipt (store, date, lines, total) with Finnish receipt rules; re-parse stored OCR text | Assign categories or write to the database | FR-6–FR-10 |
 | **categorization** | The catalog (groups, categories, products, name normalization, default list) and the assignment of a category to each line: remembered product first, then the model; record the category source; learn from user corrections | Calculate totals | FR-11–FR-15, FR-33–FR-39, FR-43 |
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
-| **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, the review state | Calculate sums or remember categories itself | FR-16–FR-21 (backend) |
+| **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
 | **export** | `GET /api/export/lines` and `/totals`: reads a period's lines and totals and builds the files through the exporter interface; the CSV exporter, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
-| **ui** | Pages: receipts list, receipt review (image beside an editable table), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, NFR-15 |
+| **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, NFR-15 |
 
 Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
-`texts.py`, `logging_setup.py`) belong to the foundation and are used by every subsystem.
+`texts.py`, `logging_setup.py`, `image_files.py`) belong to the foundation and are used by
+every subsystem. `image_files.py` holds the image file rules that import and review both
+need, because neither may depend on the other.
 The `health` package reports the state of the database, the image folders, OCR and the model
 ([api-reference.md](api-reference.md#get-apihealth)), and loads the model at start (FR-30).
 

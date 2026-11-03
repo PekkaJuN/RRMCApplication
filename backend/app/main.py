@@ -1,6 +1,6 @@
 """FastAPI application factory."""
 
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,6 +21,7 @@ from app.logging_setup import add_request_logging, configure_logging
 from app.receipt_import.routes import create_import_router
 from app.receipt_import.service import ImportService
 from app.receipt_reading.factory import create_reader
+from app.review.failed_images import FailedFolder
 from app.review.routes import create_review_router
 from app.settings import Settings, load_settings
 from app.storage.catalog_repository import CatalogRepository
@@ -36,12 +37,15 @@ def create_app(
     migrations_dir: Path = MIGRATIONS_DIR,
     import_service: ImportService | None = None,
     exporter: Exporter | None = None,
+    clock: Callable[[], datetime] | None = None,
+    failed_folder: FailedFolder | None = None,
 ) -> FastAPI:
     """Build the application.
 
-    `extra_routers`, `engines`, `migrations_dir`, `import_service` and `exporter` let tests
-    add test-only endpoints, fake servers, throwaway migrations, simulated file failures and
-    a fixed exporter; production passes none of them, and the engines then follow
+    `extra_routers`, `engines`, `migrations_dir`, `import_service`, `exporter`, `clock` and
+    `failed_folder` let tests add test-only endpoints, fake servers, throwaway migrations,
+    simulated file failures, a fixed exporter, a fixed time for new receipts and a failing
+    move of a failed image; production passes none of them, and the engines then follow
     `settings.engines`.
     """
     settings = settings or load_settings()
@@ -71,7 +75,7 @@ def create_app(
         settings, engines=engines, reader=create_reader(settings, engines)
     )
     app.include_router(create_import_router(import_service))
-    app.include_router(create_review_router(settings))
+    app.include_router(create_review_router(settings, clock, failed_folder))
     app.include_router(create_totals_router(settings))
     app.include_router(create_export_router(settings, exporter or CsvExporter()))
     for router in extra_routers:

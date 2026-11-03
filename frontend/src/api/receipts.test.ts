@@ -2,8 +2,10 @@ import { http, HttpResponse } from "msw";
 import { expect, it } from "vitest";
 import {
   DAIRY,
+  FAILED_IMAGES,
   RECEIPT_A,
   RECEIPT_A_LIMU_DAIRY,
+  RECEIPT_MANUAL,
   recordWrites,
   SUMMARY_A,
   SUMMARY_B,
@@ -11,9 +13,13 @@ import {
 import { server } from "../test/server";
 import {
   addLine,
+  createReceipt,
   deleteLine,
+  deleteReceipt,
   editLine,
   editReceipt,
+  failedImages,
+  failedImageUrl,
   getReceipt,
   listReceipts,
   receiptImageUrl,
@@ -135,4 +141,44 @@ it("line-editing AC29: edits the receipt fields with PATCH on the receipt", asyn
       body: { total_cents: 400, purchase_date: "2026-10-06" },
     },
   ]);
+});
+
+it("receipt-management AC7: creates a receipt with POST /api/receipts", async () => {
+  let body: unknown;
+  server.use(
+    http.post("/api/receipts", async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json(RECEIPT_MANUAL, { status: 201 });
+    }),
+  );
+  const fields = { store: "Testikauppa", purchase_date: "2026-10-05", total_cents: 349 };
+
+  expect(await createReceipt(fields)).toEqual({ ok: true, data: RECEIPT_MANUAL });
+  expect(body).toEqual(fields);
+});
+
+it("receipt-management AC1: deletes a receipt with DELETE /api/receipts/{id}", async () => {
+  let deleted = false;
+  server.use(
+    http.delete("/api/receipts/3", () => {
+      deleted = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+
+  expect(await deleteReceipt(3)).toEqual({ ok: true, data: undefined });
+  expect(deleted).toBe(true);
+});
+
+it("receipt-management AC16: lists the failed images", async () => {
+  server.use(
+    http.get("/api/failed-images", () => HttpResponse.json({ file_names: FAILED_IMAGES })),
+  );
+
+  expect(await failedImages()).toEqual({ ok: true, data: { file_names: FAILED_IMAGES } });
+});
+
+it("receipt-management AC30: the preview address of a failed image", () => {
+  expect(failedImageUrl("IMG_2.jpg")).toBe("/api/failed-images/image?name=IMG_2.jpg");
+  expect(failedImageUrl("kuva #1.jpg")).toBe("/api/failed-images/image?name=kuva%20%231.jpg");
 });

@@ -51,8 +51,9 @@ line linked to the product the category and source `remembered`. The rules are i
 [categorization](../categorization/README.md#rules).
 
 `ReceiptRepository(connection)` returns the frozen dataclass `ReceiptRow` (`id`,
-`image_hash`, `file_name`, `imported_at`, the read fields and `reviewed`). It has `add`
-(raises `sqlite3.IntegrityError` for an existing hash), `get`, `get_by_hash`, `delete` and
+`image_hash`, `file_name`, `imported_at`, the read fields and `reviewed`; `image_hash` and
+`file_name` are both `None` for a receipt typed in without an image). It has `add` (raises
+`sqlite3.IntegrityError` for an existing hash; takes `None` for both hash and name), `get`, `get_by_hash`, `delete` and
 `transaction()`. `summaries()` lists every receipt as `ReceiptSummaryRow` with the sum of its
 line amounts, computed in SQL, in the review list order (no date first, then newest date,
 then newest id); `set_reviewed(id, reviewed=...)` and `set_fields(id, store=...,
@@ -115,6 +116,11 @@ None yet.
   reads the schema, because `SELECT 1` would not notice a damaged file.
 - A migration file must not contain `BEGIN` or `COMMIT`; the runner wraps each file in its own
   transaction with its `schema_version` row.
+- The runner turns foreign keys off before each migration's `BEGIN` (the pragma does nothing
+  inside a transaction) and on again afterwards, also after a failure, and runs
+  `PRAGMA foreign_key_check` before the commit. Without this, the `DROP TABLE` of a table
+  rebuild would cascade-delete every row that references the table (migration `0006` rebuilds
+  `receipts`, whose lines reference it).
 - The database must stay in a Docker volume, not in a Windows folder
   ([ADR 0002](../../adr/0002-docker.md)).
 

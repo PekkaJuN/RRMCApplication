@@ -12,6 +12,7 @@ import {
   RECEIPT_A_LIMU_DAIRY,
   RECEIPT_A_MORE,
   RECEIPT_AC8,
+  RECEIPT_MANUAL,
   RECEIPT_OLD,
   recordWrites,
   type RecordedWrite,
@@ -716,4 +717,155 @@ it("styling AC1: the receipt page has no inline style", async () => {
 
   await lineRows();
   expect(container.querySelectorAll("[style]")).toHaveLength(0);
+});
+
+// Receipt management spec: delete a receipt and a receipt without an image.
+
+/** The receipt's own controls: the review button, the receipt delete and their messages. */
+function receiptControls(): HTMLElement {
+  const review = screen.getByRole("button", { name: /^(Vahvista|Peru vahvistus)$/ });
+  return review.parentElement!;
+}
+
+it("receipt-management AC25: deleting the receipt asks first, then opens the list", async () => {
+  answers(RECEIPT_A);
+  let deleted = false;
+  server.use(
+    http.delete("/api/receipts/3", () => {
+      deleted = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const onBack = vi.fn();
+  const user = userEvent.setup();
+  render(<ReceiptPage id={3} onBack={onBack} />);
+
+  await user.click(await screen.findByRole("button", { name: "Poista kuitti" }));
+  expect(screen.getByText("Poistetaanko?")).toBeInTheDocument();
+  await user.click(within(receiptControls()).getByRole("button", { name: "Poista" }));
+
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+  expect(deleted).toBe(true);
+});
+
+it("receipt-management AC26: cancelling the delete sends nothing", async () => {
+  answers(RECEIPT_A);
+  let deleted = false;
+  server.use(
+    http.delete("/api/receipts/3", () => {
+      deleted = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const onBack = vi.fn();
+  const user = userEvent.setup();
+  render(<ReceiptPage id={3} onBack={onBack} />);
+
+  await user.click(await screen.findByRole("button", { name: "Poista kuitti" }));
+  await user.click(within(receiptControls()).getByRole("button", { name: "Peruuta" }));
+
+  expect(screen.getByRole("button", { name: "Poista kuitti" })).toBeInTheDocument();
+  expect(deleted).toBe(false);
+  expect(onBack).not.toHaveBeenCalled();
+});
+
+it("receipt-management AC27: a reviewed receipt has no delete button until unconfirmed", async () => {
+  answers({ ...RECEIPT_A, reviewed: true });
+  server.use(http.patch("/api/receipts/3", () => HttpResponse.json(RECEIPT_A)));
+  const user = userEvent.setup();
+  render(<ReceiptPage id={3} onBack={() => {}} />);
+
+  await user.click(await screen.findByRole("button", { name: "Peru vahvistus" }));
+
+  expect(await screen.findByRole("button", { name: "Poista kuitti" })).toBeInTheDocument();
+});
+
+it("receipt-management AC27: no delete button on a reviewed receipt", async () => {
+  answers({ ...RECEIPT_A, reviewed: true });
+  render(<ReceiptPage id={3} onBack={() => {}} />);
+
+  expect(await screen.findByRole("button", { name: "Peru vahvistus" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Poista kuitti" })).toBeNull();
+});
+
+it.each([
+  [
+    "a refusal",
+    () =>
+      HttpResponse.json(
+        {
+          error: "receipt_reviewed",
+          message: "Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.",
+        },
+        { status: 409 },
+      ),
+    "Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.",
+  ],
+  ["a network error", () => HttpResponse.error(), "Taustapalveluun ei saada yhteyttä."],
+])("receipt-management AC28: %s keeps the page and shows the message", async (_, answer, text) => {
+  answers(RECEIPT_A);
+  server.use(http.delete("/api/receipts/3", answer));
+  const onBack = vi.fn();
+  const user = userEvent.setup();
+  render(<ReceiptPage id={3} onBack={onBack} />);
+
+  await user.click(await screen.findByRole("button", { name: "Poista kuitti" }));
+  await user.click(within(receiptControls()).getByRole("button", { name: "Poista" }));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(text);
+  expect(receiptControls()).toContainElement(alert);
+  expect(onBack).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Kauppa")).toHaveValue("Testikauppa");
+});
+
+it("receipt-management AC29: a receipt without an image shows a text and asks for no image", async () => {
+  answers(RECEIPT_MANUAL);
+  let imageAsked = false;
+  server.use(
+    http.get("/api/receipts/7/image", () => {
+      imageAsked = true;
+      return new HttpResponse(null, { status: 404 });
+    }),
+  );
+  render(<ReceiptPage id={7} onBack={() => {}} />);
+
+  expect(await screen.findByText("Ei kuvaa.")).toBeInTheDocument();
+  expect(screen.queryByRole("img")).toBeNull();
+  expect(imageAsked).toBe(false);
+});
+
+it("receipt-management AC37: the delete button is disabled while the delete runs", async () => {
+  answers(RECEIPT_A);
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let deletes = 0;
+  server.use(
+    http.delete("/api/receipts/3", async () => {
+      deletes += 1;
+      await held;
+      return HttpResponse.json(
+        {
+          error: "receipt_reviewed",
+          message: "Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.",
+        },
+        { status: 409 },
+      );
+    }),
+  );
+  const user = userEvent.setup();
+  render(<ReceiptPage id={3} onBack={() => {}} />);
+
+  await user.click(await screen.findByRole("button", { name: "Poista kuitti" }));
+  await user.click(within(receiptControls()).getByRole("button", { name: "Poista" }));
+
+  await waitFor(() => expect(deletes).toBe(1));
+  const button = screen.getByRole("button", { name: "Poista kuitti" });
+  expect(button).toBeDisabled();
+  release();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Vahvistettua kuittia");
+  expect(button).toBeEnabled();
+  expect(deletes).toBe(1);
 });

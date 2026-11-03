@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from app.engines.model import ModelUnavailableError
-from app.receipt_import.files import LocalFileStore, image_identifier
+from app.image_files import image_identifier
+from app.receipt_import.files import LocalFileStore
 from app.receipt_import.run import FileResult, ImportFolders, process_file
 from app.receipt_reading.fake import FakeReceiptReader
 from app.storage.catalog_repository import CatalogRepository

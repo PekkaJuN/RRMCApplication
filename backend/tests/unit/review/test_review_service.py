@@ -12,15 +12,22 @@ from app.categorization.errors import (
     UnknownCategoryError,
 )
 from app.categorization.names import normalize_key
+from app.image_files import image_identifier
 from app.review.errors import (
     DepositRefundAmountError,
+    DuplicateImageError,
+    ImageMoveFailedError,
     InvalidAmountError,
     InvalidDateError,
     InvalidStoreError,
+    NoImageError,
+    ReceiptReviewedError,
 )
+from app.review.failed_images import FailedFolder
 from app.review.service import (
     LineEdit,
     LineView,
+    NewReceipt,
     ReceiptEdit,
     ReceiptSummary,
     ReceiptView,
@@ -28,7 +35,8 @@ from app.review.service import (
     SubtotalView,
 )
 from app.storage.catalog_repository import CatalogRepository
-from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository
+from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository, ReceiptRow
+from tests.receipt_import_data import jpeg, png
 
 TIME = "2026-10-28T10:00:01Z"
 
@@ -294,6 +302,18 @@ def test_ac10_image_of_a_receipt(
     (tmp_path / "kuitti.jpg").write_bytes(b"\xff\xd8\xff\xe0synthetic")
 
     assert service.image(receipt_id, tmp_path) == (b"\xff\xd8\xff\xe0synthetic", "image/jpeg")
+
+
+def test_ac13_image_of_a_receipt_without_one(
+    service: ReviewService, receipts: ReceiptRepository, tmp_path: Path
+) -> None:
+    # Given a manual receipt without an image
+    with receipts.transaction():
+        manual = receipts.add(None, None, TIME, store="", purchase_date="2026-10-05", total_cents=0)
+
+    # When its image is asked for, then the answer is NoImageError
+    with pytest.raises(NoImageError):
+        service.image(manual.id, tmp_path)
 
 
 # Line editing spec: names and amounts (T8).
@@ -856,3 +876,197 @@ def test_ac23_category_id_out_of_range_is_unknown(
         service.edit_line(a, soda, LineEdit(name="Vesi", category_id=bad))
 
     assert snapshot(db) == before
+
+
+# Receipt management spec: delete a receipt (T6).
+
+
+def test_ac1_delete_an_unreviewed_receipt(
+    service: ReviewService, catalog: CatalogRepository, receipts: ReceiptRepository
+) -> None:
+    # Given receipt A and reviewed receipt R
+    a, _ = receipt_a(catalog, receipts)
+    r, r_lines = add_receipt(receipts, [("Maito", 125, None)], number=2)
+    receipts.set_reviewed(r, reviewed=True)
+    products = catalog.list_products()
+
+    # When A is deleted
+    service.delete_receipt(a)
+
+    # Then A and its lines are gone; R, its lines and the products are unchanged
+    assert receipts.get(a) is None
+    assert receipts.lines(a) == []
+    assert [summary.id for summary in service.summaries()] == [r]
+    assert [line.id for line in receipts.lines(r)] == r_lines
+    assert catalog.list_products() == products
+
+
+def test_ac3_reviewed_receipt_cannot_be_deleted(
+    service: ReviewService, receipts: ReceiptRepository
+) -> None:
+    r, lines = add_receipt(receipts, [("Maito", 125, None)])
+    receipts.set_reviewed(r, reviewed=True)
+
+    with pytest.raises(ReceiptReviewedError):
+        service.delete_receipt(r)
+
+    assert receipts.get(r) is not None
+    assert [line.id for line in receipts.lines(r)] == lines
+
+
+def test_ac5_delete_an_unknown_receipt(service: ReviewService) -> None:
+    with pytest.raises(NotFoundError):
+        service.delete_receipt(999)
+    with pytest.raises(NotFoundError):
+        service.delete_receipt(2**63)
+
+
+# Receipt management spec: create a receipt without an image (T9).
+
+NOW = datetime(2026, 11, 2, 10, 0, 0, 123456, tzinfo=UTC)
+
+
+def test_ac7_create_a_manual_receipt_without_an_image(
+    service: ReviewService, receipts: ReceiptRepository
+) -> None:
+    view = service.create_receipt(
+        NewReceipt(store="  Testi   kauppa ", purchase_date="2026-10-05", total_cents=349), NOW
+    )
+
+    assert (view.store, view.purchase_date, view.total_cents) == ("Testi kauppa", "2026-10-05", 349)
+    assert (view.file_name, view.imported_at, view.reviewed) == (
+        None,
+        "2026-11-02T10:00:00Z",
+        False,
+    )
+    assert (view.lines, view.line_sum_cents, view.difference_cents, view.warning) == (
+        [],
+        0,
+        349,
+        True,
+    )
+    row = receipts.get(view.id)
+    assert row is not None
+    assert (row.image_hash, row.ocr_text) == (None, None)
+
+
+def test_ac8_empty_store_and_zero_total(service: ReviewService) -> None:
+    view = service.create_receipt(
+        NewReceipt(store="", purchase_date="2026-10-05", total_cents=0), NOW
+    )
+
+    assert (view.store, view.total_cents, view.warning) == ("", 0, False)
+
+
+@pytest.mark.parametrize(
+    ("new", "error"),
+    [
+        (NewReceipt(store="x" * 101, purchase_date="2026-10-05", total_cents=1), InvalidStoreError),
+        (NewReceipt(store="", purchase_date="2026-02-30", total_cents=1), InvalidDateError),
+        (NewReceipt(store="", purchase_date="5.10.2026", total_cents=1), InvalidDateError),
+        (NewReceipt(store="", purchase_date="2026-10-05", total_cents=-1), InvalidAmountError),
+        (
+            NewReceipt(store="", purchase_date="2026-10-05", total_cents=100_000_000),
+            InvalidAmountError,
+        ),
+    ],
+)
+def test_ac9_invalid_fields_create_nothing(
+    service: ReviewService, new: NewReceipt, error: type[Exception]
+) -> None:
+    with pytest.raises(error):
+        service.create_receipt(new, NOW)
+
+    assert service.summaries() == []
+
+
+# Receipt management spec: create a receipt with an image (T15).
+
+
+@pytest.fixture
+def failed(tmp_path: Path) -> FailedFolder:
+    """Folder F with b.png and IMG_2.jpg (synthetic), and an empty done folder."""
+    failed_dir, done_dir = tmp_path / "import_failed", tmp_path / "import_done"
+    failed_dir.mkdir()
+    done_dir.mkdir()
+    (failed_dir / "b.png").write_bytes(png("b"))
+    (failed_dir / "IMG_2.jpg").write_bytes(jpeg("img2"))
+    return FailedFolder(failed_dir, done_dir)
+
+
+def with_image(name: str) -> NewReceipt:
+    return NewReceipt(
+        store="Testikauppa", purchase_date="2026-10-05", total_cents=349, image_file_name=name
+    )
+
+
+def test_ac20_create_a_manual_receipt_with_an_image(
+    service: ReviewService, receipts: ReceiptRepository, failed: FailedFolder, tmp_path: Path
+) -> None:
+    view = service.create_receipt(with_image("IMG_2.jpg"), NOW, failed)
+
+    assert view.file_name == "IMG_2.jpg"
+    row = receipts.get(view.id)
+    assert row is not None
+    assert row.image_hash == image_identifier(jpeg("img2"))
+    assert (tmp_path / "import_done" / "IMG_2.jpg").read_bytes() == jpeg("img2")
+    assert not (tmp_path / "import_failed" / "IMG_2.jpg").exists()
+
+
+def test_ac9_invalid_field_leaves_the_image_in_place(
+    service: ReviewService, failed: FailedFolder, tmp_path: Path
+) -> None:
+    new = NewReceipt(store="", purchase_date="2026-02-30", total_cents=1, image_file_name="b.png")
+
+    with pytest.raises(InvalidDateError):
+        service.create_receipt(new, NOW, failed)
+
+    assert (tmp_path / "import_failed" / "b.png").exists()
+    assert service.summaries() == []
+
+
+def test_ac22_image_already_in_a_receipt(
+    service: ReviewService, receipts: ReceiptRepository, failed: FailedFolder, tmp_path: Path
+) -> None:
+    with receipts.transaction():
+        receipts.add(image_identifier(png("b")), "a.png", TIME)
+
+    with pytest.raises(DuplicateImageError):
+        service.create_receipt(with_image("b.png"), NOW, failed)
+
+    assert (tmp_path / "import_failed" / "b.png").exists()
+    assert len(service.summaries()) == 1
+
+
+def test_ac22_hash_taken_meanwhile_is_a_duplicate(
+    db: sqlite3.Connection, catalog: CatalogRepository, failed: FailedFolder, tmp_path: Path
+) -> None:
+    # Given an import that stores the same image between the check and the commit
+    class RacingRepository(ReceiptRepository):
+        def get_by_hash(self, image_hash: str) -> ReceiptRow | None:
+            found = super().get_by_hash(image_hash)
+            with self.transaction():
+                super().add(image_hash, "other.png", TIME)
+            return found
+
+    racing = ReviewService(catalog, RacingRepository(db))
+
+    with pytest.raises(DuplicateImageError):
+        racing.create_receipt(with_image("b.png"), NOW, failed)
+
+    assert (tmp_path / "import_failed" / "b.png").exists()
+
+
+def test_ac24_move_fails(
+    service: ReviewService, receipts: ReceiptRepository, tmp_path: Path, failed: FailedFolder
+) -> None:
+    def failing_move(source: Path, target: Path) -> None:
+        raise OSError("simulated")
+
+    folder = FailedFolder(tmp_path / "import_failed", tmp_path / "import_done", failing_move)
+
+    with pytest.raises(ImageMoveFailedError):
+        service.create_receipt(with_image("b.png"), NOW, folder)
+
+    assert service.summaries() == []
+    assert (tmp_path / "import_failed" / "b.png").exists()

@@ -2,6 +2,20 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-03: A failed image name with a NUL character gave a server error
+
+- **Context:** receipt-management audit (T26), failed images preview and manual receipts.
+- **Symptom:** `GET /api/failed-images/image?name=a%00.jpg`, or the same name as
+  `image_file_name` in `POST /api/receipts`, answered 500 `internal_error` instead of
+  `image_not_found`.
+- **Root cause:** the name passed the name and suffix checks, and `Path.resolve()` raises
+  `ValueError` ("embedded null character"), not `OSError`, which was the only error caught.
+- **Solution:** `FailedFolder._path` catches `ValueError` too
+  (@backend/app/review/failed_images.py); regression cases `a\x00.jpg` in the AC19 and AC23
+  tests.
+- **Prevention:** test a path built from a request with a NUL character as well as with
+  `..` and path separators.
+
 ## 2026-11-02: A line's delete button was out of sight on the receipt page
 
 - **Context:** Using the receipt page on a wide window (line editing, styling specs).

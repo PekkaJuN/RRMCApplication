@@ -102,6 +102,10 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   its columns and totals in calculation, the totals package and `GET /api/totals`, and the
   Yhteenveto page. The totals, calculation, storage, UI, API, architecture and glossary docs
   describe it.
+- The receipt deletion and manual receipts spec is Done (audited 2026-11-03): delete an
+  unreviewed receipt, type in a receipt with an optional failed image, migration 0006. The
+  API, data model, architecture, review, storage, import, UI, development and glossary docs
+  describe it.
 - `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals and export terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.

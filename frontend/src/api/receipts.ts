@@ -36,7 +36,8 @@ export interface Subtotal {
 /** Mirrors the backend schema of GET /api/receipts/{id}. The backend computes the sums. */
 export interface Receipt {
   id: number;
-  file_name: string;
+  /** Null for a receipt typed in without an image (receipt-management PC6). */
+  file_name: string | null;
   imported_at: string;
   store: string | null;
   purchase_date: string | null;
@@ -115,4 +116,35 @@ export function setReviewed(id: number, reviewed: boolean): Promise<ApiResult<Re
 
 export function receiptImageUrl(id: number): string {
   return `/api/receipts/${id}/image`;
+}
+
+/** A receipt to type in; leave `image_file_name` out for no image (receipt-management PC3). */
+export interface NewReceipt {
+  store: string;
+  purchase_date: string;
+  total_cents: number;
+  image_file_name?: string;
+}
+
+export function createReceipt(receipt: NewReceipt): Promise<ApiResult<Receipt>> {
+  return apiPost<Receipt>("/api/receipts", receipt);
+}
+
+/** Deletes an unreviewed receipt and its lines (receipt-management PC1). */
+export function deleteReceipt(id: number): Promise<ApiResult<undefined>> {
+  return apiDelete(`/api/receipts/${id}`);
+}
+
+/** Mirrors GET /api/failed-images. */
+export interface FailedImages {
+  file_names: string[];
+}
+
+export function failedImages(): Promise<ApiResult<FailedImages>> {
+  return apiGet<FailedImages>("/api/failed-images");
+}
+
+/** The name goes in the query string, which the backend never logs (receipt-management PC8). */
+export function failedImageUrl(name: string): string {
+  return `/api/failed-images/image?name=${encodeURIComponent(name)}`;
 }
