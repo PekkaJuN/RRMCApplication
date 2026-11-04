@@ -1,7 +1,7 @@
 # Project Description
 
-- **Status:** In Progress (no source code yet)
-- **Updated:** 2026-10-22
+- **Status:** Done (MVP implemented)
+- **Updated:** 2026-11-04
 
 ## Overview
 
@@ -36,7 +36,7 @@ starting a local app. There are no accounts, no login and no per-person buyer in
 | Folder import | Copy images into the import folder and press a button. Each image is read once; duplicates are skipped, imported images move to a done folder and failed ones to a failed folder. | FR-1–FR-5, FR-45 |
 | Receipt reading | Store, date, lines and total read from the image with local OCR and a local language model, following Finnish receipt conventions. | FR-6–FR-10 |
 | Categorization that learns | Each line gets a category: a product corrected before keeps its category, other lines get a suggestion from the model. | FR-11–FR-15 |
-| Review | The receipt image beside an editable table of its lines, with a warning when the lines do not add up to the receipt total. | FR-16–FR-21, FR-43 |
+| Review | The receipt image beside an editable table of its lines, with a warning when the lines do not add up to the receipt total. An unreviewed receipt can be deleted, and a receipt can be typed in by hand. | FR-16–FR-21, FR-43, FR-46, FR-47 |
 | Products and categories | Manage the product list and the categories, which can be grouped (e.g. Ruoka, Auto). | FR-33–FR-39 |
 | Totals | Spending per category and group, per ISO week and per month, by purchase date. | FR-22–FR-25, FR-44 |
 | Export | CSV export of lines and totals; Google Sheets in a later release. | FR-26–FR-28 |
@@ -80,8 +80,8 @@ integration, and cloud OCR or cloud models. See [PRD non-goals](../specs/PRD.md#
 
 ## Subsystems
 
-See the [component map in architecture.md](architecture.md#component-map). Subsystem docs are
-not written yet.
+See the [component map in architecture.md](architecture.md#component-map) and the
+[subsystem list](architecture.md#subsystems).
 
 ## Related Documents
 

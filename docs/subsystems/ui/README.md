@@ -18,7 +18,7 @@ a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` 
 `/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
 `/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, any other path → Tuotteet. `usePage()` returns the page, `go(page,
 receiptId?)` and the open receipt's id. The navigation links are real links (`/`, `/tuonti`,
-`/kuitit`), and so are the date links of the list and the back link of a receipt; a plain
+`/kuitit`, `/yhteenveto`), and so are the date links of the list and the back link of a receipt; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
 has `aria-current="page"` (Kuitit also on a receipt), the back button works, and a reload
 keeps the page because Vite answers every path with `index.html`.
@@ -72,7 +72,8 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/imports.ts — `getImport()`, `startImport()` and the `ImportState` type
 - @frontend/src/api/receipts.ts — `listReceipts()`, `getReceipt()`, `editLine()`,
   `addLine()`, `deleteLine()`, `editReceipt()`, `setLineCategory()`, `setReviewed()`,
-  `receiptImageUrl()` and the receipt types
+  `receiptImageUrl()`, `createReceipt()`, `deleteReceipt()`, `failedImages()`,
+  `failedImageUrl()` and the receipt types
 - @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator),
   `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `formatDayMonth()`
   (`2026-10-01` → `1.10.`), `parseCents()` (`1,25` or
@@ -94,8 +95,8 @@ proxy answers that way when the backend is down), gives code `network_error` wit
 On the Tuotteet page, each action keeps its own error and shows the backend's `message`
 beside the item or form that caused it (`role="alert"`); the lists stay as they were. A list
 that cannot be loaded shows its error at the top of the page; "Lisää ensin kategoria." is
-shown only after the categories loaded and there were none. A filter or an add-form choice
-whose item was deleted, or turned into a group, falls back to no choice.
+shown only after the categories loaded and there were none. A filter whose item was deleted,
+or an add-form choice whose item was deleted or turned into a group, falls back to no choice.
 
 The status line shows one text per failing check, in this order: model, OCR, folders,
 database; `Kaikki palvelut toiminnassa` when all are `ok`; and the error message when the
@@ -117,7 +118,8 @@ On the Kuitit page the list is loaded when the page opens; missing date, store a
 show `–`. A list that cannot be loaded shows the error with `role="alert"`.
 
 The `Uusi kuitti` button above the list opens the new receipt form (receipt-management
-PC11). The form loads the failed images when it opens; the `Kuva` select offers `Ei kuvaa`
+PC11). The form loads the failed images when it opens, and a failed load shows its error beside
+the select; the `Kuva` select offers `Ei kuvaa`
 and then each failed image, and a chosen image shows its preview (`Valittu kuva`) from
 `/api/failed-images/image?name=...`, or `Kuvaa ei voitu näyttää.` when it does not load. An
 empty date or an unreadable total is refused without a request. A failed create keeps every
@@ -190,6 +192,7 @@ system font, so the UI loads nothing from another host.
 
 - **Custom properties** on `:root` hold every color, space, the radius, the content width
   and the font: `--color-text`, `--color-muted`, `--color-bg`, `--color-surface`,
+  `--color-surface-hover`,
   `--color-border`, `--color-line`, `--color-accent`, the error and notice colors,
   `--space-1` to `--space-4`, `--radius`, `--content-width`, `--font`. Every text color
   meets WCAG AA (4.5:1) on its background; the ratios are in the spec's Plan P1.
@@ -205,6 +208,8 @@ system font, so the UI loads nothing from another host.
   | `button` | the download links | The button look |
   | `row-group`, `row-category`, `row-total` | totals table rows | Bold group and total rows; categories indented under the group name (the toggle has a fixed width) |
   | `receipt-columns`, `receipt-image`, `receipt-lines` | receipt page | Side by side from 900 px, stacked below |
+  | `confirm-delete` | a line's delete confirmation | Keeps the question and its buttons on one row |
+  | `new-receipt-preview` | new receipt form | Keeps the preview small, so the form's buttons stay in sight |
 
 - `main` is at most 1200 px wide and centred; the header wraps on a narrow window.
 - The input rule's `font` shorthand resets `font-variant-numeric`, so `input.amount` comes
@@ -258,6 +263,8 @@ None yet.
 - [Receipt import spec](../../../specs/features/receipt-import.md) PC11
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
+- [Line editing spec](../../../specs/features/line-editing.md)
+- [Receipt deletion and manual receipts spec](../../../specs/features/receipt-management.md) PC11
 - [Category totals spec](../../../specs/features/totals.md) PC4–PC7
 - [CSV export spec](../../../specs/features/csv-export.md) PC6
 - [Visual style and accessibility spec](../../../specs/features/styling.md)

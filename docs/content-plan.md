@@ -12,14 +12,14 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-11-02
+Last reviewed: 2026-11-04
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 9 | 0 | 8 | 0 | 1 |
-| 2 Subsystems | 9 | 0 | 8 | 0 | 1 |
+| 1 Architecture | 9 | 3 | 5 | 0 | 1 |
+| 2 Subsystems | 9 | 9 | 0 | 0 | 0 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -27,9 +27,9 @@ Last reviewed: 2026-11-02
 | Order | Doc | Path | Purpose | Depends on | Status |
 |------:|-----|------|---------|------------|--------|
 | 1 | Docs index | `docs/README.md` | Entry point; links to every Tier 1 doc and subsystem | none | Not Started |
-| 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | In Progress |
-| 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | In Progress |
-| 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | In Progress |
+| 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | Done |
+| 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | Done |
+| 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | Done |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
@@ -49,19 +49,19 @@ Create only when the trigger applies. When one is started, move it into the tabl
 
 ## Tier 2: Subsystems (`docs/subsystems/<name>/README.md`)
 
-Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Progress`. Subsystem names are provisional until the architecture is written.
+Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Progress`.
 
 | Order | Subsystem | Path | Purpose | Depends on | Status |
 |------:|-----------|------|---------|------------|--------|
-| 9 | Storage | [docs/subsystems/storage/README.md](subsystems/storage/README.md) | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | In Progress |
-| 10 | Import | [docs/subsystems/import/README.md](subsystems/import/README.md) | Import runs: read images from the import folder, detect duplicates by image hash, move files to the done or failed folder; the reading step comes with its spec | 4, 9 | In Progress |
-| 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | In Progress |
-| 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | In Progress |
-| 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | In Progress |
-| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines` and `/totals`: CSV files of a period behind the exporter interface; Google Sheets later | 4, 13, 18 | In Progress |
-| 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | In Progress |
-| 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, review state | 6, 9, 12, 13 | In Progress |
-| 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | In Progress |
+| 9 | Storage | [docs/subsystems/storage/README.md](subsystems/storage/README.md) | SQLite schema access: categories, product mappings, receipts, lines | 3, 4 | Done |
+| 10 | Import | [docs/subsystems/import/README.md](subsystems/import/README.md) | Import runs: read images from the import folder, detect duplicates by image hash, move files to the done or failed folder, with the reading step | 4, 9 | Done |
+| 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Done |
+| 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | Done |
+| 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | Done |
+| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines` and `/totals`: CSV files of a period behind the exporter interface; Google Sheets later | 4, 13, 18 | Done |
+| 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
+| 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
+| 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | Done |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
@@ -96,12 +96,14 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   added and deleted lines, the store, date and total, FR-43, strict bodies and id bounds.
   The review, categorization, storage, UI, data model, API and architecture docs describe
   it.
-- Storage, categorization, import, receipt-reading and UI docs describe what is implemented;
-  their later feature specs complete them.
 - The category totals spec is Done (audited 2026-11-02): the period,
   its columns and totals in calculation, the totals package and `GET /api/totals`, and the
   Yhteenveto page. The totals, calculation, storage, UI, API, architecture and glossary docs
   describe it.
+- The CSV export spec is Done (audited 2026-11-02): the export package and the export
+  links on the Yhteenveto page. The export, totals, UI, API and glossary docs describe it.
+- The visual style and accessibility spec is Done (audited 2026-11-02): the stylesheet and
+  the axe check. The UI and development docs describe it.
 - The receipt deletion and manual receipts spec is Done (audited 2026-11-03): delete an
   unreviewed receipt, type in a receipt with an optional failed image, migration 0006. The
   API, data model, architecture, review, storage, import, UI, development and glossary docs
@@ -109,7 +111,8 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals and export terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
-- Subsystem boundaries are defined in [architecture.md](architecture.md#component-map) (In Progress: target design for the feature subsystems, open points marked `[NEEDS CLARIFICATION]`).
+- Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
+- Docs scanned against the code on 2026-11-04. Three stay In Progress: `api-reference.md` (an id outside SQLite's integer range on the catalog endpoints may give 500 instead of `not_found`; check it with a test), `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
 
 ## Related documents
 

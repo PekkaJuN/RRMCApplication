@@ -12,8 +12,9 @@ This file holds the rules that apply to every task. Detailed workflows live in s
   and total the categories per ISO week and per month. The user corrects categories in a UI,
   and corrections are remembered.
 - **Users:** one person, on their own computer. Single-user, local-only.
-- **Status:** foundation in place (containers, settings, database migrations, health
-  endpoint, app shell); no feature code yet. See [Greenfield rule](#greenfield-rule).
+- **Status:** MVP features implemented and audited (see [specs/README.md](specs/README.md)).
+  Later releases are planned in the [PRD](specs/PRD.md#9-releases). See
+  [Greenfield rule](#greenfield-rule).
 
 ### Stack (decided)
 
@@ -130,7 +131,8 @@ These apply to all code. Specs may add rules but not contradict these.
 
 ## Greenfield rule
 
-Until code exists, the documentation rules below describe the **target** design.
+The docs describe what exists. Where code does not exist yet, such as the Google Sheets
+export, the documentation rules below describe the **target** design.
 Working in an undocumented area is allowed when an approved spec covers it.
 The spec's "Files to Modify" lists the docs to create alongside the code.
 
@@ -203,8 +205,9 @@ Do not loop more than three times without asking the user.
 | Feature specs | `specs/features/<feature>.md`, index in `specs/README.md` |
 | Fixed errors | `docs/learnings.md` |
 
-Subsystems (provisional until `docs/architecture.md` exists): **import**, **receipt-reading**
-(preprocessing, OCR, parsing), **categorization**, **calculation**, **storage**, **export**, **ui**.
+Subsystems ([docs/architecture.md](docs/architecture.md#subsystems)): **import**,
+**receipt-reading** (preprocessing, OCR, parsing), **categorization**, **calculation**,
+**review**, **totals**, **storage**, **export**, **ui**.
 
 Rules:
 

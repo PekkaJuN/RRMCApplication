@@ -1,8 +1,8 @@
 # API Reference
 
 - **Status:** In Progress (health, catalog, import, receipt, line editing, totals and export
-  endpoints)
-- **Updated:** 2026-11-02
+  endpoints; an out-of-range id on the catalog endpoints is still to be checked)
+- **Updated:** 2026-11-04
 
 ## Overview
 
@@ -18,7 +18,8 @@ bodies are never logged.
 
 ## Error format
 
-Every error response has this body:
+Every error response from the app has this body (a 405 for a wrong method is FastAPI's
+default `{"detail": ...}`):
 
 ```json
 {"error": "<code>", "message": "<Finnish text for the user>"}
@@ -183,8 +184,8 @@ memory, so it is `idle` again after a backend restart.
 | 503 | `ocr_unavailable` | `Tekstintunnistus ei ole käytettävissä.` | Tesseract with `fin` and `eng` cannot run |
 | 503 | `model_unavailable` | `Kielimalli ei ole käytettävissä. Käynnistä Ollama ja tarkista mallin nimi.` | Ollama does not answer, does not have `RRMC_MODEL`, or `RRMC_MODEL` is a cloud model |
 
-The checks run in that order: folders, OCR, model. A start refused by any of them processes
-nothing.
+The checks run in that order: folders, OCR, model. The import folder is then listed, which
+can also give `folders_unavailable`. A start refused by any of them processes nothing.
 
 #### Failure reasons
 
@@ -292,7 +293,7 @@ A **receipt**:
 | Field | Meaning |
 |---|---|
 | `file_name` | The image's name in the done folder; `null` for a receipt typed in without an image |
-| `store`, `purchase_date`, `total_cents` | `null` for a receipt imported before reading existed; `store` is `""` when the model found none |
+| `store`, `purchase_date`, `total_cents` | `null` for a receipt imported before reading existed; `purchase_date` is also `null` when the model's date is not a real date; `store` is `""` when the model found none |
 | `lines` | In printed order. `category_source` is `remembered`, `model`, `user` or `null` (FR-15); `group_name` is `null` for a category without a group |
 | `line_sum_cents` | Sum of every line amount, deposit refunds included |
 | `difference_cents` | `total_cents` minus `line_sum_cents`; `null` without a total |
@@ -308,7 +309,7 @@ The OCR text is not returned.
 | 409 | `receipt_reviewed` | `Vahvistettua kuittia ei voi poistaa. Peru vahvistus ensin.` | Delete of a reviewed receipt |
 | 409 | `duplicate_image` | `Kuva on jo tuotu toiseen kuittiin.` | The chosen image is already some receipt's image |
 | 422 | `image_not_found` | `Kuvaa ei löydy epäonnistuneiden kansiosta.` | The chosen name is not a failed image: missing, a path, a folder, another suffix, or unreadable |
-| 422 | `unsupported_format` | `Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa.` | The chosen file has neither the JPEG nor the PNG signature |
+| 422 | `unsupported_format` | `Tiedostomuotoa ei tueta. Käytä JPEG- tai PNG-kuvaa.` | The chosen file is not a JPEG or PNG: its extension and its signature must agree |
 | 503 | `image_move_failed` | `Kuvaa ei voitu siirtää valmiiden kansioon. Kuittia ei luotu.` | The file could not move to the done folder, or the done folder cannot be listed; no receipt was created |
 | 422 | `invalid_amount` | `Summa ei kelpaa.` | A line amount or total outside its range |
 | 422 | `deposit_refund_amount` | `Pantinpalautuksen summan on oltava negatiivinen.` | A deposit refund whose resulting amount is 0 or more |

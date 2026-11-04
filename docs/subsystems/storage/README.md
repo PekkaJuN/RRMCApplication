@@ -23,12 +23,13 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
   their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
   `lines`, `get_line`, `set_line_category`, `update_line`, `next_position`, `delete_line`,
-  `get`, `get_by_hash`, `summaries`, `set_reviewed`, `set_fields`, `delete`)
+  `get`, `get_by_hash`, `summaries`, `set_reviewed`, `set_fields`, `delete`, `dated_lines`,
+  `export_lines`, `count_unreviewed`, `count_undated`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
   (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`,
-  `0004_line_categories.sql`, `0005_receipt_review.sql`)
+  `0004_line_categories.sql`, `0005_receipt_review.sql`, `0006_manual_receipts.sql`)
 
 ## Interfaces
 
@@ -88,7 +89,8 @@ line without a category, or a category without a group, has `None` names.
    the container.
 2. The app's lifespan calls `migrate_database` again; with nothing pending it applies nothing.
 3. `GET /api/health` calls `is_available` on each request.
-4. Each catalog request opens its own connection and closes it after the response.
+4. Each catalog, review, totals and export request opens its own connection and closes it
+   after the response.
 5. An import run opens one connection in its background thread and closes it when the run
    ends.
 
@@ -132,3 +134,4 @@ None yet.
 - [Receipt import spec](../../../specs/features/receipt-import.md)
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md)
 - [Categorization spec](../../../specs/features/categorization.md): migration 0004
+- [Receipt deletion and manual receipts spec](../../../specs/features/receipt-management.md): migration 0006

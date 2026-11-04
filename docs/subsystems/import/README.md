@@ -40,9 +40,9 @@ The package is called `receipt_import` because `import` is a Python keyword.
 
 | Function or class | Purpose |
 |---|---|
-| `ImportService.start()` | Checks the folders, lists the import folder, starts the run in a background thread and returns its first state. Raises `ImportRunningError` (409) or `FoldersUnavailableError` (503) |
+| `ImportService.start()` | Checks the folders, OCR and the model, lists the import folder, starts the run in a background thread and returns its first state. Raises `ImportRunningError` (409), `FoldersUnavailableError`, `OcrNotReadyError` or `ModelNotReadyError` (503) |
 | `ImportService.state()` | A copy of the current or latest run state (`idle`, `running`, `finished`) |
-| `process_file(path, store=, repository=, folders=, now=)` | Imports one file and returns `imported`, `duplicate`, or `failed` with a reason |
+| `process_file(path, store=, repository=, folders=, reader=, categorizer=, now=)` | Imports one file and returns `imported`, `duplicate`, or `failed` with a reason |
 | `FileStore` | `list_files`, `read_bytes`, `names_in`, `move`; tests replace it to simulate failing disks |
 
 The endpoints, the state fields and the error codes are in
