@@ -346,6 +346,6 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [Visual style and accessibility spec](../specs/features/styling.md)
 - [Receipt deletion and manual receipts spec](../specs/features/receipt-management.md)
 - [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),
-  [development.md](development.md)
+  [development.md](development.md), [security.md](security.md)
 - [AGENTS.md](../AGENTS.md): development rules and stack
 - [Content plan](content-plan.md): documentation index

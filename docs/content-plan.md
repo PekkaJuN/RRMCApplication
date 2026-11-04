@@ -18,7 +18,7 @@ Last reviewed: 2026-11-04
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 9 | 4 | 4 | 0 | 1 |
+| 1 Architecture | 10 | 6 | 4 | 0 | 0 |
 | 2 Subsystems | 9 | 9 | 0 | 0 | 0 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
@@ -26,7 +26,7 @@ Last reviewed: 2026-11-04
 
 | Order | Doc | Path | Purpose | Depends on | Status |
 |------:|-----|------|---------|------------|--------|
-| 1 | Docs index | `docs/README.md` | Entry point; links to every Tier 1 doc and subsystem | none | Not Started |
+| 1 | Docs index | [docs/README.md](README.md) | Entry point; links to every Tier 1 doc and subsystem | none | Done |
 | 2 | Project Description (required) | [docs/projectdescription.md](projectdescription.md) | Purpose, target users, key features, business domain | 1 | Done |
 | 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | Done |
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | Done |
@@ -35,6 +35,7 @@ Last reviewed: 2026-11-04
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
+| 19 | Security | [docs/security.md](security.md) | Stored data, protection and known limits | 3, 5, 6 | Done |
 
 ### Optional Tier 1 docs (not yet planned)
 
@@ -42,7 +43,6 @@ Create only when the trigger applies. When one is started, move it into the tabl
 
 | Doc | Path | Purpose | Create when |
 |-----|------|---------|-------------|
-| Security | `docs/security.md` | Auth flow, authorization, data protection | Auth, accounts or stored personal data exist |
 | Deployment | `docs/deployment.md` | Environments, CI/CD, infrastructure | The app is deployed or CI exists |
 | Integration Guide | `docs/integration.md` | External services, third-party APIs | The app calls an external service |
 | Features & Use Cases | `docs/features.md` | Feature inventory, use case documentation | Features outgrow `projectdescription.md` |
@@ -108,14 +108,14 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   unreviewed receipt, type in a receipt with an optional failed image, migration 0006. The
   API, data model, architecture, review, storage, import, UI, development and glossary docs
   describe it.
-- `docs/README.md` is not written yet. The glossary has the catalog, import, reading, line categorization, review, line
+- The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals and export terms.
-- `docs/security.md` applies (stored personal data: product names) but is not planned yet.
+- [security.md](security.md) lists four known limits. The two worth a fix are the `Host` header check and the unexpected error's message in the log (NFR-3).
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
 - Docs scanned against the code on 2026-11-04. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
 
 ## Related documents
 
-- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md), [glossary.md](glossary.md), [learnings.md](learnings.md); `docs/README.md` to be created
+- ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md), [glossary.md](glossary.md), [learnings.md](learnings.md), [security.md](security.md), [README.md](README.md)
 - ↓ Tier 2: [storage](subsystems/storage/README.md), [import](subsystems/import/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [calculation](subsystems/calculation/README.md), [review](subsystems/review/README.md), [totals](subsystems/totals/README.md), [export](subsystems/export/README.md), [ui](subsystems/ui/README.md)
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).
