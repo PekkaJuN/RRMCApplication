@@ -14,7 +14,7 @@ It reads the data and hands it to calculation; it holds no sum rule of its own:
 - [categorization](../categorization/README.md) gives the category list order
   (`CategoryService.list()`), which is the row order.
 
-It is a separate package because the totals span receipts and will also be used by the CSV
+It is a separate package because the totals span receipts and are also used by the CSV
 export (FR-26), so they are computed in one place. Totals are never stored: every request
 computes them from the database, so they always reflect the latest edits (FR-24).
 

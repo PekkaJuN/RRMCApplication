@@ -1,9 +1,9 @@
 # System Architecture
 
-- **Status:** In Progress (foundation, categorization, import with reading, receipt
-  review with the receipt check, totals and CSV export implemented; Google Sheets export
-  is target design)
-- **Updated:** 2026-11-02
+- **Status:** Done (foundation, categorization, import with reading, receipt review with
+  the receipt check, totals and CSV export implemented; Google Sheets export is target
+  design)
+- **Updated:** 2026-11-04
 
 ## Overview
 
@@ -30,7 +30,7 @@ target design (see the greenfield rule in [AGENTS.md](../AGENTS.md#greenfield-ru
 |---|---|---|
 | Backend | Python 3.12, FastAPI, Uvicorn | REST API on `127.0.0.1` only |
 | Storage | SQLite (one file) | In a Docker volume, outside version control |
-| Image preprocessing | Python imaging library (chosen in the receipt-reading spec) | Grayscale, deskew, contrast, scaling (FR-6) |
+| Image preprocessing | Pillow | Upright from EXIF, grayscale, scaling, automatic contrast (FR-6); no deskew. Tesseract's orientation check turns the image by 90, 180 or 270 degrees |
 | OCR | Tesseract 5.x, `fin` + `eng` | Installed in the backend container |
 | Parsing and categorization model | Local model through Ollama | Model name is one setting (FR-29); Ollama on `localhost` with cloud features off |
 | Frontend | React, Vite, TypeScript; one plain CSS stylesheet | Finnish UI (NFR-15); WCAG 2.1 AA checked with axe (NFR-16) |
@@ -61,7 +61,8 @@ backend/                 FastAPI app and all processing
     health/              GET /api/health and loading the model at start
     calculation/         sums in integer cents: the receipt check, category subtotals, periods
                          and period totals
-    review/              receipt endpoints: list, receipt view, image, category choice, review state,
+    review/              receipt endpoints: list, receipt view, image, category choice, line and
+                         receipt edits, review state,
                          create and delete a receipt, the failed images
     totals/              GET /api/totals: category totals per week and month of a period
     export/              CSV downloads of a period's lines and totals behind the Exporter interface
@@ -92,7 +93,8 @@ compose.yaml             Docker Compose: backend and frontend; profiles e2e and 
 
 The real settings file and the database are not committed (FR-32, NFR-4).
 
-`backend/evaluation/` may import from `app` (settings, name normalization); `app` never
+`backend/evaluation/` may import from `app` (settings, name normalization, the OCR engine,
+preprocessing and the reading prompt); `app` never
 imports from it. It runs only in the `eval` service and adds no endpoint, page or table
 ([model evaluation spec](../specs/features/model-evaluation.md)).
 
@@ -131,10 +133,10 @@ flowchart LR
 |---|---|---|---|
 | **storage** | SQLite connection, schema and migrations; repositories for categories, products, receipts and lines; transactions | Contain business rules | FR-10, NFR-6, NFR-7 |
 | **import** | List images in the import folder, compute the SHA-256 identifier, skip duplicates, run each image through receipt-reading and categorization, commit, then move the file to the done or failed folder; report the run | Read text or choose categories itself | FR-1–FR-5, FR-31, FR-45 |
-| **receipt-reading** | Preprocess the image, run OCR, turn the OCR text into a validated structured receipt (store, date, lines, total) with Finnish receipt rules; re-parse stored OCR text | Assign categories or write to the database | FR-6–FR-10 |
+| **receipt-reading** | Preprocess the image, run OCR, turn the OCR text into a validated structured receipt (store, date, lines, total) with Finnish receipt rules | Assign categories or write to the database | FR-6–FR-10 |
 | **categorization** | The catalog (groups, categories, products, name normalization, default list) and the assignment of a category to each line: remembered product first, then the model; record the category source; learn from user corrections | Calculate totals | FR-11–FR-15, FR-33–FR-39, FR-43 |
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
-| **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
+| **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, line and receipt edits, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
 | **export** | `GET /api/export/lines` and `/totals`: reads a period's lines and totals and builds the files through the exporter interface; the CSV exporter, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
 | **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, NFR-15 |
@@ -152,15 +154,15 @@ The `health` package reports the state of the database, the image folders, OCR a
 - API routes are thin: they validate input, call a subsystem service and map errors to HTTP
   responses. Services hold the rules.
 - Only **storage** runs SQL. Other subsystems use its repositories.
-- Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`;
+- Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`, `health` (its folder check);
   `categorization` → `storage` and the read line type of `receipt-reading`;
   `export` → `totals`, `calculation` (types only), `storage`; `totals` and `review` →
   `calculation`, `categorization`, `storage`.
   `calculation` does no I/O and depends on nothing. No subsystem depends on `import`,
   `export` or `review`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
-  the interfaces below. The exception is **health**, which calls only the interfaces'
-  availability checks (`check()`) and the model's `load()`.
+  the interfaces below. The exceptions are **health** and **import**, which call only the
+  interfaces' availability checks (`check()`); health also calls the model's `load()`.
 - Services that other subsystems need (for example product lookup by normalized name, used by
   FR-43) are plain Python functions or classes, not only API endpoints.
 
@@ -182,9 +184,9 @@ sequenceDiagram
   participant S as storage
   U->>A: start import
   A->>I: start
-  I-->>A: run started (202)
+  I->>I: check folders, OCR and model (FR-31)
+  I-->>A: run started (202), or refused (503)
   A-->>U: running
-  I->>I: check model availability (FR-31)
   loop each image in import folder
     I->>I: SHA-256 identifier
     alt identifier exists
@@ -207,8 +209,10 @@ sequenceDiagram
   `import_failed` with a reason that contains no receipt content (FR-4, NFR-3). Its
   identifier is not stored, so it can be retried. The exception is a file that cannot be
   moved to the done folder: it stays in the import folder for a later run.
-- If Ollama or the model is unavailable, the run stops before the first image and reports it;
-  no image is moved to `import_failed` for that reason (FR-31).
+- If Tesseract, Ollama or the model is unavailable at the start, `POST /api/import` is
+  refused with 503 and no run starts. If the model is lost during a run, the run stops at
+  the current file, which stays in the import folder, and reports it. No image is moved to
+  `import_failed` for that reason (FR-31).
 - A run works in a background thread: `POST /api/import` returns at once and the UI polls
   `GET /api/import` while the run is active. Only one run is active at a time; the state is
   kept in memory ([receipt import spec](../specs/features/receipt-import.md), PC8).
@@ -250,7 +254,7 @@ so an export always matches the totals view (FR-26, PRD risk table).
 | `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization suggests categories for unknown names ([ADR 0004](adr/0004-line-categorization.md)). Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
 | `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)` and `totals_file(totals, by)` return a file (name, media type, bytes) (FR-27) |
 
-Both interfaces live in the shared `engines` package (see
+`OcrEngine` and `ReceiptModel` live in the shared `engines` package (see
 [receipt-reading](subsystems/receipt-reading/README.md#interfaces)). The model is loaded at backend start and kept
 loaded while Ollama runs (FR-30); if Ollama is not available then, it is loaded on the first
 health check that finds it. The model name is read from settings, so switching model size
@@ -335,6 +339,12 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [Receipt review spec](../specs/features/receipt-review.md)
 - [Category totals spec](../specs/features/totals.md)
 - [Foundation spec](../specs/features/foundation.md)
+- [Model evaluation spec](../specs/features/model-evaluation.md)
+- [Receipt-reading spec](../specs/features/receipt-reading.md)
+- [Line editing spec](../specs/features/line-editing.md)
+- [CSV export spec](../specs/features/csv-export.md)
+- [Visual style and accessibility spec](../specs/features/styling.md)
+- [Receipt deletion and manual receipts spec](../specs/features/receipt-management.md)
 - [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),
   [development.md](development.md)
 - [AGENTS.md](../AGENTS.md): development rules and stack

@@ -40,7 +40,7 @@ The behavior is specified in the
 ## Interfaces
 
 The services are plain classes that take a `CatalogRepository`, so other subsystems can call
-them without the API (import and review do). Each write of `CategoryService` and
+them without the API (import, review and totals do). Each write of `CategoryService` and
 `ProductService` runs in one transaction; `LineCategoryService` runs in the caller's.
 
 | Call | Returns | Raises |
@@ -108,7 +108,7 @@ At import ([import data flow](../import/README.md#data-flow)):
 
 | Step | Where | What |
 |---|---|---|
-| `suggest` | before the commit | Lines whose normalized name matches no product, each name once in first-seen order, go to `CategorySuggester.suggest(names, options)` in one call. No call when there are none, or when the catalog has no categories |
+| `suggest` | before the commit | Lines that are not deposit refunds and whose normalized name matches no product, each name once in first-seen order, go to `CategorySuggester.suggest(names, options)` in one call. No call when there are none, or when the catalog has no categories |
 | `resolve` | inside the commit | Per line: a refund gets nothing; a matching product gives its category, `remembered`, linked; else a suggested category that still exists as a category gives `model`, not linked; else nothing |
 
 `resolve` reads products and categories again in the commit's transaction, so a product or
@@ -173,7 +173,8 @@ line, or a line that stops being a deposit refund, is resolved by its name match
   [receipt-reading](../receipt-reading/README.md#interfaces), the shared error format
   (@backend/app/errors.py) and texts (@backend/app/texts.py).
 - Used by: the API, [import](../import/README.md) (`LineCategorizer`, `create_suggester`),
-  and [review](../review/README.md) (`CategoryService`, `LineCategoryService`).
+  [review](../review/README.md) (`CategoryService`, `LineCategoryService`), and
+  [totals](../totals/README.md) (`CategoryService`).
 
 ## Modules
 

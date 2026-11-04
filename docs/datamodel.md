@@ -1,8 +1,8 @@
 # Data Model
 
-- **Status:** In Progress (catalog, receipts with their read data and review state, and
+- **Status:** Done (catalog, receipts with their read data and review state, and
   receipt lines with their categories implemented)
-- **Updated:** 2026-11-03
+- **Updated:** 2026-11-04
 
 ## Overview
 

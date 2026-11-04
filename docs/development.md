@@ -1,8 +1,9 @@
 # Development Guide
 
 - **Status:** In Progress (setup, commands and code standards written; the manual checks of
-  the foundation spec passed on a fresh clone on 2026-10-27)
-- **Updated:** 2026-10-27
+  the foundation spec passed on a fresh clone on 2026-10-27; the code standards are only
+  partly checked against the code)
+- **Updated:** 2026-11-04
 
 ## Overview
 
@@ -33,7 +34,7 @@ Python, Node.js and Tesseract run in the containers; do not install them for thi
    An existing `.env` keeps its own `RRMC_MODEL`; change it there to use the new default.
 
 3. Create the settings file from the example. Change values in `.env` only; it is not
-   committed. Every setting is explained in [.env.example](../.env.example).
+   committed. Every setting you normally change is explained in [.env.example](../.env.example).
 
    ```powershell
    Copy-Item .env.example .env
@@ -123,11 +124,12 @@ docker compose run --rm frontend npm run format
 ### E2E tests
 
 The E2E tests start `backend-e2e`, a backend with `RRMC_ENGINES=fake` and a temporary `/data`
-(new empty database and folders each time the container starts), and run Playwright in the
+(new empty database and done folder each time the container starts; the import and failed
+folders are the volumes below, which stay), and run Playwright in the
 `e2e` container, which starts its own Vite server. `run --rm` leaves `backend-e2e` running,
 so a second run reuses its database; the journeys are written to pass either way. It does
 not reload code, so after a backend change restart it (`docker compose restart
-backend-e2e`, which also empties its test data) or stop it with:
+backend-e2e`, which also empties its database and done folder) or stop it with:
 
 ```powershell
 docker compose --profile e2e down
@@ -135,7 +137,9 @@ docker compose --profile e2e down
 
 The E2E backend's import folder is the test-only volume `rrmc-e2e-import`, also mounted in
 the `e2e` container at `E2E_IMPORT_DIR`. The import journey (@frontend/e2e/import.spec.ts)
-empties it and writes synthetic files there. It is never the real import folder.
+empties it and writes synthetic files there. It is never the real import folder. The E2E
+backend's failed folder is the test-only volume `rrmc-e2e-failed`, mounted the same way at
+`E2E_FAILED_DIR`.
 
 Playwright has two projects (@frontend/playwright.config.ts): `chromium` runs every spec
 except @frontend/e2e/style.spec.ts, and `style` runs that one after them, because it imports
@@ -276,9 +280,9 @@ they can; the rest is checked in review (`.agents/skills/review-audit/SKILL.md`)
 
 | Value | Rule |
 |---|---|
-| Money | `int` cents in Python (`Cents = int`), `number` cents in TypeScript. Never `float` for money. Text from receipts is parsed with `Decimal` and converted to cents once, at the parsing boundary. Formatting with a decimal comma happens only in the UI (`formatEuro(cents)`, `Intl.NumberFormat("fi-FI", { style: "currency", currency: "EUR" })`) and in the CSV exporter. |
+| Money | `int` cents in Python, `number` cents in TypeScript. Never `float` for money. The model answers in integer cents, validated once at the parsing boundary. Formatting with a decimal comma happens only in the UI (`formatCents(cents)` in @frontend/src/format.ts) and in the CSV exporter. |
 | Purchase date | `datetime.date` / ISO `YYYY-MM-DD` string in the API. |
-| Timestamps | Timezone-aware, stored as UTC ISO 8601. "Today" and ISO weeks use `Europe/Helsinki`. |
+| Timestamps | Timezone-aware, stored as UTC ISO 8601. "Today" is the browser's local date. ISO weeks are computed from dates and need no time zone. |
 | Current time | Taken from an injected clock, never called directly in business logic, so tests control it. |
 | Names | Compared only through the shared normalization functions (product-management spec, PC6). |
 
@@ -301,7 +305,7 @@ they can; the rest is checked in review (`.agents/skills/review-audit/SKILL.md`)
 | `service.py` | The subsystem's rules. Plain functions or classes, callable from other subsystems. |
 | `schemas.py` | Pydantic models for API input and output, and for validated model output. |
 | `errors.py` | The subsystem's error classes and codes. |
-| `repository.py` | Only in **storage**: all SQL. |
+| `*_repository.py` | Only in **storage**: all SQL. |
 
 Split a module when it grows past about 300 lines or holds two unrelated things.
 
@@ -332,7 +336,8 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
 **Errors**
 
 - Expected failures raise an error class derived from `AppError(code, message, status)`.
-  One handler in `main.py` turns it into `{"error": code, "message": message}`.
+  One handler in @backend/app/errors.py turns it into `{"error": code, "message": message}`,
+  plus the error's extra fields.
 - Error codes are stable `snake_case` strings defined in the spec. Messages are Finnish and
   come from the backend text module.
 - Never `except Exception: pass`. Catch the narrowest exception, and either handle it or
@@ -394,7 +399,8 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
 - **Names reference acceptance criteria.** Python: `test_ac13_category_in_use_cannot_be_deleted`.
   TypeScript: `it("AC13: shows how many products use the category", ...)`.
 - **Structure:** Given / When / Then, as comments when the blocks are not obvious.
-- **Location:** `backend/tests/unit/<subsystem>/`, `backend/tests/integration/`;
+- **Location:** `backend/tests/unit/<subsystem>/`, `backend/tests/integration/`,
+  `backend/tests/evaluation/`;
   frontend component tests next to the component (`ProductsPage.test.tsx`); E2E in
   `frontend/e2e/`.
 - **Data:** synthetic only, built with small builder functions (`make_receipt(...)`,
@@ -402,8 +408,8 @@ Split a module when it grows past about 300 lines or holds two unrelated things.
 - **Isolation:** each backend test gets its own temporary SQLite file. No test depends on
   another test's state or order.
 - **Determinism:** no network, no sleeps, no real clock. OCR and the model use the fakes.
-  Tests that need real Tesseract or Ollama are marked `@pytest.mark.tesseract` /
-  `@pytest.mark.ollama` and are not in the default run.
+  Tests that need real Tesseract are marked `@pytest.mark.tesseract` and are not in the
+  default run.
 - **Queries:** UI tests find elements by role and label (`getByRole`, `getByLabelText`),
   not by CSS class.
 - A failing test is never edited to pass; see the Guardrails in [AGENTS.md](../AGENTS.md#guardrails).

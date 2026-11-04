@@ -16,7 +16,7 @@ gives the Finnish word the user sees.
 | Default list | oletuskategoriat | The groups and categories created once on the first start ([PRD 6.9](../specs/PRD.md#69-default-categories)) |
 | Display name | — | A name as shown: Unicode NFC, trimmed, inner whitespace collapsed to one space |
 | Normalized name | — | The display name, case-folded; stored as `name_key` and used for every comparison ([names](subsystems/categorization/README.md#names)) |
-| Receipt | kuitti | One purchase, recorded from one image: the image identifier, the file name, the import time and the read data with its lines ([datamodel](datamodel.md#receipts)) |
+| Receipt | kuitti | One purchase, recorded from one image or typed in by hand: the image identifier, the file name, the import time and the read data with its lines ([datamodel](datamodel.md#receipts)) |
 | Manual receipt | käsin luotu kuitti | A receipt the user types in on the Kuitit page instead of importing it: store, date and total, and optionally a failed image. Without an image it has no image identifier and no file name (FR-47, [review](subsystems/review/README.md#deleting-and-creating-a-receipt)) |
 | Read receipt | — | What reading one image gives: store, purchase date, total in cents, lines and the raw OCR text ([receipt-reading](subsystems/receipt-reading/README.md)) |
 | Receipt reader | — | The one interface import uses to read an image; today the OCR reader (Tesseract, then the text model) |
@@ -30,8 +30,8 @@ gives the Finnish word the user sees.
 | Category subtotal | välisumma | The sum of a receipt's lines in one category; deposit refunds are in none, lines without a category form their own subtotal (FR-19, FR-44) |
 | Review state | tarkistustila | `unreviewed` (tarkistamaton) or `confirmed` (vahvistettu); the user confirms a receipt after checking it and can cancel the confirmation (FR-21) |
 | Name match | — | The product whose normalized name equals a line's normalized name ([categorization](subsystems/categorization/README.md#line-categorization)) |
-| Resolving a line | — | Giving a new line, or a line that stops being a deposit refund, its name match's category (source `remembered`) or none; never the model (FR-43, NFR-9) |
-| OCR text | — | The raw text Tesseract read from the image; stored with the receipt so it can be re-parsed (FR-10) |
+| Resolving a line | — | Giving a new line, or a line that stops being a deposit refund, its name match's category (source `remembered`) or none; never the model (FR-43, NFR-9). Not `LineCategorizer.resolve`, the import step of the same name |
+| OCR text | — | The raw text Tesseract read from the image; stored with the receipt so a later release can re-parse it (FR-10); a manual receipt has none |
 | Import run | tuonti, tuontiajo | One press of "Tuo kuitit": the files in the import folder at that moment are processed in the background ([import](subsystems/import/README.md)) |
 | Import, done and failed folders | tuontikansio, valmiiden kansio, epäonnistuneiden kansio | Where the user puts images, where imported images move, and where files that fail move (settings `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR`) |
 | Image identifier | — | SHA-256 of an image file's bytes, 64 lowercase hex characters; stored as `image_hash` |

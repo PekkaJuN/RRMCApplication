@@ -8,8 +8,8 @@ Review serves the receipt endpoints the review UI uses: the receipt list, one re
 its lines and sums, the receipt image, line edits (name, amount, deposit refund flag,
 category), added and deleted lines, the store, date and total, the review state, deleting a
 receipt, and creating one by hand with an optional image from the failed folder (PRD
-FR-16–FR-21, FR-18, FR-43, FR-46, FR-47). It builds what the UI shows from three subsystems and holds no rule of
-its own beyond finding the right rows:
+FR-16–FR-21, FR-18, FR-43, FR-46, FR-47). It builds what the UI shows from three subsystems and holds few rules of
+its own (a reviewed receipt cannot be deleted; a deposit refund's amount sign):
 
 - [storage](../storage/README.md) reads and writes the receipts, lines and review state;
 - [calculation](../calculation/README.md) computes the line sum, the warning and the
@@ -61,7 +61,9 @@ line edit runs `LineCategoryService` inside its own transaction on the catalog's
 | `add_line(id, name, amount_cents, is_deposit_refund=...)` | Adds a line after the last one; a normal line gets its name match's category | `NotFoundError`, `InvalidNameError`, `InvalidAmountError`, `DepositRefundAmountError` |
 | `delete_line(id, line_id)` | Deletes a line on the receipt; products and other positions stay | `NotFoundError` |
 | `update_receipt(id, ReceiptEdit)` | Sets the sent store, date, total and review state; confirming is always allowed | `NotFoundError`, `InvalidStoreError`, `InvalidDateError`, `InvalidAmountError` |
-| `image(id, done_dir)` | The image bytes and media type | `NotFoundError`, `ImageMissingError` |
+| `create_receipt(NewReceipt, now, folder=None)` | Creates an unreviewed receipt without lines, with a failed image when one is named ([deleting and creating](#deleting-and-creating-a-receipt)) | `InvalidStoreError`, `InvalidDateError`, `InvalidAmountError`, `ImageNotFoundError`, `UnsupportedFormatError`, `DuplicateImageError`, `ImageMoveFailedError` |
+| `delete_receipt(id)` | Deletes an unreviewed receipt and its lines | `NotFoundError`, `ReceiptReviewedError` |
+| `image(id, done_dir)` | The image bytes and media type | `NotFoundError`, `NoImageError`, `ImageMissingError` |
 
 Category and group names come from one read of `CategoryService.list()`, whose order is
 also the order of the subtotals, so the view needs no join.
@@ -112,7 +114,8 @@ file, checks its signature, hashes it and chooses the done name; a hash already 
 `duplicate_image`. The row is committed (a `UNIQUE` failure, from an import that stored the
 same image meanwhile, is also `duplicate_image`), then the file moves. If the move fails,
 the row is deleted again and the answer is `image_move_failed`; the file is still in the
-failed folder. If that delete fails too, only the error type is logged.
+failed folder. If that delete fails too, only the error type is logged. The answer is also
+`image_move_failed`, before any row exists, when the done folder cannot be listed.
 
 `FailedFolder` accepts a plain name only: not `""`, `.` or `..`, no separator, a `.jpg`,
 `.jpeg` or `.png` suffix, a regular file whose resolved path is directly in the failed
