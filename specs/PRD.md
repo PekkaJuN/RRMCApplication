@@ -1,6 +1,6 @@
 # Product Requirements Document: RRMCApplication
 
-- **Status:** Draft
+- **Status:** Approved
 - **Created:** 2026-10-20
 - **Owner:** Pekka Nissinen
 
@@ -244,7 +244,7 @@ category, category source, product). The data model is defined in `docs/datamode
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-28 Google Sheets export (with NFR-5), FR-48 PDF export of the totals summary, FR-49 free date range for totals |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
-| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model |
+| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 
 A suggested order of feature specs for the MVP:
 
@@ -273,13 +273,13 @@ A suggested order of feature specs for the MVP:
    (Iris Xe), so the model runs on the CPU. Measured with `qwen2.5:7b`: prompt 61 tokens/s,
    output 9.6 tokens/s. A 14B model fits in memory but is about half as fast. The NFR-8
    target is 3 minutes per receipt.
-2. [NEEDS CLARIFICATION] Image source: phone photos or a scanner? (HEIC is not supported,
-   see FR-2.)
+2. Resolved (2026-11-04): receipt images are phone photos. HEIC stays unsupported (FR-2), so
+   the phone must save JPEG, or the images are converted before import.
 3. [NEEDS CLARIFICATION] Should e-receipts (PDF from store apps) be supported, and when?
 4. Resolved (2026-10-30): Tesseract + text model, `qwen3:30b-a3b-instruct-2507-q4_K_M`
    ([ADR 0003](../docs/adr/0003-receipt-reading-model.md)). Was: compare Tesseract + text model against a vision model
    on 20–30 real receipts before the parsing spec is approved.
-5. [NEEDS CLARIFICATION] Is VAT breakdown or any currency other than euro needed? (Assumed no.)
+5. Resolved (2026-11-04): no VAT breakdown and no currency other than euro.
 6. Resolved (2026-10-30): a receipt is categorized per line only; a receipt with one line
    gets one category through that line ([categorization spec](features/categorization.md)).
 7. Resolved (2026-11-02): CSV format details: FR-26.
