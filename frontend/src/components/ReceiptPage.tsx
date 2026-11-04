@@ -32,8 +32,6 @@ interface Props {
 /** Sends one change; resolves to the error message, or null when it was saved. */
 type Send = (request: () => Promise<ApiResult<Receipt>>) => Promise<string | null>;
 
-// The app has no stylesheet; this one layout rule puts the image beside the lines (FR-16)
-// and wraps them on a narrow window.
 /** An amount field's save: text that is not an amount is refused without a request. */
 function saveCents(text: string, save: (cents: number) => Promise<string | null>) {
   const cents = parseCents(text);
