@@ -18,7 +18,7 @@ Last reviewed: 2026-11-04
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
-| 1 Architecture | 9 | 3 | 5 | 0 | 1 |
+| 1 Architecture | 9 | 4 | 4 | 0 | 1 |
 | 2 Subsystems | 9 | 9 | 0 | 0 | 0 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
@@ -31,7 +31,7 @@ Last reviewed: 2026-11-04
 | 3 | System Architecture (required) | [docs/architecture.md](architecture.md) | Tech stack, folder structure, component map, deployment | 2 | Done |
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | Done |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
-| 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | In Progress |
+| 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | Done |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
 | 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
@@ -112,7 +112,7 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   editing, totals and export terms.
 - `docs/security.md` applies (stored personal data: product names) but is not planned yet.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
-- Docs scanned against the code on 2026-11-04. Three stay In Progress: `api-reference.md` (an id outside SQLite's integer range on the catalog endpoints may give 500 instead of `not_found`; check it with a test), `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
+- Docs scanned against the code on 2026-11-04. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
 
 ## Related documents
 

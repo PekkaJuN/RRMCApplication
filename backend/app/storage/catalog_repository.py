@@ -5,7 +5,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Literal, cast
 
-from app.storage.db import transaction
+from app.storage.db import fits_integer, transaction
 
 type Kind = Literal["group", "category"]
 
@@ -94,6 +94,8 @@ class CatalogRepository:
         return _row_id(cursor)
 
     def get_category(self, item_id: int) -> CategoryRow | None:
+        if not fits_integer(item_id):
+            return None
         row = self._connection.execute(_CATEGORY_SELECT + " WHERE c.id = ?", (item_id,)).fetchone()
         return _category(row) if row else None
 
@@ -125,6 +127,8 @@ class CatalogRepository:
         return _row_id(cursor)
 
     def get_product(self, product_id: int) -> ProductRow | None:
+        if not fits_integer(product_id):
+            return None
         row = self._connection.execute(
             _PRODUCT_SELECT + " WHERE p.id = ?", (product_id,)
         ).fetchone()

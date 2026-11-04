@@ -1,7 +1,7 @@
 # API Reference
 
-- **Status:** In Progress (health, catalog, import, receipt, line editing, totals and export
-  endpoints; an out-of-range id on the catalog endpoints is still to be checked)
+- **Status:** Done (health, catalog, import, receipt, line editing, totals and export
+  endpoints)
 - **Updated:** 2026-11-04
 
 ## Overview
@@ -33,7 +33,7 @@ Messages come from @backend/app/texts.py and never contain receipt content.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|
-| 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | Unknown `/api/...` path, or an id that does not exist |
+| 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | Unknown `/api/...` path, or an id that does not exist, also one outside SQLite's integer range |
 | 422 | `invalid_request` | `Pyyntö on virheellinen.` | Body or parameters not valid, including a body that is not JSON |
 | 500 | `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Unexpected error; the stack trace is in the backend log |
 
@@ -255,8 +255,8 @@ does not stop an amount edit. None of the fields can be set back to `null`.
 
 The bodies are strict: an empty body, a field the endpoint does not know, `null`, and a
 value of the wrong JSON type (`"12"` or `1.5` for a number, `1` or `"yes"` for a boolean)
-give `invalid_request`. A receipt or line id outside SQLite's integer range gives
-`not_found`, and such a `category_id` gives `unknown_category`.
+give `invalid_request`. A `category_id` outside SQLite's integer range gives
+`unknown_category`, and such a `parent_id` gives `invalid_parent`.
 
 A **receipt summary**:
 

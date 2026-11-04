@@ -168,3 +168,30 @@ def test_ac33_unknown_filter(api: TestClient) -> None:
     response = api.get("/api/products", params={"category_id": 9999})
 
     assert (response.status_code, response.json()["error"]) == (422, "unknown_category")
+
+
+OUT_OF_RANGE = [2**63, -(2**63) - 1]
+
+
+@pytest.mark.parametrize("product_id", OUT_OF_RANGE)
+def test_product_id_outside_sqlite_range_is_not_found(api: TestClient, product_id: int) -> None:
+    patched = api.patch(f"/api/products/{product_id}", json={"name": "Maito"})
+    deleted = api.delete(f"/api/products/{product_id}")
+
+    assert (patched.status_code, patched.json()["error"]) == (404, "not_found")
+    assert (deleted.status_code, deleted.json()["error"]) == (404, "not_found")
+
+
+@pytest.mark.parametrize("category", OUT_OF_RANGE)
+def test_category_id_outside_sqlite_range_is_unknown_category(
+    api: TestClient, category: int
+) -> None:
+    product = add(api, "Kevytmaito 1L", "Maitotuotteet")
+
+    filtered = api.get("/api/products", params={"category_id": category})
+    created = api.post("/api/products", json={"name": "Piimä", "category_id": category})
+    patched = api.patch(f"/api/products/{product['id']}", json={"category_id": category})
+
+    for response in (filtered, created, patched):
+        assert response.json()["error"] == "unknown_category"
+        assert response.status_code == 422

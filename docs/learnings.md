@@ -2,6 +2,21 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-04: A very large catalog id gave a server error
+
+- **Context:** The doc scan of the API reference against the code, categories and products.
+- **Symptom:** an id outside SQLite's integer range answered 500 `internal_error` instead of
+  `not_found`, in the path of `/api/categories/{id}` and `/api/products/{id}`. The same
+  happened with `category_id` and `parent_id`, in a body or in the product filter.
+- **Root cause:** Python's `int` has no limit, and binding a value outside 64 bits raises
+  `OverflowError`. Line editing added the check for receipts and lines only, in the review
+  service (`_require_ids`).
+- **Solution:** `CatalogRepository.get_category` and `get_product` return `None` for such an
+  id (@backend/app/storage/catalog_repository.py), so every route gives its usual "does not
+  exist" error. Regression tests `test_*_outside_sqlite_range_*` in
+  @backend/tests/integration/test_categories_api.py and test_products_api.py.
+- **Prevention:** a new id from a request needs a test with `2**63` and `-(2**63) - 1`.
+
 ## 2026-11-03: A line's delete confirmation wrapped on the receipt page
 
 - **Context:** Deleting a line on the receipt page on a wide window (line editing, styling
