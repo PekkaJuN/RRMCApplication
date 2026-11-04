@@ -17,6 +17,7 @@ from app.export.exporter import Exporter
 from app.export.routes import create_export_router
 from app.health.routes import create_health_router
 from app.health.service import HealthService, ModelLoader
+from app.host_check import add_host_check
 from app.logging_setup import add_request_logging, configure_logging
 from app.receipt_import.routes import create_import_router
 from app.receipt_import.service import ImportService
@@ -62,6 +63,7 @@ def create_app(
 
     app = FastAPI(title="RRMCApplication", lifespan=lifespan)
     add_error_handlers(app)
+    add_host_check(app)
     add_request_logging(app)
     app.add_middleware(
         CORSMiddleware,

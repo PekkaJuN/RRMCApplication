@@ -41,6 +41,9 @@ account and disk encryption.
   loading it and when an import starts.
 - **Browser:** the UI loads nothing from another host. CORS allows only
   `http://127.0.0.1:<RRMC_UI_PORT>` (@backend/app/main.py).
+- **Host header:** the backend answers 400 `invalid_host` unless the name is `127.0.0.1`,
+  `localhost` or a Compose service name (@backend/app/host_check.py). This stops DNS
+  rebinding, where a malicious site points its own name at `127.0.0.1` to read the answers.
 - **Login:** there is none, by design ([PRD non-goals](../specs/PRD.md#3-non-goals)).
 
 ## Input handling
@@ -63,7 +66,7 @@ account and disk encryption.
   can hold a file path (`log_without_message` in @backend/app/receipt_import/run.py).
 - API errors return a fixed Finnish text and never the details of the exception.
 
-See [known limits](#known-limits) for the one exception.
+See [known limits](#known-limits) for the one accepted exception.
 
 ## Version control
 
@@ -93,13 +96,11 @@ Each limit was checked against the running code on 2026-11-04.
   refuses the preflight of JSON, `PATCH` and `DELETE` requests. A request without a preflight
   still reaches the backend: a page on any site can start an import with `POST /api/import`.
   It cannot read the result, and it can only start what the button in the UI starts.
-- **The backend does not check the `Host` header.** A malicious site could use DNS rebinding
-  to appear as the same origin as the backend and read its answers. It needs the user to
-  open that site while the app is running.
 - **An unexpected error logs its message.** `_handle_unexpected_error` in
   @backend/app/errors.py logs the full exception, unlike the import errors above. The API
   answer stays clean, but a message that holds receipt content or a file name would reach
-  the log, which goes against NFR-3.
+  the log. The message helps to find the cause, so the user accepted this exception to
+  NFR-3 on 2026-11-04. The log stays on this computer.
 
 ## Related Documents
 

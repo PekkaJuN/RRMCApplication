@@ -33,6 +33,7 @@ Messages come from @backend/app/texts.py and never contain receipt content.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|
+| 400 | `invalid_host` | `Pyyntö hylättiin: tuntematon osoite.` | The `Host` header is not a known name of the app ([security](security.md#network)) |
 | 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | Unknown `/api/...` path, or an id that does not exist, also one outside SQLite's integer range |
 | 422 | `invalid_request` | `Pyyntö on virheellinen.` | Body or parameters not valid, including a body that is not JSON |
 | 500 | `internal_error` | `Odottamaton virhe. Katso lisätiedot palvelimen lokista.` | Unexpected error; the stack trace is in the backend log |

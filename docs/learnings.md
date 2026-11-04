@@ -2,6 +2,19 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-04: The backend answered any Host header
+
+- **Context:** Writing `docs/security.md`, checking what CORS stops.
+- **Symptom:** a request with `Host: evil.example` got normal data with status 200.
+- **Root cause:** CORS works on the `Origin` header. After DNS rebinding a page is the same
+  origin as the backend for the browser, so CORS does not apply.
+- **Solution:** @backend/app/host_check.py answers 400 `invalid_host` for an unknown name.
+  Vite's proxy sends the Compose service name, so `backend` and `backend-e2e` are allowed.
+  Regression tests in @backend/tests/integration/test_host_check.py. Tests now use the base
+  URL `http://127.0.0.1`.
+- **Prevention:** a new way to reach the backend, such as a new Compose service name, must
+  be added to the known names.
+
 ## 2026-11-04: A very large catalog id gave a server error
 
 - **Context:** The doc scan of the API reference against the code, categories and products.

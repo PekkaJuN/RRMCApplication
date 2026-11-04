@@ -110,7 +110,7 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals and export terms.
-- [security.md](security.md) lists four known limits. The two worth a fix are the `Host` header check and the unexpected error's message in the log (NFR-3).
+- [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
 - Docs scanned against the code on 2026-11-04. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
 
