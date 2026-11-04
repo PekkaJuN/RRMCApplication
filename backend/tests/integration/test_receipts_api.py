@@ -24,6 +24,7 @@ from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.migrate import MIGRATIONS_DIR, migrate
 from app.storage.receipt_repository import LineCategory, ReceiptRepository
+from tests.integration.conftest import BASE_URL
 from tests.receipt_import_data import jpeg, png
 
 TIME = "2026-10-28T10:00:01Z"
@@ -502,7 +503,7 @@ def test_ac19_migration_keeps_existing_receipts(settings: Settings, tmp_path: Pa
     connection.close()
 
     # When the backend starts
-    with TestClient(create_app(settings)) as api:
+    with TestClient(create_app(settings), base_url=BASE_URL) as api:
         listed = api.get("/api/receipts").json()
 
     # Then migration 5 is applied and both receipts are unreviewed; later migrations raise
@@ -1212,7 +1213,7 @@ def engines() -> Engines:
 def made(settings: Settings, engines: Engines) -> Iterator[TestClient]:
     """A started client with counting fake engines and the clock fixed at CREATED."""
     app = create_app(settings, engines=engines, clock=lambda: CREATED)
-    with TestClient(app, raise_server_exceptions=False) as client:
+    with TestClient(app, raise_server_exceptions=False, base_url=BASE_URL) as client:
         yield client
 
 
@@ -1491,7 +1492,7 @@ def test_ac24_move_to_the_done_folder_fails(settings: Settings) -> None:
 
     folder = FailedFolder(settings.failed_dir, settings.done_dir, failing_move)
     app = create_app(settings, failed_folder=folder)
-    with TestClient(app, raise_server_exceptions=False) as client:
+    with TestClient(app, raise_server_exceptions=False, base_url=BASE_URL) as client:
         response = client.post("/api/receipts", json={**NEW_BODY, "image_file_name": "b.png"})
 
     assert response.status_code == 503

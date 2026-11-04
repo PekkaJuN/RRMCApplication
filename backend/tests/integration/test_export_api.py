@@ -21,6 +21,7 @@ from app.settings import Settings
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.receipt_repository import LineCategory, ReceiptRepository
+from tests.integration.conftest import BASE_URL
 
 TIME = "2026-11-02T10:00:01Z"
 OCTOBER = "unit=month&from=2026-10&to=2026-10"
@@ -332,7 +333,7 @@ class FixedExporter:
 
 def test_ac12_exporter_interface(settings: Settings) -> None:
     exporter = FixedExporter()
-    with TestClient(create_app(settings, exporter=exporter)) as client:
+    with TestClient(create_app(settings, exporter=exporter), base_url=BASE_URL) as client:
         connection = connect(settings.db_path)
         try:
             add_receipt(connection, "2026-10-06", [("Ruisleipä", 300, "Leivät")])

@@ -183,7 +183,7 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 |---|---|
 | NFR-1 | Images, OCR text and parsed data never leave the computer. OCR and the model run locally; Ollama runs with cloud features disabled. |
 | NFR-2 | The backend listens on `127.0.0.1` only. CORS allows only the local UI origin. |
-| NFR-3 | Receipt content does not appear in logs or error messages. |
+| NFR-3 | Receipt content does not appear in logs or error messages. *Note (2026-11-04):* the message of an unexpected error stays in the log, to help finding its cause. The user accepted this known exception ([security.md](../docs/security.md#known-limits)). |
 | NFR-4 | Receipt images, the database and secrets are never committed to version control. |
 | NFR-5 | For Sheets export, the service-account key is stored outside the repository and outside cloud-synced folders; the sheet is private and shared only with the service account; the narrowest working scope is used. |
 

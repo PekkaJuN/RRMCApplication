@@ -9,6 +9,9 @@ from app.receipt_import.service import ImportService
 from app.settings import Settings
 from tests.integration import endpoints_for_tests
 
+# The address a browser uses; the app refuses an unknown Host.
+BASE_URL = "http://127.0.0.1"
+
 
 @pytest.fixture
 def settings(clean_env: pytest.MonkeyPatch, tmp_path: Path) -> Settings:
@@ -21,7 +24,7 @@ def make_client(settings: Settings, import_service: ImportService | None = None)
         settings, extra_routers=[endpoints_for_tests.router], import_service=import_service
     )
     # Unexpected errors must become a 500 response, as they do for a real client.
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, raise_server_exceptions=False, base_url=BASE_URL)
 
 
 @pytest.fixture

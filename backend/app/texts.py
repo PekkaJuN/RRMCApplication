@@ -1,5 +1,6 @@
 """Finnish user-facing texts of the backend. Every API error message comes from here."""
 
+INVALID_HOST = "Pyyntö hylättiin: tuntematon osoite."
 NOT_FOUND = "Pyydettyä kohdetta ei löydy."
 INVALID_REQUEST = "Pyyntö on virheellinen."
 INTERNAL_ERROR = "Odottamaton virhe. Katso lisätiedot palvelimen lokista."

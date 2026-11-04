@@ -10,6 +10,7 @@ from app.engines.model import OllamaReceiptModel
 from app.engines.ocr import FakeOcrEngine
 from app.main import create_app
 from app.settings import Settings
+from tests.integration.conftest import BASE_URL
 
 OLLAMA_URL = "http://ollama.test:11434"
 
@@ -49,7 +50,9 @@ def test_ac17_model_is_loaded_at_start(real_settings: Settings) -> None:
     ollama = MockOllama(is_up=True)
 
     # When the backend starts and the health is checked
-    with TestClient(create_app(real_settings, engines=ollama.engines())) as client:
+    with TestClient(
+        create_app(real_settings, engines=ollama.engines()), base_url=BASE_URL
+    ) as client:
         client.get("/api/health")
         # Loading runs in the background; wait for its request instead of sleeping.
         assert ollama.loaded.wait(timeout=5)
@@ -61,7 +64,9 @@ def test_ac17_model_is_loaded_at_start(real_settings: Settings) -> None:
 def test_ac18_model_is_loaded_when_ollama_starts_later(real_settings: Settings) -> None:
     # Given Ollama is not reachable when the backend starts
     ollama = MockOllama(is_up=False)
-    with TestClient(create_app(real_settings, engines=ollama.engines())) as client:
+    with TestClient(
+        create_app(real_settings, engines=ollama.engines()), base_url=BASE_URL
+    ) as client:
         assert ollama.load_requests == []
 
         # When Ollama becomes reachable and the health is checked twice

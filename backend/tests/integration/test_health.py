@@ -10,6 +10,7 @@ from app.engines.ocr import FakeOcrEngine
 from app.main import create_app
 from app.settings import Settings
 from app.storage.migrate import migrate_database
+from tests.integration.conftest import BASE_URL
 
 OLLAMA_URL = "http://ollama.test:11434"
 
@@ -43,7 +44,7 @@ def other_models(request: httpx2.Request) -> httpx2.Response:
 
 
 def test_ac12_health_with_fakes(ready_settings: Settings) -> None:
-    client = TestClient(create_app(ready_settings))
+    client = TestClient(create_app(ready_settings), base_url=BASE_URL)
 
     response = client.get("/api/health")
 
@@ -59,7 +60,7 @@ def test_ac14_ollama_down_is_degraded_within_3_seconds(ready_settings: Settings)
     app = create_app(ready_settings, engines=ollama_engines(httpx2.MockTransport(refuse)))
 
     started = time.monotonic()
-    response = TestClient(app).get("/api/health")
+    response = TestClient(app, base_url=BASE_URL).get("/api/health")
 
     assert time.monotonic() - started < 3
     assert response.status_code == 200
@@ -70,7 +71,7 @@ def test_ac14_ollama_down_is_degraded_within_3_seconds(ready_settings: Settings)
 def test_ac15_model_not_pulled_is_missing_model(ready_settings: Settings) -> None:
     app = create_app(ready_settings, engines=ollama_engines(httpx2.MockTransport(other_models)))
 
-    response = TestClient(app).get("/api/health")
+    response = TestClient(app, base_url=BASE_URL).get("/api/health")
 
     assert response.json()["status"] == "degraded"
     assert response.json()["checks"]["model"] == "missing_model"
@@ -79,7 +80,7 @@ def test_ac15_model_not_pulled_is_missing_model(ready_settings: Settings) -> Non
 def test_ac16_missing_folder_is_degraded(ready_settings: Settings) -> None:
     ready_settings.failed_dir.rmdir()
 
-    response = TestClient(create_app(ready_settings)).get("/api/health")
+    response = TestClient(create_app(ready_settings), base_url=BASE_URL).get("/api/health")
 
     assert response.json()["status"] == "degraded"
     assert response.json()["checks"]["folders"] == "unavailable"
@@ -88,6 +89,6 @@ def test_ac16_missing_folder_is_degraded(ready_settings: Settings) -> None:
 def test_ac12_missing_database_is_degraded(settings: Settings) -> None:
     make_folders(settings)
 
-    response = TestClient(create_app(settings)).get("/api/health")
+    response = TestClient(create_app(settings), base_url=BASE_URL).get("/api/health")
 
     assert response.json()["checks"]["database"] == "unavailable"
