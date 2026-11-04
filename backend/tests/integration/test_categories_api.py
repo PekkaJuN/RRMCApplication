@@ -320,3 +320,26 @@ def test_ac20b_delete_category_used_by_products_and_lines(
         "product_count": 2,
         "line_count": 3,
     }
+
+
+OUT_OF_RANGE = [2**63, -(2**63) - 1]
+
+
+@pytest.mark.parametrize("category", OUT_OF_RANGE)
+def test_category_id_outside_sqlite_range_is_not_found(api: TestClient, category: int) -> None:
+    patched = api.patch(f"/api/categories/{category}", json={"name": "Uusi"})
+    deleted = api.delete(f"/api/categories/{category}")
+
+    assert (patched.status_code, patched.json()["error"]) == (404, "not_found")
+    assert (deleted.status_code, deleted.json()["error"]) == (404, "not_found")
+
+
+@pytest.mark.parametrize("parent", OUT_OF_RANGE)
+def test_parent_id_outside_sqlite_range_is_invalid_parent(api: TestClient, parent: int) -> None:
+    created = api.post(
+        "/api/categories", json={"name": "Uusi", "kind": "category", "parent_id": parent}
+    )
+    patched = api.patch(f"/api/categories/{item_id(api, 'Muut')}", json={"parent_id": parent})
+
+    assert created.json()["error"] == "invalid_parent"
+    assert patched.json()["error"] == "invalid_parent"
