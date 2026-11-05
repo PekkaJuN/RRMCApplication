@@ -75,8 +75,8 @@ Domain terms are defined in the [PRD glossary](../specs/PRD.md#13-glossary).
 
 ## Out of scope
 
-Multiple users, hosting on a server, a mobile app, budgeting or forecasting, bank
-integration, and cloud OCR or cloud models. See [PRD non-goals](../specs/PRD.md#3-non-goals).
+Multiple users, hosting on a server, a mobile app, forecasting, bank integration, and
+cloud OCR or cloud models. See [PRD non-goals](../specs/PRD.md#3-non-goals).
 
 ## Subsystems
 

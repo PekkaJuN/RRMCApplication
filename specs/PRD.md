@@ -32,7 +32,7 @@ services send personal purchase data to third parties.
 
 - Multiple users, accounts or login.
 - Hosting on a server, or a mobile app.
-- Budgeting, forecasting or bank-account integration.
+- Forecasting or bank-account integration.
 - Cloud OCR or cloud language models.
 - Reading paper-free e-receipts in the first release (see [Open questions](#11-open-questions)).
 
@@ -175,6 +175,12 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 | FR-41 | The user can permanently delete archived data, after a confirmation. |
 | FR-42 | Archived data is not included in the totals or exports of active data, and does not appear in the normal views. |
 
+### 6.11 Monthly budget (next release)
+
+| ID | Requirement |
+|---|---|
+| FR-50 | *Next release:* on a separate page, the user sets a monthly budget for each group and each category without a group. The budget is the same for every month, and the total budget is the sum of these amounts. A second page compares the budget with the actual spending of a chosen month and its weeks. Only reviewed receipts count toward the actual spending. A week's budget is the monthly budget divided by the days of the month, times the week's days in that month, so the weeks of a month add up to its budget. The details are in the [spec](features/budget.md). |
+
 ## 7. Non-functional requirements
 
 ### 7.1 Privacy and security
@@ -242,7 +248,7 @@ category, category source, product). The data model is defined in `docs/datamode
 | Release | Scope |
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
-| Next | FR-28 Google Sheets export (with NFR-5), FR-48 PDF export of the totals summary, FR-49 free date range for totals |
+| Next | FR-28 Google Sheets export (with NFR-5), FR-48 PDF export of the totals summary, FR-49 free date range for totals, FR-50 monthly budget |
 | Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 

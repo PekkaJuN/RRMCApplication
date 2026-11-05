@@ -17,3 +17,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 10 | [CSV export](features/csv-export.md) | Done | FR-26, FR-27, FR-44 for exported totals |
 | 11 | [Visual style and accessibility](features/styling.md) | Done | NFR-16, NFR-1 for UI resources |
 | 12 | [Receipt deletion and manual receipts](features/receipt-management.md) | Done | FR-46, FR-47 (new) |
+| 13 | [Monthly budget](features/budget.md) | Review | FR-50 (new) |
