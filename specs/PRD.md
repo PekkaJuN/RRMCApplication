@@ -248,8 +248,8 @@ category, category source, product). The data model is defined in `docs/datamode
 | Release | Scope |
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
-| Next | FR-28 Google Sheets export (with NFR-5), FR-48 PDF export of the totals summary, FR-49 free date range for totals, FR-50 monthly budget |
-| Later | FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
+| Next | FR-48 PDF export of the totals summary, FR-49 free date range for totals, FR-50 monthly budget |
+| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 
 A suggested order of feature specs for the MVP:
