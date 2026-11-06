@@ -61,7 +61,9 @@ them without the API (import, review and totals do). Each write of `CategoryServ
 | `seed_defaults(repository, now)` | | |
 
 `parent_id=KEEP` (the default) leaves the group as it is; `None` takes a category out of its
-group. The API maps a left-out `parent_id` to `KEEP`.
+group. The API maps a left-out `parent_id` to `KEEP`. An update that puts a group or a category
+without a group into a group moves its monthly budget to that group, in the same
+transaction ([budget](../budget/README.md#catalog-changes)).
 
 ### Names
 
@@ -173,8 +175,8 @@ line, or a line that stops being a deposit refund, is resolved by its name match
   [receipt-reading](../receipt-reading/README.md#interfaces), the shared error format
   (@backend/app/errors.py) and texts (@backend/app/texts.py).
 - Used by: the API, [import](../import/README.md) (`LineCategorizer`, `create_suggester`),
-  [review](../review/README.md) (`CategoryService`, `LineCategoryService`), and
-  [totals](../totals/README.md) (`CategoryService`).
+  [review](../review/README.md) (`CategoryService`, `LineCategoryService`),
+  [totals](../totals/README.md) and [budget](../budget/README.md) (`CategoryService`).
 
 ## Modules
 

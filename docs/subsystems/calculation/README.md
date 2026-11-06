@@ -1,6 +1,6 @@
 # Calculation
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Storage](../storage/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Storage](../storage/README.md)
 
 ## Overview
 
@@ -9,14 +9,19 @@ Calculation computes sums in integer cents (NFR-6). It changes no data and does 
 It has the receipt check (FR-20) and the category subtotals of one receipt (FR-19, FR-44),
 used by [review](../review/README.md), and the period totals: per category and group, per
 ISO week and per month of a period (FR-22–FR-25, FR-44), used by
-[totals](../totals/README.md).
+[totals](../totals/README.md). It also compares the monthly budget with spending (FR-50), used
+by [budget](../budget/README.md).
 
 ## Key Files and Entry Points
 
 - @backend/app/calculation/receipt_check.py — `check_receipt`, `category_subtotals`
-- @backend/app/calculation/period.py — `parse_period`, `Period`, `Column`, `PeriodError`
+- @backend/app/calculation/period.py — `parse_period`, `comparison_period`, `Period`,
+  `Column`, `PeriodError`
 - @backend/app/calculation/period_totals.py — `period_totals`, `TotalLine`, `RowCategory`,
   `TotalsRow`, `PeriodTotals`
+- @backend/app/calculation/budget_comparison.py — `budget_rows`, `weekly_budget`,
+  `budget_comparison`
+- @backend/app/calculation/money.py — `AMOUNT_LIMIT`, the limit of a typed amount
 
 ## Interfaces
 
@@ -65,6 +70,31 @@ ISO week and per month of a period (FR-22–FR-25, FR-44), used by
   counted twice. A category id missing from `catalog` cannot happen (`ON DELETE
   RESTRICT`); its lines would be in no row.
 
+### Budget comparison
+
+| Function | Returns | Raises |
+|---|---|---|
+| `comparison_period(month, kind)` | `Period` | `PeriodError` |
+| `budget_rows(catalog, budgets)` | `list[BudgetRow(kind, id, name, amount_cents)]` | nothing |
+| `weekly_budget(amount_cents, period, weeks)` | `list[int]`, one amount per week | nothing |
+| `budget_comparison(period, lines, catalog, budgets)` | `Comparison(period, weeks, rows, total)` | nothing |
+
+- A **comparison period** is named by a month. With `kind` `None` or `calendar` it is that
+  calendar month. With `mid` it runs from the 15th of that month to the 14th of the next, so
+  `2026-10` is 15.10.2026–14.11.2026. Any other `kind`, or a month `parse_period` refuses,
+  raises `PeriodError`. Week columns clip to the period as in the totals.
+- `budget_rows` lists the groups and the categories without a group in catalog order; a
+  missing amount is 0. `GET /api/budget` and the comparison both use it.
+- `weekly_budget` gives a week the difference of two cumulative shares, each rounded half up
+  in integers: `share(k) = (2 × M × k + D) // (2 × D)`, with `M` the monthly budget and `D`
+  the days of the period. A week of the days `s`–`e` has `share(e) − share(s − 1)`, so rounding
+  cannot change the sum: a row's weeks always add up to `M`.
+- `budget_comparison` calls `period_totals`, so deposit refunds, group membership and the
+  `none` row follow its rules. A budget row without lines has zeros. The `none` row is last,
+  has budget 0, and exists only when `period_totals` has it. `total` sums the rows column by
+  column. The caller decides which lines count: [budget](../budget/README.md) passes only
+  those of reviewed receipts.
+
 ## Data Flow
 
 Callers pass plain values: `check_receipt` takes the amounts, `category_subtotals` takes
@@ -75,7 +105,7 @@ the line sum that storage computed in SQL as a one-item list.
 
 - Uses: nothing.
 - Used by: [review](../review/README.md), [totals](../totals/README.md),
-  [export](../export/README.md) (the period and totals types).
+  [budget](../budget/README.md), [export](../export/README.md) (the period and totals types).
 
 ## Modules
 

@@ -147,4 +147,23 @@ export const fi = {
     exportMonths: "Vie kuukausisummat (CSV)",
     exportLines: "Vie rivit (CSV)",
   },
+  budget: {
+    heading: "Budjetti",
+  },
+  comparison: {
+    heading: "Vertailu",
+    period: "Jakso",
+    calendar: "Kalenterikuukausi",
+    mid: "15.–14.",
+    month: "Kuukausi",
+    covered: (start: string, end: string) => `Jakso: ${start}–${end}`,
+    weeks: "Viikot",
+    showWeeks: "Näytä viikot",
+    hideWeeks: "Piilota viikot",
+    budget: "Budjetti",
+    actual: "Toteutunut",
+    remaining: "Jäljellä",
+    over: "Ylitetty",
+    unreviewed: (count: number) => `Tarkistamattomia kuitteja, ei mukana: ${count}`,
+  },
 } as const;

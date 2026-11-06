@@ -1,4 +1,6 @@
 import type { MouseEvent } from "react";
+import { BudgetPage } from "./components/BudgetPage";
+import { ComparisonPage } from "./components/ComparisonPage";
 import { ImportPage } from "./components/ImportPage";
 import { ProductsPage } from "./components/ProductsPage";
 import { ReceiptPage } from "./components/ReceiptPage";
@@ -13,6 +15,8 @@ const LINKS: { page: Exclude<Page, "receipt">; text: string }[] = [
   { page: "import", text: fi.import.heading },
   { page: "receipts", text: fi.receipts.heading },
   { page: "totals", text: fi.totals.heading },
+  { page: "budget", text: fi.budget.heading },
+  { page: "comparison", text: fi.comparison.heading },
 ];
 
 export function App() {
@@ -25,8 +29,9 @@ export function App() {
       return;
     }
     event.preventDefault();
-    // Yhteenveto keeps its period in the address; its own link must not drop it (totals PC5).
-    if (target === "totals" && page === "totals") {
+    // These pages keep their period in the address; their own link must not drop it
+    // (totals PC5, budget P8).
+    if (target === page && (page === "totals" || page === "comparison")) {
       return;
     }
     go(target);
@@ -43,6 +48,10 @@ export function App() {
         return <ReceiptPage key={receiptId} id={receiptId ?? 0} onBack={() => go("receipts")} />;
       case "totals":
         return <TotalsPage />;
+      case "budget":
+        return <BudgetPage />;
+      case "comparison":
+        return <ComparisonPage />;
       default:
         return <ProductsPage />;
     }

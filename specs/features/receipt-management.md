@@ -320,7 +320,8 @@ two rows for M with `Kuitin tila` `Vahvistettu`
 **Given** a database at schema version 5 with receipt A (imported, with OCR text), its
 lines with their categories, sources and product links, and receipt R
 **When** the migrations run
-**Then** the schema version is 6; A and R and every line read back with the same ids and
+**Then** migration 6 is applied first (later migrations may follow it); A and R and every
+line read back with the same ids and
 values; `PRAGMA foreign_key_check` returns no rows; inserting a receipt with `image_hash`
 set and `file_name` `NULL` (or the other way round) fails with a constraint error; inserting
 a second receipt with hash H fails with a constraint error; after the receipt with the
@@ -550,7 +551,7 @@ enabled again
 | AC8 | `create_receipt` | edge | — | `""`, total 0 | created | clock |
 | AC9 | `create_receipt` | invalid fields with an image | F | each bad value | the matching error; file not moved | clock, temp folders |
 | AC13 | `ReviewService.image` | no image | M | image(M) | `NoImageError` | none |
-| AC15 | `migrate` | data kept | version 5 with A, R, lines | migrate | version 6, same rows, FK check empty, both-or-neither and unique checks | none |
+| AC15 | `migrate` | data kept | version 5 with A, R, lines | migrate | migration 6 applied first, same rows, FK check empty, both-or-neither and unique checks | none |
 | AC16 | failed images list | names | F | list | `b.png`, `fake.jpg`, `IMG_2.jpg` | temp folder |
 | AC17 | failed images list | empty, missing | — | list | `[]`; `FoldersUnavailableError` | temp folder |
 | AC19 | failed image preview | refused names | F | each name | `ImageNotFoundError` | temp folder |

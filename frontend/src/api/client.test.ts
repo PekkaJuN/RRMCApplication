@@ -1,7 +1,21 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "../test/server";
-import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
+
+describe("apiPut", () => {
+  it("budget AC2: sends the method and the JSON body", async () => {
+    server.use(
+      http.put("/api/things/1", async ({ request }) =>
+        HttpResponse.json({ sent: await request.json() }),
+      ),
+    );
+
+    const result = await apiPut<{ sent: unknown }>("/api/things/1", { amount_cents: 1 });
+
+    expect(result).toEqual({ ok: true, data: { sent: { amount_cents: 1 } } });
+  });
+});
 
 describe("apiGet", () => {
   it("AC23: returns the data of a successful response", async () => {

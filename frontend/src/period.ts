@@ -4,6 +4,10 @@
  * the shape, so a bad address falls back to the current month.
  */
 
+import type { TotalsColumn } from "./api/totals";
+import { formatDate, formatDayMonth } from "./format";
+import { fi } from "./i18n/fi";
+
 export type PeriodUnit = "month" | "week";
 
 export interface Period {
@@ -68,4 +72,15 @@ export function weekLabel(key: string): string {
 export function monthLabel(key: string): string {
   const [year, month] = key.split("-");
   return `${Number(month)}/${year}`;
+}
+
+/** A column heading; a partial column adds the mark and its days (totals PC4, budget PC10). */
+export function columnHeading(column: TotalsColumn, unit: PeriodUnit): string {
+  const name = unit === "week" ? weekLabel(column.key) : monthLabel(column.key);
+  if (!column.partial) {
+    return name;
+  }
+  // A partial column lies within one month, so the end date's year covers both days.
+  const days = `${formatDayMonth(column.start_date)}–${formatDate(column.end_date)}`;
+  return `${name} ${fi.totals.partial} ${days}`;
 }

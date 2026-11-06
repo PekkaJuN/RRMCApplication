@@ -51,6 +51,14 @@ gives the Finnish word the user sees.
 | Lines file | kuittirivit | The CSV export of every line of the receipts dated in a period, deposit refunds included ([export](subsystems/export/README.md)) |
 | Totals file | summat | The CSV export of a period's category totals by week (`summat_viikot`) or by month (`summat_kuukaudet`), in long format |
 | Long format | pitkä muoto | One row per column and category, with the period column's key in a cell, instead of one column per week or month; suited to a pivot table |
+| Budget row | budjettirivi | A group or a category without a group; a category inside a group is not one ([budget](subsystems/budget/README.md)) |
+| Monthly budget | kuukausibudjetti | The amount of one budget row in integer cents; the same for every month, without history |
+| Total budget | kokonaisbudjetti | The sum of the monthly budgets of all budget rows; computed, never entered |
+| Comparison period | jakso | A calendar month, or a 15–14 period, that the Vertailu page compares with the budget |
+| 15–14 period | 15.–14. | From the 15th of a month to the 14th of the next, named after the month it starts in: `2026-10` is 15.10.2026–14.11.2026 |
+| Weekly budget | viikkobudjetti | A row's monthly budget divided by the period's days, times the week's days in the period; the weeks add up to the monthly budget |
+| Actual spending | toteutunut | The spending of reviewed receipts, by the totals' rules |
+| Remaining | jäljellä | The budget minus the actual spending; negative when the row is over budget |
 | Exporter | — | The interface that turns a period's lines or totals into a file; CSV now, Google Sheets later (FR-27) |
 
 ## Subsystems

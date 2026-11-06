@@ -43,6 +43,7 @@ To see the status of every doc and what is missing, read the
   period totals
 - [Review](subsystems/review/README.md): the receipt endpoints of the review UI
 - [Totals](subsystems/totals/README.md): the totals endpoint
+- [Budget](subsystems/budget/README.md): monthly budgets and their comparison
 - [Export](subsystems/export/README.md): CSV export and the exporter interface
 - [UI](subsystems/ui/README.md): the React UI, stylesheet and accessibility check
 

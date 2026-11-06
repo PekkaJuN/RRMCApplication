@@ -1,9 +1,9 @@
 # System Architecture
 
 - **Status:** Done (foundation, categorization, import with reading, receipt review with
-  the receipt check, totals and CSV export implemented; Google Sheets export is target
-  design)
-- **Updated:** 2026-11-04
+  the receipt check, totals, monthly budget and CSV export implemented; Google Sheets
+  export is target design)
+- **Updated:** 2026-11-06
 
 ## Overview
 
@@ -65,6 +65,7 @@ backend/                 FastAPI app and all processing
                          receipt edits, review state,
                          create and delete a receipt, the failed images
     totals/              GET /api/totals: category totals per week and month of a period
+    budget/              /api/budget: monthly budgets and their comparison with spending
     export/              CSV downloads of a period's lines and totals behind the Exporter interface
     <subsystem>/         one package per feature subsystem (see Component map)
   evaluation/            development tool, not part of the app: compares reading variants
@@ -76,6 +77,7 @@ frontend/                React + Vite + TypeScript UI
   src/api/               shared API client and typed clients, one per resource
   src/components/        components; a page component per feature page (ProductsPage, ImportPage)
   src/period.ts          the totals period: address, current month and week, labels
+  src/comparison.ts      the Vertailu period: address and current period
   src/navigation.ts      page switching between the pages
   src/i18n/fi.ts         all Finnish UI texts
   src/test/              MSW setup and test data for component tests
@@ -115,6 +117,11 @@ flowchart LR
   TOT --> CALC
   TOT --> CAT
   TOT --> ST
+  API --> BUD[budget]
+  BUD --> CALC
+  BUD --> CAT
+  BUD --> TOT
+  BUD --> ST
   API --> EXP[export]
   IMP --> RR[receipt-reading]
   IMP --> CAT
@@ -138,8 +145,9 @@ flowchart LR
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
 | **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, line and receipt edits, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
+| **budget** | `/api/budget`: reads and saves the monthly budgets, reads the reviewed lines, the counts and the category order, and returns the comparison from calculation | Calculate sums itself or store figures | FR-50 (backend) |
 | **export** | `GET /api/export/lines` and `/totals`: reads a period's lines and totals and builds the files through the exporter interface; the CSV exporter, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28 |
-| **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, NFR-15 |
+| **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, budget and comparison, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, FR-50, NFR-15 |
 
 Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
 `texts.py`, `logging_setup.py`, `image_files.py`) belong to the foundation and are used by
@@ -157,7 +165,8 @@ The `health` package reports the state of the database, the image folders, OCR a
 - Dependencies point one way: `import` → `receipt-reading`, `categorization`, `storage`, `health` (its folder check);
   `categorization` → `storage` and the read line type of `receipt-reading`;
   `export` → `totals`, `calculation` (types only), `storage`; `totals` and `review` →
-  `calculation`, `categorization`, `storage`.
+  `calculation`, `categorization`, `storage`; `budget` → `calculation`, `categorization`,
+  `totals` (its column schema and period error), `storage`.
   `calculation` does no I/O and depends on nothing. No subsystem depends on `import`,
   `export` or `review`.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
@@ -245,6 +254,15 @@ download links ask `GET /api/export/totals` (by week or by month) and
 `GET /api/export/lines` for the same period. The totals file uses the same totals service,
 so an export always matches the totals view (FR-26, PRD risk table).
 
+### Budget
+
+Implemented: [budget](subsystems/budget/README.md).
+
+The Budjetti page reads and saves one monthly budget per group and category without a group.
+The Vertailu page asks `GET /api/budget/comparison` for a calendar month or a period from the
+15th to the 14th; budget reads the lines of reviewed receipts dated in it, and calculation
+computes the budget, spending and remaining per row and ISO week (FR-50).
+
 ## Key interfaces
 
 | Interface | Owner | Real implementation | Purpose |
@@ -321,10 +339,11 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
   periods and the weekly and monthly totals
 - [review](subsystems/review/README.md) — the receipt endpoints of the review UI
 - [totals](subsystems/totals/README.md) — the totals endpoint
+- [budget](subsystems/budget/README.md) — the monthly budgets and their comparison
 - [export](subsystems/export/README.md) — the CSV export endpoints and the exporter
   interface
 - [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
-  Tuotteet, Tuonti, Kuitit, receipt and Yhteenveto pages
+  Tuotteet, Tuonti, Kuitit, receipt, Yhteenveto, Budjetti and Vertailu pages
 
 ## Related Documents
 

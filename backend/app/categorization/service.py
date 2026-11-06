@@ -96,6 +96,9 @@ class CategoryService:
                 raise InvalidParentError()
             self._check_parent(new_kind, new_parent)
             self._repository.update_category(item.id, display, key, new_kind, new_parent)
+            # A row inside a group has no budget of its own (budget spec PC8).
+            if item.parent_id is None and new_parent is not None:
+                self._repository.move_budget(item.id, new_parent)
             return self._get(item.id)
 
     def delete(self, item_id: int) -> None:

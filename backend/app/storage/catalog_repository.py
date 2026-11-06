@@ -119,6 +119,29 @@ class CatalogRepository:
     def delete_category(self, item_id: int) -> None:
         self._connection.execute("DELETE FROM categories WHERE id = ?", (item_id,))
 
+    def budgets(self) -> dict[int, int]:
+        """The saved monthly budgets by category id; a missing id has 0."""
+        rows = self._connection.execute("SELECT category_id, amount_cents FROM budgets")
+        return {row["category_id"]: row["amount_cents"] for row in rows}
+
+    def set_budget(self, category_id: int, amount_cents: int) -> None:
+        self._connection.execute(
+            "INSERT INTO budgets (category_id, amount_cents) VALUES (?, ?)"
+            " ON CONFLICT (category_id) DO UPDATE SET amount_cents = excluded.amount_cents",
+            (category_id, amount_cents),
+        )
+
+    def move_budget(self, from_id: int, to_id: int) -> None:
+        """Add the budget of `from_id` to `to_id` and remove it; without one, do nothing."""
+        self._connection.execute(
+            "INSERT INTO budgets (category_id, amount_cents)"
+            " SELECT ?, amount_cents FROM budgets WHERE category_id = ?"
+            " ON CONFLICT (category_id) DO UPDATE"
+            " SET amount_cents = budgets.amount_cents + excluded.amount_cents",
+            (to_id, from_id),
+        )
+        self._connection.execute("DELETE FROM budgets WHERE category_id = ?", (from_id,))
+
     def add_product(self, name: str, name_key: str, category_id: int) -> int:
         cursor = self._connection.execute(
             "INSERT INTO products (name, name_key, category_id) VALUES (?, ?, ?)",

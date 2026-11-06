@@ -39,6 +39,7 @@ starting a local app. There are no accounts, no login and no per-person buyer in
 | Review | The receipt image beside an editable table of its lines, with a warning when the lines do not add up to the receipt total. An unreviewed receipt can be deleted, and a receipt can be typed in by hand. | FR-16–FR-21, FR-43, FR-46, FR-47 |
 | Products and categories | Manage the product list and the categories, which can be grouped (e.g. Ruoka, Auto). | FR-33–FR-39 |
 | Totals | Spending per category and group, per ISO week and per month, by purchase date. | FR-22–FR-25, FR-44 |
+| Budget | A monthly budget for each group and each category without a group, compared with the reviewed spending of a calendar month or a period from the 15th to the 14th, and of its weeks. | FR-50 |
 | Export | CSV export of lines and totals; Google Sheets in a later release. | FR-26–FR-28 |
 
 Releases and the order of work are in [PRD section 9](../specs/PRD.md#9-releases).
@@ -75,8 +76,8 @@ Domain terms are defined in the [PRD glossary](../specs/PRD.md#13-glossary).
 
 ## Out of scope
 
-Multiple users, hosting on a server, a mobile app, budgeting or forecasting, bank
-integration, and cloud OCR or cloud models. See [PRD non-goals](../specs/PRD.md#3-non-goals).
+Multiple users, hosting on a server, a mobile app, forecasting, bank integration, and
+cloud OCR or cloud models. See [PRD non-goals](../specs/PRD.md#3-non-goals).
 
 ## Subsystems
 

@@ -84,6 +84,11 @@ it("totals AC14, AC22: /yhteenveto is the totals page, also with a period", () =
   expect(pageFromPath("/yhteenveto/")).toBe("products");
 });
 
+it("budget AC17, AC19: /budjetti and /vertailu are their pages, also with a period", () => {
+  expect(pageFromPath("/budjetti")).toBe("budget");
+  expect(pageFromPath("/vertailu")).toBe("comparison");
+});
+
 it("totals AC14: go pushes /yhteenveto", () => {
   const { result } = renderHook(() => usePage());
 

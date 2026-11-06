@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.calculation.period import Column, PeriodError, parse_period
+from app.calculation.period import Column, PeriodError, comparison_period, parse_period
 
 
 def test_ac1_one_month_covers_its_days() -> None:
@@ -130,3 +130,84 @@ def test_column_keys_have_four_digit_years() -> None:
     period = parse_period("month", "0999-01", "0999-01")
     assert period.month_columns()[0].key == "0999-01"
     assert period.week_columns()[0].key == "0999-W01"
+
+
+# Budget spec PC5, P3: the comparison period.
+
+
+def test_ac26_a_mid_period_runs_from_the_15th_to_the_14th() -> None:
+    period = comparison_period("2026-10", "mid")
+    assert (period.first, period.last) == ("2026-10", "2026-10")
+    assert (period.start, period.end) == (date(2026, 10, 15), date(2026, 11, 14))
+
+
+def test_ac28_a_mid_period_crosses_the_year() -> None:
+    period = comparison_period("2026-12", "mid")
+    assert (period.start, period.end) == (date(2026, 12, 15), date(2027, 1, 14))
+
+
+def test_ac28_a_mid_period_over_february_has_28_days() -> None:
+    period = comparison_period("2027-02", "mid")
+    assert (period.start, period.end) == (date(2027, 2, 15), date(2027, 3, 14))
+
+
+@pytest.mark.parametrize("kind", [None, "calendar"])
+def test_ac30_a_calendar_period_is_the_month(kind: str | None) -> None:
+    period = comparison_period("2026-10", kind)
+    assert (period.start, period.end) == (date(2026, 10, 1), date(2026, 10, 31))
+
+
+@pytest.mark.parametrize(
+    ("month", "kind"),
+    [
+        ("2026-10", "bad"),
+        ("2026-10", ""),
+        ("2026-10", "MID"),
+        (None, "mid"),
+        (None, None),
+        ("2026-13", "mid"),
+        ("2026-W40", None),
+    ],
+)
+def test_ac15_ac30_an_invalid_comparison_period_is_refused(
+    month: str | None, kind: str | None
+) -> None:
+    with pytest.raises(PeriodError):
+        comparison_period(month, kind)
+
+
+def test_ac27_weeks_of_a_mid_period() -> None:
+    columns = comparison_period("2026-10", "mid").week_columns()
+
+    assert columns == [
+        Column("2026-W42", date(2026, 10, 15), date(2026, 10, 18), partial=True),
+        Column("2026-W43", date(2026, 10, 19), date(2026, 10, 25), partial=False),
+        Column("2026-W44", date(2026, 10, 26), date(2026, 11, 1), partial=False),
+        Column("2026-W45", date(2026, 11, 2), date(2026, 11, 8), partial=False),
+        Column("2026-W46", date(2026, 11, 9), date(2026, 11, 14), partial=True),
+    ]
+
+
+def test_ac28_weeks_of_a_mid_period_across_the_year() -> None:
+    columns = comparison_period("2026-12", "mid").week_columns()
+
+    assert [column.key for column in columns] == [
+        "2026-W51",
+        "2026-W52",
+        "2026-W53",
+        "2027-W01",
+        "2027-W02",
+    ]
+    assert [column.partial for column in columns] == [True, False, False, False, True]
+
+
+def test_ac28_a_mid_period_over_february_has_four_whole_weeks() -> None:
+    columns = comparison_period("2027-02", "mid").week_columns()
+
+    assert [column.key for column in columns] == [
+        "2027-W07",
+        "2027-W08",
+        "2027-W09",
+        "2027-W10",
+    ]
+    assert not any(column.partial for column in columns)

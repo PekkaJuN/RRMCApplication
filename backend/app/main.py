@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.budget.routes import create_budget_router
 from app.categorization.defaults import seed_defaults
 from app.categorization.routes import create_catalog_router
 from app.engines.factory import Engines, create_engines
@@ -79,6 +80,7 @@ def create_app(
     app.include_router(create_import_router(import_service))
     app.include_router(create_review_router(settings, clock, failed_folder))
     app.include_router(create_totals_router(settings))
+    app.include_router(create_budget_router(settings))
     app.include_router(create_export_router(settings, exporter or CsvExporter()))
     for router in extra_routers:
         app.include_router(router)

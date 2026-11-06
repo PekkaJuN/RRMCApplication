@@ -43,6 +43,11 @@ export function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> 
   return request<T>("PATCH", path, body);
 }
 
+/** PUT a JSON body to a backend path. */
+export function apiPut<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return request<T>("PUT", path, body);
+}
+
 /** DELETE a backend path. Success has no data (204), unless the answer has a body. */
 export function apiDelete<T = undefined>(path: string): Promise<ApiResult<T>> {
   return request<T>("DELETE", path);

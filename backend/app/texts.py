@@ -62,3 +62,6 @@ INVALID_STORE = "Kaupan nimi saa olla enintään 100 merkkiä."
 INVALID_PERIOD = "Jakso on virheellinen."
 
 NO_CATEGORY = "Ei kategoriaa"
+
+# Monthly budget (budget spec)
+NOT_A_BUDGET_ROW = "Budjetin voi asettaa vain ryhmälle tai ryhmättömälle kategorialle."

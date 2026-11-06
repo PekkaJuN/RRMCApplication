@@ -138,8 +138,8 @@ def test_ac15_migration_keeps_existing_data(version_5: sqlite3.Connection) -> No
     # When the migrations run
     applied = migrate(version_5, MIGRATIONS_DIR)
 
-    # Then the version is 6 and every row reads back the same
-    assert applied == [6]
+    # Then migration 6 ran first and every row reads back the same
+    assert applied[0] == 6
     assert all_rows(version_5, "receipts") == receipts
     assert all_rows(version_5, "receipt_lines") == lines
     assert version_5.execute("PRAGMA foreign_key_check").fetchall() == []

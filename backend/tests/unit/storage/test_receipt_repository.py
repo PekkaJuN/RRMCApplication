@@ -401,6 +401,29 @@ def test_ac8_dated_lines_in_a_range(db: sqlite3.Connection) -> None:
     ]
 
 
+def test_ac7_dated_lines_of_reviewed_receipts_only(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    reviewed = add_dated(repository, 1, "2026-10-05")
+    unreviewed = add_dated(repository, 2, "2026-10-06")
+    repository.add_line(reviewed, 1, "Maito", 125, is_deposit_refund=False)
+    repository.add_line(unreviewed, 1, "Maito", 300, is_deposit_refund=False)
+    repository.set_reviewed(reviewed, reviewed=True)
+
+    lines = repository.dated_lines("2026-10-01", "2026-10-31", reviewed_only=True)
+
+    assert lines == [DatedLineRow("2026-10-05", 125, None, is_deposit_refund=False)]
+
+
+def test_ac22_dated_lines_count_every_receipt_by_default(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    unreviewed = add_dated(repository, 1, "2026-10-06")
+    repository.add_line(unreviewed, 1, "Maito", 300, is_deposit_refund=False)
+
+    lines = repository.dated_lines("2026-10-01", "2026-10-31")
+
+    assert lines == [DatedLineRow("2026-10-06", 300, None, is_deposit_refund=False)]
+
+
 def test_ac20_count_unreviewed_in_a_range(db: sqlite3.Connection) -> None:
     repository = ReceiptRepository(db)
     confirmed = add_dated(repository, 1, "2026-10-05")
