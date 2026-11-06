@@ -244,6 +244,20 @@ If a skill conflicts with this file, this file wins; tell the user.
 Keep this table in sync with the folders. A skill marked *planned* must not be used until its
 script exists.
 
+## Model routing
+
+Two tiers. Each tool maps them to its own models in its agent file:
+`.claude/agents/checker.md` and `.codex/agents/checker.toml`. The shared instructions are in
+`.agents/roles/checker.md`.
+
+- **`checker` (fast tier):** bounded lookups and mechanical checks. Delegate these to the
+  `checker` subagent.
+- **Main session (strong tier):** coding, root-cause reasoning, spec decisions and the final
+  audit verdict. Read the spec yourself before implementing it.
+
+Treat `checker` output as findings, not decisions. Run the final tests and checks in the main
+session before declaring work done.
+
 ## Reporting
 
 When you finish, state in a few lines: what changed, how you verified it (commands and
