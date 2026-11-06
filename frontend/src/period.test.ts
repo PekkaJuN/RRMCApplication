@@ -1,6 +1,8 @@
 import { expect, it } from "vitest";
 import {
+  columnHeading,
   currentMonth,
+  currentMonthRange,
   currentWeek,
   monthLabel,
   periodFromSearch,
@@ -68,4 +70,59 @@ it("totals AC23: week and month labels without leading zeros", () => {
   expect(weekLabel("2027-W01")).toBe("vk 1/2027");
   expect(monthLabel("2026-12")).toBe("12/2026");
   expect(monthLabel("2027-01")).toBe("1/2027");
+});
+
+// Date range spec.
+
+it("date range AC16: a range is read from the address and written back", () => {
+  const search = "?unit=range&from=2026-10-15&to=2026-11-14";
+  const period = periodFromSearch(search);
+
+  expect(period).toEqual({ unit: "range", from: "2026-10-15", to: "2026-11-14" });
+  expect(period && periodToSearch(period)).toBe(search);
+});
+
+it("date range AC18: a range of another shape gives no period", () => {
+  const addresses = [
+    "?unit=range&from=2026-10&to=2026-11-14",
+    "?unit=range&from=2026-10-15",
+    "?unit=range&from=2026-W40&to=2026-11-14",
+    "?unit=range&from=15.10.2026&to=2026-11-14",
+  ];
+
+  expect(addresses.map(periodFromSearch)).toEqual(addresses.map(() => null));
+});
+
+it("date range AC19: a day that is not real is left for the backend", () => {
+  expect(periodFromSearch("?unit=range&from=2026-02-30&to=2026-03-01")).toEqual({
+    unit: "range",
+    from: "2026-02-30",
+    to: "2026-03-01",
+  });
+});
+
+it("date range AC13: the current month as days, by the local date", () => {
+  expect(currentMonthRange(new Date(2026, 10, 6))).toEqual({
+    unit: "range",
+    from: "2026-11-01",
+    to: "2026-11-30",
+  });
+  expect(currentMonthRange(new Date(2028, 1, 10)).to).toBe("2028-02-29");
+  expect(currentMonthRange(new Date(2026, 11, 31)).to).toBe("2026-12-31");
+});
+
+it("date range AC21: a partial column's heading across a month and a year", () => {
+  const column = (key: string, start_date: string, end_date: string) => ({
+    key,
+    start_date,
+    end_date,
+    partial: true,
+  });
+
+  expect(columnHeading(column("2026-W44", "2026-10-28", "2026-11-01"), "week")).toBe(
+    "vk 44/2026 (osittainen) 28.10.–1.11.2026",
+  );
+  expect(columnHeading(column("2026-W53", "2026-12-30", "2027-01-02"), "week")).toBe(
+    "vk 53/2026 (osittainen) 30.12.2026–2.1.2027",
+  );
 });

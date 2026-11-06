@@ -29,7 +29,7 @@ function optionTexts(select: HTMLElement): string[] {
 
 async function fill(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
-  fireEvent.change(screen.getByLabelText("Päivä"), { target: { value: "2026-10-05" } });
+  await user.type(screen.getByLabelText("Päivä"), "05.10.2026");
   await user.type(screen.getByLabelText("Loppusumma"), "3,49");
 }
 
@@ -164,7 +164,7 @@ it.each([
   expect(await screen.findByRole("alert")).toHaveTextContent(text);
   expect(onCreated).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Kauppa")).toHaveValue("Testikauppa");
-  expect(screen.getByLabelText("Päivä")).toHaveValue("2026-10-05");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("05.10.2026");
   expect(screen.getByLabelText("Loppusumma")).toHaveValue("3,49");
   expect(select).toHaveDisplayValue("IMG_2.jpg");
   expect(screen.getByRole("img", { name: "Valittu kuva" })).toBeInTheDocument();
@@ -212,4 +212,104 @@ it("receipt-management AC36: a double click sends one create; a refusal enables 
   expect(await screen.findByRole("alert")).toHaveTextContent("Kuva on jo tuotu toiseen kuittiin.");
   expect(button).toBeEnabled();
   expect(bodies).toHaveLength(1);
+});
+
+// Date field PC5.
+
+it("date-field AC14: the date is typed as dd.mm.yyyy and sent as YYYY-MM-DD", async () => {
+  const bodies = answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+
+  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  await user.type(screen.getByLabelText("Päivä"), "15.9.2026");
+  await user.type(screen.getByLabelText("Loppusumma"), "3,49");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("15.09.2026");
+  await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
+
+  await waitFor(() =>
+    expect(bodies).toEqual([
+      { store: "Testikauppa", purchase_date: "2026-09-15", total_cents: 349 },
+    ]),
+  );
+});
+
+it("date-field AC14: a date that is not real sends nothing and keeps every value", async () => {
+  const bodies = answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+
+  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  await user.type(screen.getByLabelText("Päivä"), "31.09.2026");
+  await user.type(screen.getByLabelText("Loppusumma"), "3,49");
+  expect(screen.getByRole("alert")).toHaveTextContent("Päivämäärä ei kelpaa.");
+  await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
+
+  expect(screen.getByRole("alert")).toHaveTextContent("Päivämäärä ei kelpaa.");
+  expect(bodies).toEqual([]);
+  expect(screen.getByLabelText("Kauppa")).toHaveValue("Testikauppa");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("31.09.2026");
+  expect(screen.getByLabelText("Loppusumma")).toHaveValue("3,49");
+});
+
+it("date-field AC14: an old valid date is not sent after an invalid edit", async () => {
+  const bodies = answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+  const date = screen.getByLabelText("Päivä");
+
+  await user.type(date, "15.09.2026");
+  await user.type(screen.getByLabelText("Loppusumma"), "3,49");
+  await user.clear(date);
+  await user.type(date, "31.09.2026");
+  await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
+
+  expect(screen.getByRole("alert")).toHaveTextContent("Päivämäärä ei kelpaa.");
+  expect(bodies).toEqual([]);
+});
+
+it("date-field AC5: editing the date clears the message", async () => {
+  answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+  const date = screen.getByLabelText("Päivä");
+
+  await user.type(date, "abc");
+  await user.tab();
+  expect(screen.getByRole("alert")).toBeInTheDocument();
+  await user.type(date, "d");
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("date-field AC7: a day picked from the calendar is sent", async () => {
+  const bodies = answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+  const picker = document.querySelector<HTMLInputElement>('input[type="date"]');
+  if (picker === null) {
+    throw new Error("no picker");
+  }
+
+  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  fireEvent.change(picker, { target: { value: "2026-09-15" } });
+  await user.type(screen.getByLabelText("Loppusumma"), "3,49");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("15.09.2026");
+  await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
+
+  await waitFor(() =>
+    expect(bodies).toEqual([
+      { store: "Testikauppa", purchase_date: "2026-09-15", total_cents: 349 },
+    ]),
+  );
+});
+
+it("date-field PC2: Enter shows the date with leading zeros", async () => {
+  answers();
+  const user = userEvent.setup();
+  render(<NewReceiptForm onCreated={() => {}} onCancel={() => {}} />);
+
+  await user.type(screen.getByLabelText("Päivä"), "5.9.2026{Enter}");
+
+  expect(screen.getByLabelText("Päivä")).toHaveValue("05.09.2026");
 });

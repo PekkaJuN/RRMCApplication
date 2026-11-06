@@ -339,3 +339,110 @@ def test_ac19_no_product_names_in_the_answer_or_the_log(
     assert "GET /api/totals 200" in logged
     assert "Salainen" not in logged
     assert "2026-10" not in logged
+
+
+# Date range (date range spec).
+
+RANGE = "/api/totals?unit=range&from=2026-10-15&to=2026-11-14"
+
+
+def test_date_range_ac1_a_range_is_totalled_by_its_days(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    bread = category(db, "Leivät")
+    for day, amount in [
+        ("2026-10-14", 100),
+        ("2026-10-15", 200),
+        ("2026-11-14", 400),
+        ("2026-11-15", 800),
+    ]:
+        add_receipt(db, day, [("Ruisleipä", amount, bread)])
+
+    response = api.get(RANGE)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["unit"], body["from"], body["to"]) == ("range", "2026-10-15", "2026-11-14")
+    assert body["month_totals"] == [200, 400]
+
+
+def test_date_range_ac4_a_whole_month_gives_the_months_totals(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    bread = category(db, "Leivät")
+    add_receipt(db, "2026-10-01", [("Ruisleipä", 100, bread)])
+    add_receipt(db, "2026-10-31", [("Ruisleipä", 200, bread)])
+
+    by_range = api.get("/api/totals?unit=range&from=2026-10-01&to=2026-10-31").json()
+    by_month = api.get(OCTOBER).json()
+
+    for key in ("weeks", "months", "rows", "week_totals", "month_totals"):
+        assert by_range[key] == by_month[key]
+
+
+def test_date_range_ac5_across_a_year_boundary(api: TestClient, db: sqlite3.Connection) -> None:
+    bread = category(db, "Leivät")
+    for day, amount in [
+        ("2026-12-29", 1),
+        ("2026-12-30", 10),
+        ("2027-01-02", 20),
+        ("2027-01-03", 2),
+    ]:
+        add_receipt(db, day, [("Ruisleipä", amount, bread)])
+
+    body = api.get("/api/totals?unit=range&from=2026-12-30&to=2027-01-02").json()
+
+    assert body["week_totals"] == [30]
+    assert body["month_totals"] == [10, 20]
+    assert [column["key"] for column in body["weeks"]] == ["2026-W53"]
+    assert [column["partial"] for column in body["months"]] == [True, True]
+
+
+def test_date_range_ac6_the_rules_stay_the_same(api: TestClient, db: sqlite3.Connection) -> None:
+    add_receipt(
+        db,
+        "2026-10-20",
+        [("Maito", 229, category(db, "Maitotuotteet")), ("Panttipalautus", -40, None)],
+    )
+    add_receipt(db, "2026-10-21", [("Tuntematon", 100, None)], reviewed=True)
+    add_receipt(db, None, [("Limu", 300, None)])
+
+    body = api.get(RANGE).json()
+
+    assert body["month_totals"] == [329, 0]
+    assert body["rows"][-1]["kind"] == "none"
+    assert (body["unreviewed_receipts"], body["undated_receipts"]) == (1, 1)
+
+
+def test_date_range_ac7_the_longest_range(api: TestClient) -> None:
+    accepted = api.get("/api/totals?unit=range&from=2027-01-01&to=2028-12-31")
+    refused = api.get("/api/totals?unit=range&from=2027-01-01&to=2029-01-01")
+
+    assert accepted.status_code == 200
+    assert refused.status_code == 422
+    assert refused.json()["error"] == "invalid_period"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "unit=range&to=2026-10-15",
+        "unit=range&from=2026-10-15",
+        "unit=range&from=2026-02-30&to=2026-03-01",
+        "unit=range&from=2026-2-3&to=2026-03-01",
+        "unit=range&from=20261015&to=20261016",
+        "unit=range&from=2026-10&to=2026-11",
+        "unit=range&from=2026-W40&to=2026-W41",
+        "unit=range&from=0000-01-01&to=0000-01-02",
+        "unit=range&from=9999-01-01&to=9999-01-02",
+        "unit=range&from=٢٠٢٦-١٠-١٥&to=٢٠٢٦-١٠-١٦",
+        "unit=range&from=2026-10-02&to=2026-10-01",
+        "unit=month&from=2026-10-15&to=2026-10-15",
+        "unit=week&from=2026-10-15&to=2026-10-15",
+    ],
+)
+def test_date_range_ac8_ac9_invalid_values(api: TestClient, query: str) -> None:
+    response = api.get(f"/api/totals?{query}")
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "invalid_period", "message": "Jakso on virheellinen."}

@@ -277,6 +277,39 @@ async function download(page: Page, link: string): Promise<{ name: string; text:
 
 const TOTALS_HEADER = "Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa\r\n";
 
+test("date range AC14, AC20: totals and export of a date range", async ({ page }) => {
+  await writeFile(
+    join(importDir, `kuitti-${RUN}_aikavali.jpg`),
+    Buffer.concat([SYNTHETIC_JPEG, Buffer.from(" range")]),
+  );
+  await page.goto("/tuonti");
+  await page.getByRole("button", { name: "Tuo kuitit" }).click();
+  await expect(
+    page.getByRole("region", { name: "Edellinen tuonti" }).getByText("Tuotu: 1"),
+  ).toBeVisible();
+  await page.goto("/yhteenveto");
+
+  await page.getByRole("combobox", { name: "Jakso" }).selectOption({ label: "Aikaväli" });
+  await expect(page.getByLabel("Alkaen", { exact: true })).not.toBeEditable();
+  // Set through the calendar's input, so this journey does not depend on its window.
+  const calendars = page.locator('input[type="date"]');
+  await calendars.nth(0).fill("2026-10-03");
+  await expect(page).toHaveURL(/from=2026-10-03/);
+  await calendars.nth(1).fill("2026-10-07");
+  await expect(page).toHaveURL(/\?unit=range&from=2026-10-03&to=2026-10-07$/);
+  await page.reload();
+
+  await expect(page.getByRole("combobox", { name: "Jakso" })).toHaveValue("range");
+  await expect(page.getByLabel("Alkaen", { exact: true })).toHaveValue("03.10.2026");
+  await expect(page.getByRole("table", { name: "Viikot" })).toContainText(
+    "vk 41/2026 (osittainen) 5.10.–7.10.2026",
+  );
+  const weeks = await download(page, "Vie viikkosummat (CSV)");
+  expect(weeks.name).toBe("summat_viikot_2026-10-03_2026-10-07.csv");
+  expect(weeks.text.startsWith(TOTALS_HEADER)).toBe(true);
+  expect(weeks.text).toContain("2026-W41;2026-10-05;2026-10-07;kyllä;");
+});
+
 test("export AC1, AC2, AC16, AC13: download the CSV files of a month", async ({ page }) => {
   await writeFile(
     join(importDir, `kuitti-${RUN}_vienti.jpg`),
@@ -305,4 +338,42 @@ test("export AC1, AC2, AC16, AC13: download the CSV files of a month", async ({ 
   expect(months.text).not.toContain("2026-W");
   expect(lines.text).toContain(";Maito;1,25;");
   expect(lines.text).toContain(";Limu;2,24;");
+});
+
+test("date-field AC6, AC7, AC16, AC17: the real calendar picks only a chosen day", async ({
+  page,
+}) => {
+  const address = "/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14";
+  // The browser's calendar window is not in the page, so nothing shows that it has opened.
+  const OPENING_MS = 500;
+  await page.goto(address);
+  const from = page.getByLabel("Alkaen", { exact: true });
+  await expect(from).toHaveValue("15.10.2026");
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/totals")) {
+      requests.push(request.url());
+    }
+  });
+
+  await page.getByRole("button", { name: "Avaa kalenteri: Alkaen" }).focus();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(OPENING_MS);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(OPENING_MS);
+
+  expect(requests).toEqual([]);
+  expect(page.url()).toContain(address);
+  await expect(from).toHaveValue("15.10.2026");
+
+  await from.click();
+  await page.waitForTimeout(OPENING_MS);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+
+  await expect(page).toHaveURL(/from=2026-10-16&to=2026-11-14$/);
+  await expect(from).toHaveValue("16.10.2026");
+  expect(requests).toHaveLength(1);
 });

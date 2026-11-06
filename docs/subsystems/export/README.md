@@ -70,8 +70,9 @@ The endpoints, their files and error codes are in the
   leading `'`, so Excel shows it as text instead of running it as a formula. Amounts and
   dates are not changed, so `-1,50` stays a number.
 - File names: `kuittirivit_<from>_<to>.csv`, `summat_viikot_<from>_<to>.csv`,
-  `summat_kuukaudet_<from>_<to>.csv`. `parse_period` has checked the bounds, so they hold
-  only digits, `-` and `W`.
+  `summat_kuukaudet_<from>_<to>.csv`. A date range gives
+  `kuittirivit_2026-10-15_2026-11-14.csv`. `parse_period` has checked the bounds, so they
+  hold only digits, `-` and `W`.
 
 ## Dependencies
 

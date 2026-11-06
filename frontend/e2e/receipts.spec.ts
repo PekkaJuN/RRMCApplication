@@ -28,7 +28,7 @@ async function openForm(page: Page): Promise<void> {
 async function create(page: Page, store: string): Promise<void> {
   const form = page.getByRole("form", { name: "Uusi kuitti" });
   await form.getByLabel("Kauppa").fill(store);
-  await form.getByLabel("Päivä").fill("2026-09-15");
+  await form.getByLabel("Päivä", { exact: true }).fill("15.09.2026");
   await form.getByLabel("Loppusumma").fill("1,25");
   await form.getByRole("button", { name: "Luo kuitti" }).click();
   await expect(page).toHaveURL(/\/kuitit\/\d+$/);
@@ -50,6 +50,21 @@ test("AC29, AC11: type in a receipt without an image and add a line", async ({ p
 
   await page.getByRole("link", { name: "Takaisin kuittilistaan" }).click();
   await expect(page.getByRole("table", { name: "Kuittilista" }).getByText(store)).toBeVisible();
+});
+
+test("date-field AC14, AC8: a date typed as dd.mm.yyyy is saved", async ({ page }) => {
+  await openForm(page);
+  await create(page, `E2E-kauppa ${RUN} pvm`);
+  const date = page.getByLabel("Päivä", { exact: true });
+  await expect(date).toHaveValue("15.09.2026");
+
+  await date.fill("16.9.2026");
+  const saved = page.waitForResponse((answer) => answer.request().method() === "PATCH");
+  await date.press("Enter");
+  await saved;
+  await page.reload();
+
+  await expect(page.getByLabel("Päivä", { exact: true })).toHaveValue("16.09.2026");
 });
 
 test("AC30: type in a failed receipt with its image", async ({ page }) => {

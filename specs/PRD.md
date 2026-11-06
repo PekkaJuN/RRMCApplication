@@ -103,6 +103,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-21 | A list view shows all receipts with date, store, total, warning state and review state (unreviewed / confirmed). |
 | FR-46 | The user can delete an unreviewed receipt and its lines, after a confirmation. A reviewed receipt must be made unreviewed first. Products, categories and the image file are kept; the image is no longer a duplicate, so it can be imported again. |
 | FR-47 | The user can create a receipt by hand with store, purchase date and total, and then add its lines in the receipt view. When it is created, an image from the failed folder can be attached to it; the image then moves to the done folder and is not read by OCR or the model. A typed-in receipt is counted, reviewed, deleted and exported like an imported one. |
+| FR-51 | *Next release:* date fields show `dd.mm.yyyy`, accept it where they can be typed in, and have a calendar button. Dates are stored and sent as `YYYY-MM-DD`. |
 
 ### 6.5 Totals
 
@@ -248,7 +249,7 @@ category, category source, product). The data model is defined in `docs/datamode
 | Release | Scope |
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
-| Next | FR-48 PDF export of the totals summary, FR-49 free date range for totals, FR-50 monthly budget |
+| Next | FR-48 PDF export of the totals summary, FR-49 free date range for totals, FR-50 monthly budget, FR-51 date fields as `dd.mm.yyyy` |
 | Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 

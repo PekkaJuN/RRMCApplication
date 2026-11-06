@@ -339,7 +339,7 @@ Implemented in @backend/app/totals/routes.py. The rules are in
 
 | Method and path | Query | Success | Errors |
 |---|---|---|---|
-| `GET /api/totals` | `unit` `month` or `week`; `from` and `to` as `2026-10` or `2026-W40`, inclusive; at most 24 months or 104 weeks | 200, the totals of the period | 422 `invalid_period` |
+| `GET /api/totals` | `unit` `month`, `week` or `range`; `from` and `to` as `2026-10`, `2026-W40` or `2026-10-15`, inclusive; at most 24 months, 104 weeks or 731 days | 200, the totals of the period | 422 `invalid_period` |
 
 ```json
 {
@@ -373,7 +373,7 @@ without a purchase date, which are in no period.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|
-| 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week that does not exist; `from` after `to`; a longer period |
+| 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week or a day that does not exist; `from` after `to`; a longer period |
 
 ### Budget
 

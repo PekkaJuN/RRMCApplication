@@ -2,6 +2,19 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-06: Moving inside the date calendar counted as a pick
+
+- **Context:** The date field keeps a hidden native date input as its calendar. An independent
+  review tried the real calendar in Chromium with the keyboard.
+- **Symptom:** each arrow key or month button in the open calendar saved the receipt's date, or
+  loaded totals and added a history entry. Esc went through the same path.
+- **Root cause:** Chromium writes the input's value and fires `input` on every step. React's
+  `onChange` listens to `input`. Tests fired one event per pick, so they could not see it.
+- **Solution:** @frontend/src/components/DateInput.tsx listens to the native `change` event on
+  the element, which fires only for a chosen day, and sets the value from an effect.
+- **Prevention:** a native picker's events differ from a form input's, so test them in a real
+  browser. @frontend/e2e/import.spec.ts drives the real calendar with the keyboard.
+
 ## 2026-11-06: The import polling test failed under load
 
 - **Context:** The monthly budget spec added five frontend test files, so more test files

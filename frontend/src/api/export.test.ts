@@ -23,3 +23,17 @@ it("export AC13: the URLs of a month period", () => {
   );
   expect(exportUrl("lines", OCTOBER)).toBe("/api/export/lines?unit=month&from=2026-10&to=2026-10");
 });
+
+it("date range AC20: the URLs of a date range", () => {
+  const range = { unit: "range", from: "2026-10-15", to: "2026-11-14" } as const;
+
+  expect(exportUrl("weeks", range)).toBe(
+    "/api/export/totals?unit=range&from=2026-10-15&to=2026-11-14&by=week",
+  );
+  expect(exportUrl("months", range)).toBe(
+    "/api/export/totals?unit=range&from=2026-10-15&to=2026-11-14&by=month",
+  );
+  expect(exportUrl("lines", range)).toBe(
+    "/api/export/lines?unit=range&from=2026-10-15&to=2026-11-14",
+  );
+});

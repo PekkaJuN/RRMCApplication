@@ -22,6 +22,8 @@
   the duplicate check; an import that takes the chosen done name between `take` and the
   move answers 503 instead of retrying with a new name; `npm audit` reports a moderate
   `minimatch` advisory in the ESLint dev tools, unchanged by this feature.
+  2026-11-06: `Päivä` is the [date field](date-field.md), shown as `dd.mm.yyyy`; requests
+  still send `YYYY-MM-DD`.
 - **Depends on:** [Receipt review](receipt-review.md), [Line editing](line-editing.md),
   [Receipt import](receipt-import.md)
 - **Implements:** new PRD FR-46 (delete a receipt) and FR-47 (create a receipt by hand,
@@ -130,7 +132,7 @@ Two gaps block the user today:
   answer arrives, `Poista kuitti` is disabled, so a second delete cannot be sent; after a
   failed delete it is enabled again (AC37).
 - **PC11 New receipt form on the receipt list.** The Kuitit page has a `Uusi kuitti` button
-  above the list. It opens a form with `Kauppa`, `Päivä` (date input), `Loppusumma`, `Kuva`
+  above the list. It opens a form with `Kauppa`, `Päivä` (date field), `Loppusumma`, `Kuva`
   (a select) and the buttons `Luo kuitti` and `Peruuta`. `Peruuta` closes the form without
   sending. While the create request runs, `Luo kuitti` is disabled, so a double click sends
   one request; after a failed create it is enabled again (AC36).
@@ -866,8 +868,8 @@ sequenceDiagram
   (reset when the choice changes), field errors and a submit error. On mount it calls
   `failedImages()`. On submit the total (`parseCents`) and a non-empty date are checked
   first (AC32); then `createReceipt`, sending `image_file_name` only when one is chosen.
-  Errors keep every value (AC33). The date input is `type="date"`, whose value is already
-  `YYYY-MM-DD`.
+  Errors keep every value (AC33). The date is the [date field](date-field.md), and the request
+  sends `YYYY-MM-DD`.
 - **`ReceiptsPage`:** a `Uusi kuitti` button above the list shows the form; `onCancel`
   unmounts it, so reopening starts empty (AC34); `onCreated` calls the page's `onOpen(id)`.
 - **`fi.ts`:** the texts of the UI texts table. **`styles.css`:** the preview at most

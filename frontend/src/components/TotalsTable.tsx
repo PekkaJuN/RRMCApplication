@@ -1,12 +1,12 @@
 import type { TotalsColumn, TotalsRow } from "../api/totals";
 import { formatCents } from "../format";
 import { fi } from "../i18n/fi";
-import { columnHeading, type PeriodUnit } from "../period";
+import { columnHeading, type ColumnUnit } from "../period";
 
 interface Props {
   label: string;
   /** Which columns these are: weeks or months. */
-  unit: PeriodUnit;
+  unit: ColumnUnit;
   columns: TotalsColumn[];
   rows: TotalsRow[];
   totals: number[];
