@@ -12,14 +12,14 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-11-04
+Last reviewed: 2026-11-06
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
 | 1 Architecture | 10 | 6 | 4 | 0 | 0 |
-| 2 Subsystems | 9 | 9 | 0 | 0 | 0 |
+| 2 Subsystems | 10 | 10 | 0 | 0 | 0 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -62,7 +62,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | Done |
-| 19 | Budget | [docs/subsystems/budget/README.md](subsystems/budget/README.md) | `/api/budget`: monthly budgets and their comparison with reviewed spending of a calendar month or a 15–14 period | 6, 9, 12, 13, 18 | Done |
+| 20 | Budget | [docs/subsystems/budget/README.md](subsystems/budget/README.md) | `/api/budget`: monthly budgets and their comparison with reviewed spending of a calendar month or a 15–14 period | 6, 9, 12, 13, 18 | Done |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
@@ -112,11 +112,16 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The monthly budget spec is Done (audited 2026-11-06): the budget package, migration 0007, the comparison
   in calculation, and the Budjetti and Vertailu pages. The budget, calculation, storage,
   categorization, UI, API, data model, architecture and glossary docs describe it.
+- The Finnish date field spec is Done (audited 2026-11-06): date fields as `dd.mm.yyyy` with a
+  calendar button. The UI and glossary docs describe it.
+- The free date range spec is Done (audited 2026-11-06): the `range` period in calculation, its
+  use in totals and the CSV export, and `Aikaväli` on the Yhteenveto page. The calculation,
+  totals, export, UI, API and glossary docs describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
-- Docs scanned against the code on 2026-11-04. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
+- Docs scanned against the code on 2026-11-06. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
 
 ## Related documents
 

@@ -81,6 +81,11 @@ export const fi = {
     unreviewed: "Tarkistamaton",
     reviewed: "Vahvistettu",
   },
+  dateField: {
+    placeholder: "pp.kk.vvvv",
+    calendar: (label: string) => `Avaa kalenteri: ${label}`,
+    invalid: "Päivämäärä ei kelpaa.",
+  },
   newReceipt: {
     open: "Uusi kuitti",
     heading: "Uusi kuitti",
@@ -130,6 +135,7 @@ export const fi = {
     unit: "Jakso",
     month: "Kuukausi",
     week: "Viikko",
+    range: "Aikaväli",
     from: "Alkaen",
     to: "Päättyen",
     weeks: "Viikot",

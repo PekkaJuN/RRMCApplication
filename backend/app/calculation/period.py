@@ -1,9 +1,9 @@
 """The periods of the totals and the budget comparison.
 
-A totals period is whole calendar months or whole ISO weeks (totals spec PC3, P1). A
-comparison period is a calendar month or a period from the 15th to the 14th of the next
-month (budget spec PC5, P3). A period's columns are the weeks and months that have a day in
-it, clipped to its days.
+A totals period is whole calendar months, whole ISO weeks (totals spec PC3, P1) or a free
+date range (date range spec PC1, PC4). A comparison period is a calendar month or a period
+from the 15th to the 14th of the next month (budget spec PC5, P3). A period's columns are the
+weeks and months that have a day in it, clipped to its days.
 """
 
 import re
@@ -12,10 +12,14 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Literal
 
+# The kind of a column, and of a totals file.
 Unit = Literal["month", "week"]
+PeriodUnit = Unit | Literal["range"]
 
 MAX_MONTHS = 24
 MAX_WEEKS = 104
+# The longest possible 24 months.
+MAX_RANGE_DAYS = 731
 # Years 1–9998: the columns of a period in 9999 would run past `date.max`.
 MAX_YEAR = 9998
 MID_PERIOD_START_DAY = 15
@@ -23,6 +27,7 @@ MID_PERIOD_START_DAY = 15
 # fullmatch with explicit digits: `\d` would also accept non-ASCII digits.
 _MONTH = re.compile(r"([0-9]{4})-(0[1-9]|1[0-2])")
 _WEEK = re.compile(r"([0-9]{4})-W(0[1-9]|[1-4][0-9]|5[0-3])")
+_DAY = re.compile(r"([0-9]{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])")
 
 
 class PeriodError(ValueError):
@@ -39,7 +44,7 @@ class Column:
 
 @dataclass(frozen=True)
 class Period:
-    unit: Unit
+    unit: PeriodUnit
     first: str
     last: str
     start: date
@@ -94,6 +99,11 @@ def parse_period(unit: str | None, first: str | None, last: str | None) -> Perio
         if not 1 <= length <= MAX_WEEKS:
             raise PeriodError
         return Period("week", first, last, start, last_monday + timedelta(days=6))
+    if unit == "range":
+        start, end = _day(first), _day(last)
+        if not 1 <= (end - start).days + 1 <= MAX_RANGE_DAYS:
+            raise PeriodError
+        return Period("range", first, last, start, end)
     raise PeriodError
 
 
@@ -119,6 +129,17 @@ def _month(value: str) -> tuple[int, int]:
     if match is None or not 1 <= int(match[1]) <= MAX_YEAR:
         raise PeriodError
     return int(match[1]), int(match[2])
+
+
+def _day(value: str) -> date:
+    match = _DAY.fullmatch(value)
+    if match is None or not 1 <= int(match[1]) <= MAX_YEAR:
+        raise PeriodError
+    try:
+        # Raises for a day its month does not have.
+        return date(int(match[1]), int(match[2]), int(match[3]))
+    except ValueError as error:
+        raise PeriodError from error
 
 
 def _monday(value: str) -> date:

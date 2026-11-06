@@ -44,3 +44,27 @@ export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
   return `${Number(day)}.${Number(month)}.${year}`;
 }
+
+/** `2026-10-05` → `05.10.2026`: the text of a date field (date field PC1). */
+export function dateToText(date: string): string {
+  return date.split("-").reverse().join(".");
+}
+
+const DATE_TEXT = /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{4})$/;
+
+/** `5.10.2026` → `2026-10-05`, or null when the text is not a real day (date field PC2). */
+export function parseDateText(text: string): string | null {
+  const match = DATE_TEXT.exec(text.trim());
+  if (match === null) {
+    return null;
+  }
+  const [, dayText = "", monthText = "", yearText = ""] = match;
+  const [day, month, year] = [Number(dayText), Number(monthText), Number(yearText)];
+  // Not `Date.UTC`: it maps the years 0–99 to the 1900s.
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  if (year === 0 || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return `${yearText}-${monthText.padStart(2, "0")}-${dayText.padStart(2, "0")}`;
+}

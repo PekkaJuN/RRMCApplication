@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -248,7 +248,7 @@ it("receipt-management AC29: a receipt typed in on the Kuitit page opens without
 
   await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
   await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
-  fireEvent.change(screen.getByLabelText("Päivä"), { target: { value: "2026-10-05" } });
+  await user.type(screen.getByLabelText("Päivä"), "05.10.2026");
   await user.type(screen.getByLabelText("Loppusumma"), "3,49");
   await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
 

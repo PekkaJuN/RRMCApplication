@@ -1,7 +1,8 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { createReceipt, failedImages, failedImageUrl, type NewReceipt } from "../api/receipts";
-import { parseCents } from "../format";
+import { dateToText, parseCents, parseDateText } from "../format";
 import { fi } from "../i18n/fi";
+import { DateInput } from "./DateInput";
 
 interface Props {
   /** Called with the new receipt's id after it was created. */
@@ -12,6 +13,7 @@ interface Props {
 /** The `Uusi kuitti` form on the Kuitit page (receipt-management PC11). */
 export function NewReceiptForm({ onCreated, onCancel }: Props) {
   const headingId = useId();
+  const dateId = useId();
   const [store, setStore] = useState("");
   const [date, setDate] = useState("");
   const [total, setTotal] = useState("");
@@ -41,15 +43,31 @@ export function NewReceiptForm({ onCreated, onCancel }: Props) {
     };
   }, []);
 
+  /** On leaving the field: an empty date is checked only when the form is sent. */
+  function checkDate() {
+    const parsed = parseDateText(date);
+    if (parsed !== null) {
+      setDate(dateToText(parsed));
+    }
+    setDateError(parsed === null && date !== "" ? fi.dateField.invalid : null);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const cents = parseCents(total);
-    setDateError(date === "" ? fi.newReceipt.dateMissing : null);
+    // Read from the text at submit, so an old valid date cannot go with an invalid edit.
+    const purchaseDate = parseDateText(date);
+    setDateError(
+      date === "" ? fi.newReceipt.dateMissing : purchaseDate ? null : fi.dateField.invalid,
+    );
     setTotalError(cents === null ? fi.receipt.amountFormat : null);
-    if (date === "" || cents === null) {
+    if (purchaseDate !== null) {
+      setDate(dateToText(purchaseDate));
+    }
+    if (purchaseDate === null || cents === null) {
       return;
     }
-    const receipt: NewReceipt = { store, purchase_date: date, total_cents: cents };
+    const receipt: NewReceipt = { store, purchase_date: purchaseDate, total_cents: cents };
     if (image !== "") {
       receipt.image_file_name = image;
     }
@@ -76,10 +94,21 @@ export function NewReceiptForm({ onCreated, onCancel }: Props) {
           {fi.receipt.store}{" "}
           <input value={store} onChange={(event) => setStore(event.target.value)} />
         </label>{" "}
-        <label>
-          {fi.receipt.date}{" "}
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        </label>
+        <label htmlFor={dateId}>{fi.receipt.date}</label>{" "}
+        <DateInput
+          id={dateId}
+          label={fi.receipt.date}
+          text={date}
+          onTextChange={(text) => {
+            setDate(text);
+            setDateError(null);
+          }}
+          onPick={(text) => {
+            setDate(text);
+            setDateError(null);
+          }}
+          onBlur={checkDate}
+        />
         {dateError && <span role="alert"> {dateError}</span>}{" "}
         <label>
           {fi.receipt.total}{" "}

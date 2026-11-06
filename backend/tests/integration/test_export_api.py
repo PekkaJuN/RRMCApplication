@@ -368,3 +368,93 @@ def test_ac15_privacy(
         "GET /api/export/lines 200",
         "GET /api/export/totals 200",
     ]
+
+
+# Date range (date range spec).
+
+RANGE = "unit=range&from=2026-10-15&to=2026-11-14"
+
+
+def add_range_fixture(db: sqlite3.Connection) -> None:
+    for day, amount in [
+        ("2026-10-14", 100),
+        ("2026-10-15", 200),
+        ("2026-11-14", 400),
+        ("2026-11-15", 800),
+    ]:
+        add_receipt(db, day, [("Ruisleipä", amount, "Leivät")])
+
+
+def test_date_range_ac10_lines_file(api: TestClient, db: sqlite3.Connection) -> None:
+    add_range_fixture(db)
+
+    response = lines_file(api, RANGE)
+
+    assert response.status_code == 200
+    assert (
+        response.headers["Content-Disposition"]
+        == 'attachment; filename="kuittirivit_2026-10-15_2026-11-14.csv"'
+    )
+    assert [row[0] for row in rows(response)] == ["2026-10-15", "2026-11-14"]
+
+
+def test_date_range_ac11_totals_files(api: TestClient, db: sqlite3.Connection) -> None:
+    add_range_fixture(db)
+
+    weeks = totals_file(api, RANGE, "week")
+    months = totals_file(api, RANGE, "month")
+
+    assert (
+        weeks.headers["Content-Disposition"]
+        == 'attachment; filename="summat_viikot_2026-10-15_2026-11-14.csv"'
+    )
+    assert (
+        months.headers["Content-Disposition"]
+        == 'attachment; filename="summat_kuukaudet_2026-10-15_2026-11-14.csv"'
+    )
+    assert rows(weeks)[-1] == [
+        "2026-W46",
+        "2026-11-09",
+        "2026-11-14",
+        "kyllä",
+        "Ruoka",
+        "Leivät",
+        "4,00",
+    ]
+    assert rows(months)[-1] == [
+        "2026-11",
+        "2026-11-01",
+        "2026-11-14",
+        "kyllä",
+        "Ruoka",
+        "Leivät",
+        "4,00",
+    ]
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "unit=range&from=2026-02-30&to=2026-03-01",
+        "unit=range&from=2026-10-02&to=2026-10-01",
+        "unit=range&from=2027-01-01&to=2029-01-01",
+        "unit=range&from=2026-10&to=2026-11",
+    ],
+)
+def test_date_range_ac12_invalid_range(api: TestClient, query: str) -> None:
+    for response in (lines_file(api, query), totals_file(api, query, "week")):
+        assert response.status_code == 422
+        assert response.json() == INVALID_PERIOD
+
+
+def test_date_range_ac12_a_bad_range_comes_before_a_bad_by(api: TestClient) -> None:
+    response = totals_file(api, "unit=range&from=2026-02-30&to=2026-03-01", "range")
+
+    assert response.json() == INVALID_PERIOD
+
+
+def test_date_range_ac12_a_file_cannot_be_by_range(api: TestClient) -> None:
+    response = totals_file(api, RANGE, "range")
+
+    assert response.status_code == 422
+    assert response.json() == INVALID_REQUEST

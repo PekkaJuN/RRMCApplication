@@ -36,6 +36,9 @@ keeps the page because Vite answers every path with `index.html`.
   progress, and the report of the latest run
 - @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the `Uusi kuitti` button and
   form, and the receipt list
+- @frontend/src/components/DateInput.tsx — a date as `dd.mm.yyyy` text with a calendar button;
+  holds no state. A native date input shows the browser's format, so it stays only as the
+  hidden calendar; only its native `change` event is a pick. With `pickerOnly` the text cannot be edited, and a click opens the calendar
 - @frontend/src/components/NewReceiptForm.tsx — the `Uusi kuitti` form: store, date, total
   and a failed image with its preview
 - @frontend/src/components/ReceiptPage.tsx — one receipt: editable store, date and total,
@@ -44,7 +47,8 @@ keeps the page because Vite answers every path with `index.html`.
   delete), the add form, line sum and subtotals; one save queue
 - @frontend/src/components/EditableField.tsx — an input that saves when it is left or on
   Enter, only when changed; Esc puts back the saved value; a refused save keeps the typed
-  text and shows its message
+  text and shows its message. With `type="date"` it uses `DateInput`, takes and saves
+  `YYYY-MM-DD`, and sends no text that is not a real day
 - @frontend/src/components/AddLineForm.tsx — the `Uusi rivi` form
 - @frontend/src/components/TotalsPage.tsx — the Yhteenveto page: the period chooser, the
   three download links, the two counts and the two tables; owns the period and keeps it
@@ -60,7 +64,7 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/comparison.ts — the Vertailu period's address form and `currentComparison`
 - @frontend/src/period.ts — the period's address form (`periodFromSearch`,
   `periodToSearch`), `currentMonth`, `currentWeek` (ISO), `weekLabel`, `monthLabel`,
-  `columnHeading`
+  `columnHeading`, `currentMonthRange`
 - @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
   types
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
@@ -87,7 +91,9 @@ keeps the page because Vite answers every path with `index.html`.
   `receiptImageUrl()`, `createReceipt()`, `deleteReceipt()`, `failedImages()`,
   `failedImageUrl()` and the receipt types
 - @frontend/src/format.ts — `formatCents()` (`-40` → `-0,40 €`, no thousands separator),
-  `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `formatDayMonth()`
+  `formatCentsInput()` (`-40` → `-0,40`, an amount field's value), `dateToText()`
+  (`2026-10-05` → `05.10.2026`), `parseDateText()` (`5.10.2026` → `2026-10-05`, or null),
+  `formatDayMonth()`
   (`2026-10-01` → `1.10.`), `parseCents()` (`1,25` or
   `1.25` → `125`, `null` for anything else) and `formatDate()` (`2026-10-05` → `5.10.2026`),
   with integer arithmetic and string splitting only
@@ -140,7 +146,7 @@ because a receipt without an image has no duplicate check. `Peruuta` unmounts th
 After a create the new receipt's page opens.
 
 The receipt page loads the receipt and the categories in parallel. The backend computes the
-line sum, warning and subtotals; the page only shows them. The store, date (a date input)
+line sum, warning and subtotals; the page only shows them. The store, date (a [date field](../../glossary.md))
 and total, and each line's name and amount, are `EditableField`s; a missing value is an empty
 input. Each line also has a deposit refund checkbox, its category and a delete button that
 asks first (`ConfirmDelete`); the `Uusi rivi` form under the table adds a line. Every change
@@ -188,19 +194,23 @@ month input then chooses another period of the same kind. Each change pushes a h
 entry, and the `Vertailu` link does nothing while the page is open. The week table is plain
 state: it survives changes of period and sends no request, and a reload hides it.
 
-The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`),
+The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`
+or `/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14`),
 or the current month by the browser's local date when the address has no complete,
 well-formed period, and writes it back with `replaceState`, so the address always shows the
 period. Each change pushes a history entry, and `popstate` reads the period again, so the
 back button returns to the previous period. The `Yhteenveto` link does nothing while the
 page is open, so it cannot drop the period from the address. The chooser is a `Jakso` select (`Kuukausi`,
-`Viikko`) and two native `month` or `week` inputs, `Alkaen` and `Päättyen`, whose values
-are the API's format; changing the unit sets both to the month or ISO week of today. An
-emptied input sends nothing. Only the answer to the latest request is shown. The backend
+`Viikko`, `Aikaväli`) and two inputs, `Alkaen` and `Päättyen`. For a month or a week they
+are native inputs whose values are the API's format; for `Aikaväli` they are calendar-only
+date fields (`EditableField` with `type="date"` and `pickerOnly`), and a picked day loads
+the totals. Changing the
+unit sets both to the month or ISO week of today, or to the first and last day of this
+month. An emptied input sends nothing. Only the answer to the latest request is shown. The backend
 decides validity, so a refused period shows `Jakso on virheellinen.` (`role="alert"`). The
 two tables share one set of expanded groups, so a group opens in both. The counts of
-unreviewed and undated receipts show as `role="status"` when not 0. Chrome and Edge show
-pickers for the inputs; Firefox shows text fields that accept the same text. The texts are
+unreviewed and undated receipts show as `role="status"` when not 0. For a month or a week, Chrome and Edge show
+pickers; Firefox shows text fields that accept the same text. The texts are
 in the [totals spec](../../../specs/features/totals.md#ui-texts).
 
 Under the chooser, three plain links with the `download` attribute, `Vie viikkosummat

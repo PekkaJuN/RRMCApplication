@@ -323,3 +323,180 @@ it("styling AC1: the Yhteenveto page has no inline style", async () => {
   expect(screen.getAllByRole("link")).toHaveLength(3);
   expect(container.querySelectorAll("[style]")).toHaveLength(0);
 });
+
+// Date range spec.
+
+const RANGE_PATH = "/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14";
+const RANGE_SEARCH = "?unit=range&from=2026-10-15&to=2026-11-14";
+
+it("date range AC13: choosing Aikaväli selects the current month as days", async () => {
+  const queries = answerTotals();
+  const user = userEvent.setup();
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  await user.selectOptions(screen.getByRole("combobox", { name: "Jakso" }), "Aikaväli");
+
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("01.11.2026");
+  expect(screen.getByLabelText("Päättyen")).toHaveValue("30.11.2026");
+  expect(window.location.search).toBe("?unit=range&from=2026-11-01&to=2026-11-30");
+  await vi.waitFor(() => expect(queries).toContain("unit=range&from=2026-11-01&to=2026-11-30"));
+});
+
+it("date range AC16: an address opens the range", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  const queries = answerTotals();
+  render(<TotalsPage />);
+
+  expect(screen.getByRole("combobox", { name: "Jakso" })).toHaveValue("range");
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("15.10.2026");
+  expect(screen.getByLabelText("Päättyen")).toHaveValue("14.11.2026");
+  await screen.findByRole("table", { name: "Viikot" });
+  expect(queries).toEqual(["unit=range&from=2026-10-15&to=2026-11-14"]);
+});
+
+it("date range AC17: the back button shows the earlier range", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  answerTotals();
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  popTo("/yhteenveto?unit=range&from=2026-09-01&to=2026-09-30");
+
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("01.09.2026");
+  expect(screen.getByLabelText("Päättyen")).toHaveValue("30.09.2026");
+});
+
+it.each([
+  "/yhteenveto?unit=range&from=2026-10&to=2026-11-14",
+  "/yhteenveto?unit=range&from=2026-10-15",
+])("date range AC18: a malformed address %s opens the current month", async (path) => {
+  window.history.replaceState(null, "", path);
+  answerTotals();
+  render(<TotalsPage />);
+
+  expect(await screen.findByRole("table", { name: "Viikot" })).toBeInTheDocument();
+  expect(window.location.search).toBe("?unit=month&from=2026-11&to=2026-11");
+});
+
+it("date range AC19: a refused range shows the error, no tables and no links", async () => {
+  window.history.replaceState(null, "", "/yhteenveto?unit=range&from=2026-02-30&to=2026-03-01");
+  server.use(
+    http.get("/api/totals", () =>
+      HttpResponse.json(
+        { error: "invalid_period", message: "Jakso on virheellinen." },
+        { status: 422 },
+      ),
+    ),
+  );
+  render(<TotalsPage />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jakso on virheellinen.");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("30.02.2026");
+});
+
+it("date range AC20: the export links follow the shown range", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  answerTotals();
+  render(<TotalsPage />);
+
+  const lines = await screen.findByRole("link", { name: "Vie rivit (CSV)" });
+
+  expect(lines).toHaveAttribute(
+    "href",
+    "/api/export/lines?unit=range&from=2026-10-15&to=2026-11-14",
+  );
+  expect(screen.getByRole("link", { name: "Vie viikkosummat (CSV)" })).toHaveAttribute(
+    "href",
+    "/api/export/totals?unit=range&from=2026-10-15&to=2026-11-14&by=week",
+  );
+  expect(screen.getByRole("link", { name: "Vie kuukausisummat (CSV)" })).toHaveAttribute(
+    "href",
+    "/api/export/totals?unit=range&from=2026-10-15&to=2026-11-14&by=month",
+  );
+});
+
+/** Pick a day from the calendar of the field `index`: 0 Alkaen, 1 Päättyen. */
+function pick(index: number, day: string) {
+  const picker = document.querySelectorAll<HTMLInputElement>('input[type="date"]')[index];
+  if (picker === undefined) {
+    throw new Error("no picker");
+  }
+  fireEvent.change(picker, { target: { value: day } });
+}
+
+it("date range AC14: each picked day loads the range", async () => {
+  window.history.replaceState(null, "", "/yhteenveto?unit=range&from=2026-11-01&to=2026-11-30");
+  const queries = answerTotals();
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  pick(0, "2026-10-15");
+  await vi.waitFor(() => expect(window.location.search).toContain("from=2026-10-15"));
+  pick(1, "2026-11-14");
+
+  await vi.waitFor(() =>
+    expect(queries).toEqual([
+      "unit=range&from=2026-11-01&to=2026-11-30",
+      "unit=range&from=2026-10-15&to=2026-11-30",
+      "unit=range&from=2026-10-15&to=2026-11-14",
+    ]),
+  );
+  expect(window.location.search).toBe(RANGE_SEARCH);
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("15.10.2026");
+});
+
+it("date range AC15: the text cannot be edited", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  const queries = answerTotals();
+  const user = userEvent.setup();
+  HTMLInputElement.prototype.showPicker = vi.fn();
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+  const from = screen.getByLabelText("Alkaen");
+
+  await user.type(from, "1");
+  pick(0, "");
+
+  expect(from).toHaveValue("15.10.2026");
+  expect(queries).toEqual(["unit=range&from=2026-10-15&to=2026-11-14"]);
+  expect(window.location.search).toBe(RANGE_SEARCH);
+  expect(screen.getByRole("table", { name: "Viikot" })).toBeInTheDocument();
+});
+
+it("date range AC17: a changed range goes back with its fields and tables", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  const queries = answerTotals();
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  pick(0, "2026-10-20");
+  await vi.waitFor(() => expect(window.location.search).toContain("from=2026-10-20"));
+  popTo(RANGE_PATH);
+
+  expect(screen.getByLabelText("Alkaen")).toHaveValue("15.10.2026");
+  expect(await screen.findByRole("table", { name: "Viikot" })).toBeInTheDocument();
+  await vi.waitFor(() => expect(queries.at(-1)).toBe("unit=range&from=2026-10-15&to=2026-11-14"));
+});
+
+it("date range AC19: Alkaen after Päättyen shows the error, no tables and no links", async () => {
+  window.history.replaceState(null, "", RANGE_PATH);
+  answerTotals((params) =>
+    params.get("from") === "2026-12-01"
+      ? HttpResponse.json(
+          { error: "invalid_period", message: "Jakso on virheellinen." },
+          { status: 422 },
+        )
+      : HttpResponse.json(OCTOBER),
+  );
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  pick(0, "2026-12-01");
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jakso on virheellinen.");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});

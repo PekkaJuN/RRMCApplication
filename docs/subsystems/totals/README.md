@@ -5,7 +5,7 @@ Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../.
 ## Overview
 
 Totals serves `GET /api/totals`: spending per category and group, per ISO week and per
-calendar month, by purchase date, for a period the user chooses (PRD FR-22–FR-25, FR-44).
+calendar month, by purchase date, for a period the user chooses (PRD FR-22–FR-25, FR-44, FR-49).
 It reads the data and hands it to calculation; it holds no sum rule of its own:
 
 - [calculation](../calculation/README.md#period-totals) checks the period, builds the week

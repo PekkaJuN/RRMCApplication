@@ -136,3 +136,19 @@ def test_export_line_counts_of_the_no_category_row() -> None:
     totals = period_totals(OCTOBER, [line("2026-10-05", 199, None)], CATALOG)
     [none] = totals.rows
     assert (none.week_counts, none.month_counts) == ([0, 1, 0, 0, 0], [1])
+
+
+def test_date_range_ac6_the_rules_stay_the_same() -> None:
+    period = parse_period("range", "2026-10-15", "2026-11-14")
+    lines = [
+        line("2026-10-14", 999, MAITO),
+        line("2026-10-15", 100, MAITO),
+        line("2026-10-16", -40, None, refund=True),
+        line("2026-11-14", 200, None),
+        line("2026-11-15", 999, MAITO),
+    ]
+
+    totals = period_totals(period, lines, CATALOG)
+
+    assert totals.month_totals == [100, 200]
+    assert [row.kind for row in totals.rows] == ["group", "none"]

@@ -10,6 +10,8 @@
   suggestions are marked on the lines; the list shows the newest purchase date first, with
   receipts without a date at the top. Specify approved by the user; Plan added (the sums go
   to the planned **calculation** subsystem, see [Plan](#plan)). Plan approved by the user; Tasks added; spec approved by the user; implementation started; Files to Modify updated during T1, T2, T18 and T19 (tests pinned to migration 4 and to two navigation links, the test repository's `add_line`, the E2E test moved into `import.spec.ts`). Audited (PASS), see [Audit](#audit).
+  2026-11-06: the receipt page's `Päivä` is the [date field](date-field.md), shown as
+  `dd.mm.yyyy`; the receipt list keeps `5.10.2026`.
 - **Depends on:** [Receipt import](receipt-import.md), [Receipt reading](receipt-reading.md),
   [Line categorization](categorization.md)
 - **Implements:** PRD FR-16, FR-17, FR-19, FR-20, FR-21, FR-13 (UI part), FR-15 (shown for
@@ -360,7 +362,7 @@ the rows `6.10.2026 | Kauppa B | 5,00 € | Summa ei täsmää | Tarkistamaton` 
 **Given** the Kuitit page with receipt A
 **When** the user clicks A's row
 **Then** the address is `/kuitit/<A>` and the page shows the heading `Kuitti`, `Testikauppa`,
-`5.10.2026`, `3,49 €`, `Tarkistamaton`, the button `Vahvista`, an image `Kuitin kuva` whose
+`05.10.2026`, `3,49 €`, `Tarkistamaton`, the button `Vahvista`, an image `Kuitin kuva` whose
 source is `/api/receipts/<A>/image` inside a link to the same address with
 `target="_blank"`, and the table `Kuittirivit` with the rows `Maito | 1,25 €` and
 `Limu | 2,24 €`; the back link `Takaisin kuittilistaan` returns to `/kuitit`. Reloading

@@ -54,6 +54,10 @@ by [budget](../budget/README.md).
   day of the first unit, `end` the last day of the last. It is at most 24 months or 104
   weeks, in the years 1–9998 (the columns of 9999 would run past `date.max`). A malformed bound, a week that does not exist (`2027-W53`), a missing value, an
   unknown unit, `first` after `last`, or a longer period raises `PeriodError`.
+- A **date range** (`range`, bounds `2026-10-15`) is a period of free days, both ends
+  included. One day is valid, and the longest is 731 days, the longest possible 24 months.
+  A day that is not real or not `YYYY-MM-DD`, the years outside 1–9998, `first` after
+  `last`, or a longer range raises `PeriodError`.
 - A **column** is each ISO week and each month with a day in the period, clipped to the
   period's days; it is **partial** when it was clipped. October 2026 has the week columns
   `2026-W40` (1–4 Oct, partial) to `2026-W44` (26–31 Oct, partial). A week's key uses its

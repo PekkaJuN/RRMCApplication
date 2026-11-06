@@ -7,7 +7,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 // own earlier value instead of assuming an empty month.
 
 const RUN = Date.now();
-const RECEIPT_DATE = "2026-03-10";
+const RECEIPT_DATE = "10.03.2026";
 
 function comparisonTotal(page: Page): Locator {
   return page.getByRole("table", { name: "Kuukausi" }).getByRole("row", { name: /Yhteensä/ });
@@ -25,7 +25,7 @@ async function typeInReceipt(page: Page, store: string): Promise<void> {
   await page.getByRole("button", { name: "Uusi kuitti" }).click();
   const form = page.getByRole("form", { name: "Uusi kuitti" });
   await form.getByLabel("Kauppa").fill(store);
-  await form.getByLabel("Päivä").fill(RECEIPT_DATE);
+  await form.getByLabel("Päivä", { exact: true }).fill(RECEIPT_DATE);
   await form.getByLabel("Loppusumma").fill("1,25");
   await form.getByRole("button", { name: "Luo kuitti" }).click();
   await expect(page).toHaveURL(/\/kuitit\/\d+$/);

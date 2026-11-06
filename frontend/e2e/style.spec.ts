@@ -398,10 +398,38 @@ test("styling AC16: axe finds no WCAG 2.1 AA violation on any page", async ({ pa
     await expect(target.getByRole("alert")).toBeVisible();
   };
   const found: Record<string, string[]> = {};
-  for (const { name, open } of [...PAGES, { name: "Yhteenveto, virhe", open: refused }]) {
+  const dateRange = async (target: Page) => {
+    await target.goto("/yhteenveto?unit=range&from=2026-10-03&to=2026-10-07");
+    await expect(target.getByLabel("Alkaen", { exact: true })).toHaveValue("03.10.2026");
+    await expect(target.getByRole("button", { name: "Avaa kalenteri: Alkaen" })).toBeVisible();
+  };
+  const newReceipt = async (target: Page) => {
+    await target.goto("/kuitit");
+    await target.getByRole("button", { name: "Uusi kuitti" }).click();
+    await expect(target.getByRole("form", { name: "Uusi kuitti" })).toBeVisible();
+  };
+  for (const { name, open } of [
+    ...PAGES,
+    { name: "Yhteenveto, virhe", open: refused },
+    { name: "Uusi kuitti", open: newReceipt },
+    { name: "Yhteenveto, aikaväli", open: dateRange },
+  ]) {
     await open(page);
     found[name] = await axeViolations(page);
   }
 
   expect(found).toEqual(Object.fromEntries(Object.keys(found).map((name) => [name, []])));
+});
+
+test("date-field AC6: the calendar button works in a real browser", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await openReceipt(page);
+  const button = page.getByRole("button", { name: "Avaa kalenteri: Päivä" });
+
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await button.click();
+
+  expect(errors).toEqual([]);
 });

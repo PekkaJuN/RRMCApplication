@@ -5,6 +5,7 @@ import { fi } from "../i18n/fi";
 import { PAGE_PATHS } from "../navigation";
 import {
   currentMonth,
+  currentMonthRange,
   currentWeek,
   isUnitValue,
   periodFromSearch,
@@ -12,6 +13,7 @@ import {
   type Period,
   type PeriodUnit,
 } from "../period";
+import { EditableField } from "./EditableField";
 import { TotalsTable } from "./TotalsTable";
 
 const EXPORT_LINKS: readonly [ExportKind, string][] = [
@@ -19,6 +21,44 @@ const EXPORT_LINKS: readonly [ExportKind, string][] = [
   ["months", fi.totals.exportMonths],
   ["lines", fi.totals.exportLines],
 ];
+
+const CURRENT_PERIOD: Record<PeriodUnit, (today: Date) => Period> = {
+  month: currentMonth,
+  week: currentWeek,
+  range: currentMonthRange,
+};
+
+interface BoundProps {
+  label: string;
+  unit: PeriodUnit;
+  value: string;
+  onChoose: (value: string) => void;
+}
+
+/** One end of the period: a calendar-only date field for a date range, else a native month
+ * or week input. Text that is not a date cannot get into a range (date range PC5). */
+function PeriodBound({ label, unit, value, onChoose }: BoundProps) {
+  if (unit === "range") {
+    return (
+      <EditableField
+        label={label}
+        showLabel
+        type="date"
+        pickerOnly
+        value={value}
+        onSave={(date) => {
+          onChoose(date);
+          return Promise.resolve(null);
+        }}
+      />
+    );
+  }
+  return (
+    <label>
+      {label} <input type={unit} value={value} onChange={(event) => onChoose(event.target.value)} />
+    </label>
+  );
+}
 
 function periodFromAddress(): Period {
   return periodFromSearch(window.location.search) ?? currentMonth(new Date());
@@ -89,7 +129,7 @@ export function TotalsPage() {
 
   function changeUnit(event: ChangeEvent<HTMLSelectElement>) {
     const unit = event.target.value as PeriodUnit;
-    choose(unit === "week" ? currentWeek(new Date()) : currentMonth(new Date()));
+    choose(CURRENT_PERIOD[unit](new Date()));
   }
 
   function toggle(groupId: number) {
@@ -100,7 +140,6 @@ export function TotalsPage() {
     setExpanded(next);
   }
 
-  const inputType = draft.unit === "week" ? "week" : "month";
   const hasRows = totals !== null && totals.rows.length > 0;
 
   return (
@@ -112,24 +151,21 @@ export function TotalsPage() {
           <select value={draft.unit} onChange={changeUnit}>
             <option value="month">{fi.totals.month}</option>
             <option value="week">{fi.totals.week}</option>
+            <option value="range">{fi.totals.range}</option>
           </select>
         </label>{" "}
-        <label>
-          {fi.totals.from}{" "}
-          <input
-            type={inputType}
-            value={draft.from}
-            onChange={(event) => choose({ ...draft, from: event.target.value })}
-          />
-        </label>{" "}
-        <label>
-          {fi.totals.to}{" "}
-          <input
-            type={inputType}
-            value={draft.to}
-            onChange={(event) => choose({ ...draft, to: event.target.value })}
-          />
-        </label>
+        <PeriodBound
+          label={fi.totals.from}
+          unit={draft.unit}
+          value={draft.from}
+          onChoose={(from) => choose({ ...draft, from })}
+        />{" "}
+        <PeriodBound
+          label={fi.totals.to}
+          unit={draft.unit}
+          value={draft.to}
+          onChoose={(to) => choose({ ...draft, to })}
+        />
       </p>
       {totals !== null && (
         <p>

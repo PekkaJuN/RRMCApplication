@@ -198,6 +198,41 @@ select {
   border-radius: var(--radius);
 }
 
+/* A date field (date field PC1). The calendar input stays at the button, so the browser
+   opens the calendar there; `display: none` is avoided because `showPicker` is not documented
+   for such an element. */
+.date-input {
+  position: relative;
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.date-input input[type="text"] {
+  width: 8em;
+}
+
+.date-input input[readonly] {
+  cursor: pointer;
+}
+
+.date-input button {
+  padding: var(--space-1) var(--space-2);
+  line-height: 1;
+}
+
+input.date-picker {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* After the input rule: its `font` shorthand resets the figures of an amount input. */
 input.amount {
   text-align: right;

@@ -211,3 +211,84 @@ def test_ac28_a_mid_period_over_february_has_four_whole_weeks() -> None:
         "2027-W10",
     ]
     assert not any(column.partial for column in columns)
+
+
+# Date range (date range spec).
+
+
+def test_date_range_ac2_columns_of_a_range() -> None:
+    period = parse_period("range", "2026-10-15", "2026-11-14")
+
+    assert (period.unit, period.first, period.last) == ("range", "2026-10-15", "2026-11-14")
+    assert (period.start, period.end) == (date(2026, 10, 15), date(2026, 11, 14))
+    assert period.week_columns() == [
+        Column("2026-W42", date(2026, 10, 15), date(2026, 10, 18), partial=True),
+        Column("2026-W43", date(2026, 10, 19), date(2026, 10, 25), partial=False),
+        Column("2026-W44", date(2026, 10, 26), date(2026, 11, 1), partial=False),
+        Column("2026-W45", date(2026, 11, 2), date(2026, 11, 8), partial=False),
+        Column("2026-W46", date(2026, 11, 9), date(2026, 11, 14), partial=True),
+    ]
+    assert period.month_columns() == [
+        Column("2026-10", date(2026, 10, 15), date(2026, 10, 31), partial=True),
+        Column("2026-11", date(2026, 11, 1), date(2026, 11, 14), partial=True),
+    ]
+
+
+def test_date_range_ac3_one_day() -> None:
+    period = parse_period("range", "2026-10-07", "2026-10-07")
+    day = date(2026, 10, 7)
+
+    assert period.week_columns() == [Column("2026-W41", day, day, partial=True)]
+    assert period.month_columns() == [Column("2026-10", day, day, partial=True)]
+
+
+def test_date_range_ac4_a_whole_month_has_the_columns_of_the_month() -> None:
+    period = parse_period("range", "2026-10-01", "2026-10-31")
+    month = parse_period("month", "2026-10", "2026-10")
+
+    assert period.week_columns() == month.week_columns()
+    assert period.month_columns() == month.month_columns()
+    assert period.month_columns()[0].partial is False
+
+
+def test_date_range_ac5_across_a_year_boundary() -> None:
+    period = parse_period("range", "2026-12-30", "2027-01-02")
+
+    assert period.week_columns() == [
+        Column("2026-W53", date(2026, 12, 30), date(2027, 1, 2), partial=True)
+    ]
+    assert [column.key for column in period.month_columns()] == ["2026-12", "2027-01"]
+    assert all(column.partial for column in period.month_columns())
+
+
+def test_date_range_ac7_the_longest_range() -> None:
+    assert parse_period("range", "2027-01-01", "2028-12-31").end == date(2028, 12, 31)
+    with pytest.raises(PeriodError):
+        parse_period("range", "2027-01-01", "2029-01-01")
+
+
+@pytest.mark.parametrize(
+    ("first", "last"),
+    [
+        (None, "2026-10-15"),
+        ("2026-10-15", None),
+        ("2026-02-30", "2026-03-01"),
+        ("2026-2-3", "2026-03-01"),
+        ("20261015", "2026-10-16"),
+        ("2026-10", "2026-11"),
+        ("2026-W40", "2026-W41"),
+        ("0000-01-01", "0000-01-02"),
+        ("9999-01-01", "9999-01-02"),
+        ("٢٠٢٦-١٠-١٥", "٢٠٢٦-١٠-١٦"),
+        ("2026-10-02", "2026-10-01"),
+    ],
+)
+def test_date_range_ac8_invalid_values(first: str | None, last: str | None) -> None:
+    with pytest.raises(PeriodError):
+        parse_period("range", first, last)
+
+
+@pytest.mark.parametrize("unit", ["month", "week"])
+def test_date_range_ac9_other_units_do_not_take_days(unit: str) -> None:
+    with pytest.raises(PeriodError):
+        parse_period(unit, "2026-10-15", "2026-10-15")

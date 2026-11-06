@@ -50,7 +50,7 @@ it("AC22: the receipt with its image and lines", async () => {
   expect(await screen.findByRole("heading", { name: "Kuitti" })).toBeInTheDocument();
   // Line editing turned the fields into inputs (line-editing PC12).
   expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
-  expect(screen.getByLabelText("Päivä")).toHaveValue("2026-10-05");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("05.10.2026");
   expect(screen.getByLabelText("Loppusumma")).toHaveValue("3,49");
   expect(screen.getByText("Tarkistamaton")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Vahvista" })).toBeInTheDocument();
@@ -387,7 +387,7 @@ it("line-editing AC24: the receipt page shows editable fields", async () => {
   render(<ReceiptPage id={3} onBack={() => {}} />);
 
   expect(await screen.findByLabelText("Kauppa")).toHaveValue("Testikauppa");
-  expect(screen.getByLabelText("Päivä")).toHaveValue("2026-10-05");
+  expect(screen.getByLabelText("Päivä")).toHaveValue("05.10.2026");
   expect(screen.getByLabelText("Loppusumma")).toHaveValue("3,49");
   expect(screen.getByRole("textbox", { name: "Tuote: Maito" })).toHaveValue("Maito");
   expect(screen.getByRole("textbox", { name: "Summa: Maito" })).toHaveValue("1,25");
@@ -557,7 +557,7 @@ it("line-editing AC29: store, date and total save from the view", async () => {
     "Rivien summa 3,49 € poikkeaa loppusummasta 4,00 €. Erotus 0,51 €.",
   );
   const date = screen.getByLabelText("Päivä");
-  fireEvent.change(date, { target: { value: "2026-10-06" } });
+  fireEvent.change(date, { target: { value: "06.10.2026" } });
   fireEvent.blur(date);
   await waitFor(() => expect(writes).toHaveLength(2));
   const store = screen.getByLabelText("Kauppa");

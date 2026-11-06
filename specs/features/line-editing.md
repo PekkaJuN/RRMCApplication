@@ -9,6 +9,8 @@
   proposed are included (extra body fields refused, ids out of range give 404, category
   names as text while the categories load, the AC15 test on receipt A). Specify approved
   by the user; Plan added. Plan approved by the user; Tasks added; spec approved by the user; implementation started; Files to Modify updated during T8 (the receipt-review service tests that call the replaced methods); PC1 clarified during T10 (only sent values are checked), with a regression test under AC7; Files to Modify updated during T19 (two `App.test.tsx` tests that read the store as text) and T22 (the receipt-review E2E test finds the `Maito` row by its input).
+  2026-11-06: `Päivä` is the [date field](date-field.md), shown as `dd.mm.yyyy`; requests
+  still send `YYYY-MM-DD`.
 - **Depends on:** [Receipt review](receipt-review.md), [Line categorization](categorization.md)
 - **Implements:** PRD FR-18 (without quantity and unit price, see [Out of Scope](#out-of-scope)),
   FR-43, FR-19 (after every edit), FR-44 (for edited and added lines); NFR-1, NFR-3, NFR-9,
@@ -406,7 +408,7 @@ changes
 ### AC24: Receipt page shows editable fields
 **Given** the API returns receipt A with a deposit refund line `Panttipalautus` -40
 **When** the receipt page opens
-**Then** the inputs `Kauppa`, `Päivä` and `Loppusumma` hold `Testikauppa`, `2026-10-05` and
+**Then** the inputs `Kauppa`, `Päivä` and `Loppusumma` hold `Testikauppa`, `05.10.2026` and
 `3,49`; the input `Tuote: Maito` holds `Maito`, `Summa: Maito` holds `1,25`,
 `Pantinpalautus: Maito` is unchecked; `Pantinpalautus: Panttipalautus` is checked,
 `Summa: Panttipalautus` holds `-0,40`, and its category cell shows `Pantinpalautus`; each
@@ -448,7 +450,7 @@ the answer `Limu`'s category cell shows `Pantinpalautus` and has no dropdown
 ### AC29: Editing store, date and total in the view
 **Given** receipt A on the receipt page
 **When** the user sets `Loppusumma` to `4,00` and presses Enter, sets `Päivä` to
-`2026-10-06` and leaves it, and sets `Kauppa` to `Uusi kauppa` and leaves it
+`06.10.2026` and leaves it, and sets `Kauppa` to `Uusi kauppa` and leaves it
 **Then** the UI sends `PATCH /api/receipts/<A>` with `{"total_cents": 400}`, then
 `{"purchase_date": "2026-10-06"}`, then `{"store": "Uusi kauppa"}`; after the first answer
 the page shows `Rivien summa 3,49 € poikkeaa loppusummasta 4,00 €. Erotus 0,51 €.` with

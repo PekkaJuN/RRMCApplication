@@ -18,3 +18,5 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 11 | [Visual style and accessibility](features/styling.md) | Done | NFR-16, NFR-1 for UI resources |
 | 12 | [Receipt deletion and manual receipts](features/receipt-management.md) | Done | FR-46, FR-47 (new) |
 | 13 | [Monthly budget](features/budget.md) | Done | FR-50 (new) |
+| 14 | [Finnish date field](features/date-field.md) | Done | FR-51 (new) |
+| 15 | [Free date range for totals](features/date-range-totals.md) | Done | FR-49 |
