@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -19,7 +19,7 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
   signed 64-bit range (`INTEGER_MIN`, `INTEGER_MAX`), so an id from a request cannot raise
   `OverflowError`
 - @backend/app/storage/catalog_repository.py — `CatalogRepository`: all SQL for groups,
-  categories, products and `app_state`, and `move_product_lines` (FR-36)
+  categories, products, budgets and `app_state`, and `move_product_lines` (FR-36)
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
   their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
   `lines`, `get_line`, `set_line_category`, `update_line`, `next_position`, `delete_line`,
@@ -29,7 +29,8 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
   (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`,
-  `0004_line_categories.sql`, `0005_receipt_review.sql`, `0006_manual_receipts.sql`)
+  `0004_line_categories.sql`, `0005_receipt_review.sql`, `0006_manual_receipts.sql`,
+  `0007_budgets.sql`)
 
 ## Interfaces
 
@@ -69,9 +70,16 @@ once, so the schema's `CHECK`s see one consistent row. `LineCategory` and `Categ
 are defined here. The rules are in [import](../import/README.md) and
 [categorization](../categorization/README.md#line-categorization).
 
+For the [budget](../budget/README.md), `CatalogRepository` has `budgets()` (amounts by
+category id; a missing id has 0), `set_budget(category_id, cents)` and
+`move_budget(from_id, to_id)`, which adds the first amount to the second and removes the
+first, and does nothing without one. They are on the catalog repository so that a category
+update moves a budget in its own transaction.
+
 For the [totals](../totals/README.md), `dated_lines(start, end)` returns the lines of the
 receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive) as `DatedLineRow`
-(purchase date, amount, category id, refund flag; no product name), in no order.
+(purchase date, amount, category id, refund flag; no product name), in no order. With
+`reviewed_only=True` it returns only the lines of reviewed receipts, for the budget.
 `count_unreviewed(start, end)` counts the unreviewed receipts dated in the range, and
 `count_undated()` the receipts without a purchase date. The date `CHECK` keeps every
 `purchase_date` as `YYYY-MM-DD`, so `BETWEEN` on the text compares dates.
@@ -100,7 +108,7 @@ line without a category, or a category without a group, has `None` names.
 - Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
   [categorization](../categorization/README.md), [import](../import/README.md),
   [review](../review/README.md), [totals](../totals/README.md),
-  [export](../export/README.md).
+  [budget](../budget/README.md), [export](../export/README.md).
 
 ## Modules
 

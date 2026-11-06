@@ -3,11 +3,10 @@
 import re
 from datetime import date
 
+from app.calculation.money import AMOUNT_LIMIT
 from app.categorization.names import normalize_display
 from app.review.errors import InvalidAmountError, InvalidDateError, InvalidStoreError
 
-# ±999 999,99 €: far above any receipt, and exact as a JavaScript number in the UI.
-AMOUNT_LIMIT = 99_999_999
 STORE_MAX = 100
 # ASCII digits only: `\d` would also match other scripts' digits, and `date.fromisoformat`
 # alone also accepts forms like `20261005`.

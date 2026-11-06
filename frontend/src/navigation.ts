@@ -1,7 +1,8 @@
 import { useEffect, useState, type MouseEvent } from "react";
 
 // A few pages do not justify a router library; a router can replace this without changing the pages.
-export type Page = "products" | "import" | "receipts" | "receipt" | "totals";
+export type Page =
+  "products" | "import" | "receipts" | "receipt" | "totals" | "budget" | "comparison";
 
 /** Pages with a fixed path; a receipt's path holds its id (`receiptPath`). */
 export const PAGE_PATHS: Record<Exclude<Page, "receipt">, string> = {
@@ -9,6 +10,8 @@ export const PAGE_PATHS: Record<Exclude<Page, "receipt">, string> = {
   import: "/tuonti",
   receipts: "/kuitit",
   totals: "/yhteenveto",
+  budget: "/budjetti",
+  comparison: "/vertailu",
 };
 
 const RECEIPT_PATH = /^\/kuitit\/([1-9][0-9]*)$/;
@@ -32,6 +35,12 @@ export function pageFromPath(pathname: string): Page {
   }
   if (pathname === PAGE_PATHS.totals) {
     return "totals";
+  }
+  if (pathname === PAGE_PATHS.budget) {
+    return "budget";
+  }
+  if (pathname === PAGE_PATHS.comparison) {
+    return "comparison";
   }
   return pathname === PAGE_PATHS.import ? "import" : "products";
 }

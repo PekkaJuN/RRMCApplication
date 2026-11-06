@@ -112,7 +112,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-23 | Totals group by the receipt's purchase date, not by the import date. |
 | FR-24 | Totals update when a receipt is edited. |
 | FR-25 | The user chooses the period shown: one calendar month, a range of months, one ISO week or a range of ISO weeks. The default is the current calendar month. Only receipts whose purchase date falls inside the period are counted. An ISO week that crosses the period's start or end counts only its days inside the period, so it shows a partial total (e.g. ISO week 1 of 2026, Mon 29 Dec 2025 – Sun 4 Jan 2026, shown for January 2026 counts only 1–4 January). |
-| FR-49 | *Next release:* the user can also choose the period as a free date range, from a start date to an end date, in addition to the options in FR-25. The same rules apply: only receipts whose purchase date falls inside the range are counted, and weeks and months at the range's edges count only their days inside it. [NEEDS CLARIFICATION: does the CSV export (FR-26) use the same date range option?] |
+| FR-49 | *Next release:* the user can also choose the period as a free date range, from a start date to an end date, in addition to the options in FR-25. The same rules apply: only receipts whose purchase date falls inside the range are counted, and weeks and months at the range's edges count only their days inside it. The CSV export (FR-26) uses the same date range, so it can also cover a period such as the 15th to the 14th. |
 | FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
@@ -179,7 +179,7 @@ Not part of the MVP. Remaining details are open (see [Open questions](#11-open-q
 
 | ID | Requirement |
 |---|---|
-| FR-50 | *Next release:* on a separate page, the user sets a monthly budget for each group and each category without a group. The budget is the same for every month, and the total budget is the sum of these amounts. A second page compares the budget with the actual spending of a chosen month and its weeks. Only reviewed receipts count toward the actual spending. A week's budget is the monthly budget divided by the days of the month, times the week's days in that month, so the weeks of a month add up to its budget. The details are in the [spec](features/budget.md). |
+| FR-50 | *Next release:* on a separate page, the user sets a monthly budget for each group and each category without a group. The budget is the same for every month, and the total budget is the sum of these amounts. A second page compares the budget with the actual spending of a chosen period and its weeks: a calendar month, or a period from the 15th to the 14th of the next month. Only reviewed receipts count toward the actual spending. A week's budget is the monthly budget divided by the days of the period, times the week's days in that period, so the weeks of a period add up to its budget. The details are in the [spec](features/budget.md). |
 
 ## 7. Non-functional requirements
 

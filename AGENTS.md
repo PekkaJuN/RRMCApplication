@@ -207,7 +207,7 @@ Do not loop more than three times without asking the user.
 
 Subsystems ([docs/architecture.md](docs/architecture.md#subsystems)): **import**,
 **receipt-reading** (preprocessing, OCR, parsing), **categorization**, **calculation**,
-**review**, **totals**, **storage**, **export**, **ui**.
+**review**, **totals**, **budget**, **storage**, **export**, **ui**.
 
 Rules:
 

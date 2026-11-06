@@ -6,6 +6,7 @@ import indexHtml from "../index.html?raw";
 import type { Health } from "./api/health";
 import { App } from "./App";
 import { fi } from "./i18n/fi";
+import { answerBudget, answerComparison } from "./test/budget";
 import { defaultItems, fakeCatalog } from "./test/catalog";
 import { IDLE } from "./test/imports";
 import { RECEIPT_A, RECEIPT_MANUAL, SUMMARY_A, SUMMARY_B } from "./test/receipts";
@@ -63,7 +64,8 @@ it("AC25: shows the heading, the navigation and the status line", async () => {
 });
 
 // The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti",
-// receipt-review PC7 "Kuitit" and the totals spec PC4 "Yhteenveto".
+// receipt-review PC7 "Kuitit", the totals spec PC4 "Yhteenveto" and the budget spec PC3 and
+// PC6 "Budjetti" and "Vertailu".
 it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   render(<App />);
 
@@ -74,6 +76,8 @@ it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
     "Tuonti",
     "Kuitit",
     "Yhteenveto",
+    "Budjetti",
+    "Vertailu",
   ]);
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
@@ -253,6 +257,49 @@ it("receipt-management AC29: a receipt typed in on the Kuitit page opens without
   expect(body).toEqual({ store: "Testikauppa", purchase_date: "2026-10-05", total_cents: 349 });
   expect(screen.queryByRole("img")).toBeNull();
   expect(imageAsked).toBe(false);
+});
+
+// Budget spec: the Budjetti and Vertailu pages.
+
+it("budget AC17: the Budjetti link opens the page", async () => {
+  answerBudget();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Budjetti" }));
+
+  const main = screen.getByRole("main");
+  expect(within(main).getByRole("heading", { name: "Budjetti" })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/budjetti");
+  expect(await within(main).findByRole("textbox", { name: "Auto" })).toBeInTheDocument();
+});
+
+it("budget AC19: the Vertailu link opens the page", async () => {
+  answerComparison();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Vertailu" }));
+
+  const main = screen.getByRole("main");
+  expect(within(main).getByRole("heading", { name: "Vertailu" })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/vertailu");
+  expect(await within(main).findByRole("table", { name: "Kuukausi" })).toBeInTheDocument();
+});
+
+it("budget P8: the Vertailu link on the Vertailu page keeps the chosen period", async () => {
+  window.history.replaceState(null, "", "/vertailu?month=2026-10&period=mid");
+  answerComparison();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Vertailu" }));
+
+  expect(window.location.search).toBe("?month=2026-10&period=mid");
+  expect(await screen.findByRole("table", { name: "Kuukausi" })).toBeInTheDocument();
 });
 
 // Totals spec: the Yhteenveto page.

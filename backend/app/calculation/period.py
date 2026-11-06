@@ -1,6 +1,9 @@
-"""The period of the totals: whole calendar months or whole ISO weeks (totals spec PC3, P1).
+"""The periods of the totals and the budget comparison.
 
-A period's columns are the weeks and months that have a day in it, clipped to its days.
+A totals period is whole calendar months or whole ISO weeks (totals spec PC3, P1). A
+comparison period is a calendar month or a period from the 15th to the 14th of the next
+month (budget spec PC5, P3). A period's columns are the weeks and months that have a day in
+it, clipped to its days.
 """
 
 import re
@@ -15,6 +18,7 @@ MAX_MONTHS = 24
 MAX_WEEKS = 104
 # Years 1–9998: the columns of a period in 9999 would run past `date.max`.
 MAX_YEAR = 9998
+MID_PERIOD_START_DAY = 15
 
 # fullmatch with explicit digits: `\d` would also accept non-ASCII digits.
 _MONTH = re.compile(r"([0-9]{4})-(0[1-9]|1[0-2])")
@@ -91,6 +95,23 @@ def parse_period(unit: str | None, first: str | None, last: str | None) -> Perio
             raise PeriodError
         return Period("week", first, last, start, last_monday + timedelta(days=6))
     raise PeriodError
+
+
+def comparison_period(month: str | None, kind: str | None) -> Period:
+    """The comparison period named by `month`; `PeriodError` for every invalid value."""
+    if kind not in (None, "calendar", "mid"):
+        raise PeriodError
+    period = parse_period("month", month, month)
+    if kind != "mid":
+        return period
+    next_month = period.end + timedelta(days=1)
+    return Period(
+        "month",
+        period.first,
+        period.last,
+        period.start.replace(day=MID_PERIOD_START_DAY),
+        next_month.replace(day=MID_PERIOD_START_DAY - 1),
+    )
 
 
 def _month(value: str) -> tuple[int, int]:

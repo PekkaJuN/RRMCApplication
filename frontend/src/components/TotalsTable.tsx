@@ -1,7 +1,7 @@
 import type { TotalsColumn, TotalsRow } from "../api/totals";
-import { formatCents, formatDate, formatDayMonth } from "../format";
+import { formatCents } from "../format";
 import { fi } from "../i18n/fi";
-import { monthLabel, weekLabel, type PeriodUnit } from "../period";
+import { columnHeading, type PeriodUnit } from "../period";
 
 interface Props {
   label: string;
@@ -19,16 +19,6 @@ interface Props {
  * total; a group's categories show when it is expanded (totals spec PC4). */
 export function TotalsTable({ label, unit, columns, rows, totals, expanded, onToggle }: Props) {
   const amountsOf = (row: TotalsRow) => (unit === "week" ? row.weeks : row.months);
-
-  function heading(column: TotalsColumn): string {
-    const name = unit === "week" ? weekLabel(column.key) : monthLabel(column.key);
-    if (!column.partial) {
-      return name;
-    }
-    // A partial column lies within one month, so the end date's year covers both days.
-    const days = `${formatDayMonth(column.start_date)}–${formatDate(column.end_date)}`;
-    return `${name} ${fi.totals.partial} ${days}`;
-  }
 
   function amountCells(amounts: number[]) {
     return amounts.map((amount, index) => (
@@ -85,7 +75,7 @@ export function TotalsTable({ label, unit, columns, rows, totals, expanded, onTo
             <th scope="col">{fi.totals.category}</th>
             {columns.map((column) => (
               <th key={column.key} scope="col" className="amount">
-                {heading(column)}
+                {columnHeading(column, unit)}
               </th>
             ))}
           </tr>

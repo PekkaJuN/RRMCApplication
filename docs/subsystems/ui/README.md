@@ -1,6 +1,6 @@
 # UI
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
 
 ## Overview
 
@@ -8,17 +8,19 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and five pages: **Tuotteet** for groups, categories and
+reports the backend's health) and seven pages: **Tuotteet** for groups, categories and
 products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, the
-**receipt page** for one receipt, and **Yhteenveto** for the category totals. The app opens
-on Tuotteet.
+**receipt page** for one receipt, **Yhteenveto** for the category totals, **Budjetti** for
+the monthly budgets and **Vertailu** for the budget against spending. The app opens on
+Tuotteet.
 
 A few pages do not justify a router library. @frontend/src/navigation.ts maps the address to
 a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` → Kuitit,
 `/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
-`/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, any other path → Tuotteet. `usePage()` returns the page, `go(page,
+`/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, `/budjetti` → Budjetti, `/vertailu` →
+Vertailu, any other path → Tuotteet. `usePage()` returns the page, `go(page,
 receiptId?)` and the open receipt's id. The navigation links are real links (`/`, `/tuonti`,
-`/kuitit`, `/yhteenveto`), and so are the date links of the list and the back link of a receipt; a plain
+`/kuitit`, `/yhteenveto`, `/budjetti`, `/vertailu`), and so are the date links of the list and the back link of a receipt; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
 has `aria-current="page"` (Kuitit also on a receipt), the back button works, and a reload
 keeps the page because Vite answers every path with `index.html`.
@@ -49,8 +51,18 @@ keeps the page because Vite answers every path with `index.html`.
   in the address
 - @frontend/src/components/TotalsTable.tsx — one totals table (weeks or months): group rows
   that expand, categories, `Ei kategoriaa`, `Yhteensä`; partial column headings
+- @frontend/src/components/BudgetPage.tsx — the Budjetti page: an amount field per budget
+  row and the total
+- @frontend/src/components/ComparisonPage.tsx — the Vertailu page: the period, the covered
+  dates, the counts and the tables; owns the period and keeps it in the address
+- @frontend/src/components/ComparisonTable.tsx — `ComparisonMonthTable` and
+  `ComparisonWeekTable`, with the text `Ylitetty`
+- @frontend/src/comparison.ts — the Vertailu period's address form and `currentComparison`
 - @frontend/src/period.ts — the period's address form (`periodFromSearch`,
-  `periodToSearch`), `currentMonth`, `currentWeek` (ISO), `weekLabel`, `monthLabel`
+  `periodToSearch`), `currentMonth`, `currentWeek` (ISO), `weekLabel`, `monthLabel`,
+  `columnHeading`
+- @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
+  types
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
 - @frontend/src/api/export.ts — `exportUrl(kind, period)`: the download URLs of the
   [export](../export/README.md)
@@ -65,7 +77,7 @@ keeps the page because Vite answers every path with `index.html`.
   place; no browser dialog; an optional `label` names the first button (`Poista kuitti`)
   and `disabled` turns it off
 - @frontend/src/api/client.ts — shared API client (`apiGet`, `apiPost`, `apiPatch`,
-  `apiDelete`)
+  `apiPut`, `apiDelete`)
 - @frontend/src/api/health.ts — `getHealth()` and the `Health` type
 - @frontend/src/api/catalog.ts — typed catalog client and the `CatalogItem` and `Product`
   types
@@ -84,8 +96,8 @@ keeps the page because Vite answers every path with `index.html`.
 
 ## Interfaces
 
-`apiGet<T>(path)`, `apiPost<T>(path, body)`, `apiPatch<T>(path, body)` and
-`apiDelete(path)` return `{ok: true, data}` or `{ok: false, error: {code, message}}`
+`apiGet<T>(path)`, `apiPost<T>(path, body)`, `apiPatch<T>(path, body)`,
+`apiPut<T>(path, body)` and `apiDelete(path)` return `{ok: true, data}` or `{ok: false, error: {code, message}}`
 (`data` is `undefined` for a 204). An
 error response in the [API error format](../../api-reference.md#error-format) keeps its code
 and Finnish message. A failed request, or an answer that is not in that format (the Vite
@@ -158,6 +170,23 @@ table sit side by side on a window at least 900 px wide and stack on a narrower 
 (`.receipt-columns`). The texts are in the
 [receipt review spec](../../../specs/features/receipt-review.md#ui-texts) and the
 [line editing spec](../../../specs/features/line-editing.md#ui-texts).
+
+The Budjetti page saves an amount with `EditableField` when the field is left or on Enter.
+Text that is no amount shows `Anna summa muodossa 1,25.` and sends nothing; the backend
+decides the limits. The answer of a save replaces the rows, so the total follows it. Saves
+run one at a time, because every answer holds all rows and an older one must not arrive last.
+
+The Vertailu page takes its period from the address (`/vertailu?month=2026-10`, or
+`/vertailu?month=2026-10&period=mid` for the period from the 15th to the 14th), and writes
+it back with `replaceState`. Without a valid month it opens the current period of the
+address's kind: the calendar month, or with `period=mid` the current 15–14 period. An
+unknown `period` opens the current calendar month. The page checks only the month's shape,
+so a month the backend refuses, such as `9999-01`, shows the backend's error, and the
+controls still work. The `Jakso` select chooses the kind and moves to the period of that kind that
+holds today by the browser's local date, so `15.–14.` on 2026-11-06 selects `2026-10`. The
+month input then chooses another period of the same kind. Each change pushes a history
+entry, and the `Vertailu` link does nothing while the page is open. The week table is plain
+state: it survives changes of period and sends no request, and a reload hides it.
 
 The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`),
 or the current month by the browser's local date when the address has no complete,

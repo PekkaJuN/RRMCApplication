@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** Done (health, catalog, import, receipt, line editing, totals and export
-  endpoints)
-- **Updated:** 2026-11-04
+- **Status:** Done (health, catalog, import, receipt, line editing, totals, budget and
+  export endpoints)
+- **Updated:** 2026-11-06
 
 ## Overview
 
@@ -103,8 +103,8 @@ A **product**:
 |---|---|---|---|
 | `GET /api/categories` | | 200, list of items: groups, each followed by its categories, then the categories without a group; Finnish alphabetical order inside each part | |
 | `POST /api/categories` | `{"name", "kind", "parent_id"?}` | 201, the item | 422 `invalid_name`, `invalid_parent`; 409 `duplicate_name` |
-| `PATCH /api/categories/{id}` | any of `name`, `kind`, `parent_id`; a left-out field is kept, `"parent_id": null` takes a category out of its group | 200, the item | 404 `not_found`; 422 `invalid_name`, `invalid_parent`; 409 `duplicate_name`, `category_has_products`, `group_not_empty` |
-| `DELETE /api/categories/{id}` | | 204, no body | 404 `not_found`; 409 `category_in_use`, `group_not_empty` |
+| `PATCH /api/categories/{id}` | any of `name`, `kind`, `parent_id`; a left-out field is kept, `"parent_id": null` takes a category out of its group; a budget row moved into a group adds its budget to the group's ([budget](subsystems/budget/README.md#catalog-changes)) | 200, the item | 404 `not_found`; 422 `invalid_name`, `invalid_parent`; 409 `duplicate_name`, `category_has_products`, `group_not_empty` |
+| `DELETE /api/categories/{id}` | | 204, no body; the item's budget is deleted with it | 404 `not_found`; 409 `category_in_use`, `group_not_empty` |
 | `GET /api/products` | `q` (part of the name, any case), `category_id` (a category, or a group for all its categories); both combine | 200, list of products sorted by name | 422 `unknown_category` |
 | `POST /api/products` | `{"name", "category_id"}` | 201, the product | 422 `invalid_name`, `unknown_category`, `not_a_category`; 409 `duplicate_name` |
 | `PATCH /api/products/{id}` | any of `name`, `category_id`; a new `category_id` also moves every receipt line linked to the product (FR-36) | 200, the product | 404 `not_found`; 422 as for `POST`; 409 `duplicate_name` |
@@ -375,6 +375,68 @@ without a purchase date, which are in no period.
 |---|---|---|---|
 | 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week that does not exist; `from` after `to`; a longer period |
 
+### Budget
+
+Implemented in @backend/app/budget/routes.py. The rules are in
+[calculation](subsystems/calculation/README.md#budget-comparison); the package is
+[budget](subsystems/budget/README.md).
+
+| Method and path | Input | Success | Errors |
+|---|---|---|---|
+| `GET /api/budget` | — | 200, the budget rows and the total | — |
+| `PUT /api/budget/{id}` | `{"amount_cents": 40000}`, an integer from 0 to 99999999 | 200, the same shape as `GET` | 404 `not_found`, 422 `not_a_budget_row`, 422 `invalid_amount` |
+| `GET /api/budget/comparison` | `month` as `2026-10`; `period` `calendar` (default) or `mid` | 200, the comparison of the period | 422 `invalid_period` |
+
+```json
+{
+  "rows": [
+    {"kind": "group", "id": 1, "name": "Ruoka", "amount_cents": 40000},
+    {"kind": "category", "id": 30, "name": "Juomat", "amount_cents": 5000}
+  ],
+  "total_cents": 45000
+}
+```
+
+A budget row is a group or a category without a group; a row without a saved amount has 0.
+The comparison answers:
+
+```json
+{
+  "month": "2026-10", "period": "mid",
+  "start_date": "2026-10-15", "end_date": "2026-11-14",
+  "weeks": [
+    {"key": "2026-W42", "start_date": "2026-10-15", "end_date": "2026-10-18", "partial": true}
+  ],
+  "rows": [
+    {"kind": "group", "id": 1, "name": "Ruoka", "budget_cents": 40000,
+     "actual_cents": 12500, "remaining_cents": 27500,
+     "weeks": [{"budget_cents": 5161, "actual_cents": 12500}]},
+    {"kind": "none", "id": null, "name": null, "budget_cents": 0,
+     "actual_cents": 199, "remaining_cents": -199,
+     "weeks": [{"budget_cents": 0, "actual_cents": 199}]}
+  ],
+  "total": {"budget_cents": 40000, "actual_cents": 12699, "remaining_cents": 27301,
+            "weeks": [{"budget_cents": 5161, "actual_cents": 12699}]},
+  "unreviewed_receipts": 1,
+  "undated_receipts": 0
+}
+```
+
+The example shows one week of five. Only reviewed receipts count as spending. With `mid`,
+`month` names the month the period starts in. Every budget row is listed; the `none` row
+exists only when reviewed lines have no category. A row's `weeks` follow the order of
+`weeks` and add up to its budget. `unreviewed_receipts` counts the unreviewed receipts dated
+in the period; `undated_receipts` counts all receipts without a purchase date.
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | `PUT` with an unknown id |
+| 422 | `not_a_budget_row` | `Budjetin voi asettaa vain ryhmälle tai ryhmättömälle kategorialle.` | `PUT` for a category inside a group |
+| 422 | `invalid_amount` | `Summa ei kelpaa.` | `PUT` with a negative or too large amount |
+| 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `month`, or an unknown `period` |
+
+A float or a string as `amount_cents` answers 422 `invalid_request`.
+
 ### Export
 
 Implemented in @backend/app/export/routes.py; the package is
@@ -425,6 +487,7 @@ Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
 - [import](subsystems/import/README.md) — the rules behind the import endpoints
 - [review](subsystems/review/README.md) — the receipt endpoints
 - [totals](subsystems/totals/README.md) — the totals endpoint
+- [budget](subsystems/budget/README.md) — the budget and comparison endpoints
 - [export](subsystems/export/README.md) — the CSV export endpoints
 
 ## Related Documents

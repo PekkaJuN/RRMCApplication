@@ -1,7 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import type { ImportState } from "../api/imports";
 import { FINISHED, IDLE, READ_FAILURES, running, STOPPED } from "../test/imports";
 import { server } from "../test/server";
@@ -85,19 +85,25 @@ it("AC27: start an import, follow its progress and see the report", async () => 
 });
 
 it("AC28: a running import is shown on page open and polled about every second", async () => {
-  const answers = importStates(running(2, 5), FINISHED);
+  importStates(running(2, 5), FINISHED);
+  // The timer starts the request at once, but MSW sees it later, so a count there would depend
+  // on the load. Waiting for that count would move the fake clock and hide a slower poll.
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  onTestFinished(() => fetchSpy.mockRestore());
+  const started = () =>
+    fetchSpy.mock.calls.filter(([url]) => (url as URL).pathname === "/api/import").length;
   render(<ImportPage />);
 
   expect(await screen.findByText("Tuonti käynnissä: 2/5")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Tuo kuitit" })).toBeDisabled();
-  expect(answers.gets()).toBe(1);
+  expect(started()).toBe(1);
 
   await nextPoll();
 
-  expect(answers.gets()).toBe(2);
+  expect(started()).toBe(2);
   expect(await screen.findByText("Tuotu: 1")).toBeInTheDocument();
   await nextPoll();
-  expect(answers.gets()).toBe(2);
+  expect(started()).toBe(2);
 });
 
 it.each([

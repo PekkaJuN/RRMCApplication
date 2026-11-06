@@ -2,6 +2,22 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-06: The import polling test failed under load
+
+- **Context:** The monthly budget spec added five frontend test files, so more test files
+  ran side by side.
+- **Symptom:** `AC28: a running import is shown on page open and polled about every second`
+  in @frontend/src/components/ImportPage.test.tsx failed in about one full run of five with
+  `expected 1 to be 2`. It never failed in serial runs, and the page had not changed.
+- **Root cause:** Advancing the fake clock fires the poll timer, which only starts the
+  request. MSW answers it on real time, so the count read right after the clock moved could
+  still be the old one. The test depended on the machine being idle.
+- **Solution:** the test counts the `fetch` calls, which the timer starts at once, instead of
+  the requests MSW has seen. A first fix with `vi.waitFor` was withdrawn: under fake timers
+  `vi.waitFor` moves the clock on every check, so a slower poll passed the test.
+- **Prevention:** to check a timer, count what it starts synchronously. Do not use `vi.waitFor`
+  around a check of timing under fake timers. Wait with `findBy` only for what the answer shows.
+
 ## 2026-11-04: The backend answered any Host header
 
 - **Context:** Writing `docs/security.md`, checking what CORS stops.

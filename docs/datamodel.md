@@ -1,15 +1,15 @@
 # Data Model
 
 - **Status:** Done (catalog, receipts with their read data and review state, and
-  receipt lines with their categories implemented)
-- **Updated:** 2026-11-04
+  receipt lines with their categories, and budgets implemented)
+- **Updated:** 2026-11-06
 
 ## Overview
 
 The app keeps all its data in one SQLite database. This document describes the schema and
 how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
 categories and products), the imported receipts with what was read from them and their
-review state, and their lines with their categories.
+review state, their lines with their categories, and the monthly budgets.
 
 ## Where the database is
 
@@ -112,6 +112,19 @@ Lines stored before migration `0004` have no category. The rules that set these 
 [categorization](subsystems/categorization/README.md#line-categorization). Indexes on
 `category_id` and `product_id` keep the category delete check and FR-36 updates fast.
 
+### budgets
+
+The monthly budget of a group or a category without a group. It is the same for every
+month and has no history ([budget](subsystems/budget/README.md)).
+
+| Column | Type | Meaning |
+|---|---|---|
+| `category_id` | `INTEGER PRIMARY KEY`, references `categories (id)`, `ON DELETE CASCADE` | The group or category; deleting it deletes the budget |
+| `amount_cents` | `INTEGER NOT NULL`, `CHECK (≥ 0)` | The monthly budget in integer cents. No upper limit here: a budget moved into a group may exceed the limit of a typed amount |
+
+A missing row means 0. "Only a budget row has a budget" needs another row, which `CHECK`
+cannot read, so the budget and categorization services enforce it.
+
 ### Relationships and rules
 
 ```mermaid
@@ -120,6 +133,7 @@ erDiagram
   categories ||--o{ products : "category holds"
   receipts ||--o{ receipt_lines : "has"
   categories ||--o{ receipt_lines : "categorizes"
+  categories ||--o| budgets : "has"
   products ||--o{ receipt_lines : "is followed by"
 ```
 
@@ -132,9 +146,10 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are six, `0001_catalog.sql`,
+  (four digits, then a short name). Today there are seven, `0001_catalog.sql`,
   `0002_receipts.sql`, `0003_receipt_reading.sql`, `0004_line_categories.sql`,
-  `0005_receipt_review.sql` and `0006_manual_receipts.sql`, so the schema version is 6.
+  `0005_receipt_review.sql`, `0006_manual_receipts.sql` and `0007_budgets.sql`, so the
+  schema version is 7.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,

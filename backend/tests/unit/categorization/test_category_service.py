@@ -355,3 +355,81 @@ def test_ac20b_counts_products_and_lines(
         service.delete(herkut.id)
 
     assert error.value.extra == {"product_count": 2, "line_count": 3}
+
+
+# Budget spec PC8, P6: a budget follows its category.
+
+
+def named(service: CategoryService, name: str) -> CategoryRow:
+    return next(row for row in service.list() if row.name == name)
+
+
+def test_ac23_a_category_moved_into_a_group_adds_its_budget_to_the_group(
+    service: CategoryService, repo: CatalogRepository
+) -> None:
+    juomat, ruoka = named(service, "Juomat"), named(service, "Ruoka")
+    repo.set_budget(juomat.id, 5000)
+    repo.set_budget(ruoka.id, 40000)
+
+    service.update(juomat.id, parent_id=ruoka.id)
+
+    assert repo.budgets() == {ruoka.id: 45000}
+
+
+def test_ac23_a_group_turned_into_a_category_in_a_group_moves_its_budget(
+    service: CategoryService, repo: CatalogRepository
+) -> None:
+    empty = service.create("Testiryhmä", "group", None)
+    ruoka = named(service, "Ruoka")
+    repo.set_budget(empty.id, 1000)
+    repo.set_budget(ruoka.id, 40000)
+
+    service.update(empty.id, kind="category", parent_id=ruoka.id)
+
+    assert repo.budgets() == {ruoka.id: 41000}
+
+
+def test_ac23_a_move_between_groups_changes_no_budget(
+    service: CategoryService, repo: CatalogRepository
+) -> None:
+    other = service.create("Testiryhmä", "group", None)
+    maito, ruoka = named(service, "Maitotuotteet"), named(service, "Ruoka")
+    repo.set_budget(ruoka.id, 40000)
+    repo.set_budget(other.id, 1000)
+
+    service.update(maito.id, parent_id=other.id)
+
+    assert repo.budgets() == {ruoka.id: 40000, other.id: 1000}
+
+
+def test_ac24_leaving_a_group_keeps_the_group_budget(
+    service: CategoryService, repo: CatalogRepository
+) -> None:
+    maito, ruoka = named(service, "Maitotuotteet"), named(service, "Ruoka")
+    repo.set_budget(ruoka.id, 40000)
+
+    service.update(maito.id, parent_id=None)
+
+    assert repo.budgets() == {ruoka.id: 40000}
+
+
+def test_ac23_a_refused_move_moves_no_budget(
+    service: CategoryService, repo: CatalogRepository
+) -> None:
+    juomat = named(service, "Juomat")
+    target = service.create("Testikategoria", "category", None)
+    repo.set_budget(juomat.id, 5000)
+
+    with pytest.raises(InvalidParentError):
+        service.update(juomat.id, parent_id=target.id)
+
+    assert repo.budgets() == {juomat.id: 5000}
+
+
+def test_ac16_a_rename_keeps_the_budget(service: CategoryService, repo: CatalogRepository) -> None:
+    juomat = named(service, "Juomat")
+    repo.set_budget(juomat.id, 5000)
+
+    service.update(juomat.id, name="Virvokkeet")
+
+    assert repo.budgets() == {juomat.id: 5000}

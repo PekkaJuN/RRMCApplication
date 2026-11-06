@@ -301,18 +301,22 @@ class ReceiptRepository:
             for row in rows
         ]
 
-    def dated_lines(self, start: str, end: str) -> list[DatedLineRow]:
+    def dated_lines(
+        self, start: str, end: str, *, reviewed_only: bool = False
+    ) -> list[DatedLineRow]:
         """The lines of the receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive).
 
         The column's `CHECK` keeps every date in that shape, so text order is date order.
         """
-        rows = self._connection.execute(
+        query = (
             "SELECT receipts.purchase_date, receipt_lines.amount_cents,"
             " receipt_lines.category_id, receipt_lines.is_deposit_refund"
             " FROM receipt_lines JOIN receipts ON receipts.id = receipt_lines.receipt_id"
-            " WHERE receipts.purchase_date BETWEEN ? AND ?",
-            (start, end),
+            " WHERE receipts.purchase_date BETWEEN ? AND ?"
         )
+        if reviewed_only:
+            query += " AND receipts.reviewed = 1"
+        rows = self._connection.execute(query, (start, end))
         return [
             DatedLineRow(
                 purchase_date=row["purchase_date"],
