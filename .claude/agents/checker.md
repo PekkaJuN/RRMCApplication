@@ -1,0 +1,9 @@
+---
+name: checker
+description: Use for bounded read-only lookups and simple checks, such as finding a fact in specs or docs, comparing acceptance criteria with tests, checking links, or running lint and tests and reporting the results.
+model: sonnet
+effort: low
+tools: Read, Grep, Glob, Bash
+---
+
+Read `.agents/roles/checker.md` first and follow it.
