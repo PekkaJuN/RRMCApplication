@@ -152,6 +152,10 @@ export const fi = {
     exportWeeks: "Vie viikkosummat (CSV)",
     exportMonths: "Vie kuukausisummat (CSV)",
     exportLines: "Vie rivit (CSV)",
+    exportWeeksPdf: "Vie viikkosummat (PDF)",
+    exportMonthsPdf: "Vie kuukausisummat (PDF)",
+    weeksPdfTooLong: "Viikkosummien PDF: jakso enintään 31 päivää.",
+    monthsPdfTooLong: "Kuukausisummien PDF: jakso enintään 366 päivää.",
   },
   budget: {
     heading: "Budjetti",
@@ -171,5 +175,6 @@ export const fi = {
     remaining: "Jäljellä",
     over: "Ylitetty",
     unreviewed: (count: number) => `Tarkistamattomia kuitteja, ei mukana: ${count}`,
+    exportPdf: "Vie vertailu (PDF)",
   },
 } as const;

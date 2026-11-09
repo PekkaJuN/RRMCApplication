@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings>=2.6",
     "httpx2>=2.16",
     "pillow>=11.0",
+    "reportlab>=5.1",
 ]
 
 [dependency-groups]
@@ -18,6 +19,8 @@ dev = [
     "ruff>=0.8",
     "pyright>=1.1.390",
     "pip-audit>=2.7",
+    "pdfminer-six>=20260107",
+    "types-reportlab>=5.1",
 ]
 
 [tool.uv]

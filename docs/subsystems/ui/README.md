@@ -68,8 +68,9 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
   types
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
-- @frontend/src/api/export.ts — `exportUrl(kind, period)`: the download URLs of the
-  [export](../export/README.md)
+- @frontend/src/api/export.ts — `exportUrl(kind, period)` and `comparisonPdfUrl(period)`:
+  the download URLs of the [export](../export/README.md); `pdfLimits(start, end)`: whether
+  each totals PDF of a period is within its limit
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -193,6 +194,10 @@ holds today by the browser's local date, so `15.–14.` on 2026-11-06 selects `2
 month input then chooses another period of the same kind. Each change pushes a history
 entry, and the `Vertailu` link does nothing while the page is open. The week table is plain
 state: it survives changes of period and sends no request, and a reload hides it.
+Under the covered dates, the link `Vie vertailu (PDF)` (`download`, `button` class) points
+at the comparison PDF of the period of the shown answer, not of the controls; it is hidden
+while the period is refused or cannot be loaded. The week table's state does not change
+the file.
 
 The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`
 or `/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14`),
@@ -221,6 +226,14 @@ and takes its name from `Content-Disposition`. They are shown while the totals o
 period are loaded (also when it has no lines) and hidden while the period is refused or
 the totals cannot be loaded. They have the `button` class. The texts are
 in the [CSV export spec](../../../specs/features/csv-export.md#ui-texts).
+
+After them, under the same rules, come `Vie viikkosummat (PDF)` and `Vie kuukausisummat
+(PDF)`. When the shown period is over a PDF's limit (31 days for the weekly PDF, 366 for
+the monthly one, counted by `pdfLimits` from the answer's `start_date` and `end_date`), the
+link is replaced by the text `Viikkosummien PDF: jakso enintään 31 päivää.` or
+`Kuukausisummien PDF: jakso enintään 366 päivää.`, so a refused file is never saved as a
+download. The backend checks the limits too. The texts are in the
+[PDF export spec](../../../specs/features/pdf-export.md#ui-texts).
 
 ### Styling
 
@@ -306,5 +319,6 @@ None yet.
 - [Receipt deletion and manual receipts spec](../../../specs/features/receipt-management.md) PC11
 - [Category totals spec](../../../specs/features/totals.md) PC4–PC7
 - [CSV export spec](../../../specs/features/csv-export.md) PC6
+- [PDF export spec](../../../specs/features/pdf-export.md) PC9, PC10
 - [Visual style and accessibility spec](../../../specs/features/styling.md)
 - [development.md](../../development.md#code-standards): TypeScript and React rules

@@ -317,3 +317,64 @@ it.each([
   await screen.findByRole("table", { name: "Kuukausi" });
   expect(window.location.search).toBe(search);
 });
+
+// PDF export (PDF export spec PC10).
+
+const pdfLink = () => screen.queryByRole("link", { name: "Vie vertailu (PDF)" });
+
+it("PDF export AC21: the link downloads the PDF of the shown period", async () => {
+  window.history.replaceState(null, "", "/vertailu?month=2026-10&period=mid");
+  answerComparison();
+  render(<ComparisonPage />);
+
+  await screen.findByRole("table", { name: "Kuukausi" });
+  const link = pdfLink();
+  expect(link).toHaveAttribute("href", "/api/export/comparison/pdf?month=2026-10&period=mid");
+  expect(link).toHaveAttribute("download", "");
+});
+
+it("PDF export AC21: the link follows a new month", async () => {
+  answerComparison();
+  render(<ComparisonPage />);
+  await screen.findByRole("table", { name: "Kuukausi" });
+  expect(pdfLink()).toHaveAttribute(
+    "href",
+    "/api/export/comparison/pdf?month=2026-11&period=calendar",
+  );
+
+  changeMonth("2026-09");
+
+  await vi.waitFor(() =>
+    expect(pdfLink()).toHaveAttribute(
+      "href",
+      "/api/export/comparison/pdf?month=2026-09&period=calendar",
+    ),
+  );
+});
+
+it("PDF export AC21: no link while the comparison answer is an error", async () => {
+  server.use(
+    http.get("/api/budget/comparison", () =>
+      HttpResponse.json(
+        { error: "invalid_period", message: "Jakso on virheellinen." },
+        { status: 422 },
+      ),
+    ),
+  );
+  render(<ComparisonPage />);
+
+  await screen.findByRole("alert");
+  expect(pdfLink()).not.toBeInTheDocument();
+});
+
+it("PDF export AC21: opening the week table does not change the link", async () => {
+  answerComparison();
+  const user = userEvent.setup();
+  render(<ComparisonPage />);
+  await screen.findByRole("table", { name: "Kuukausi" });
+  const before = pdfLink()?.getAttribute("href");
+
+  await user.click(showWeeks());
+
+  expect(pdfLink()?.getAttribute("href")).toBe(before);
+});

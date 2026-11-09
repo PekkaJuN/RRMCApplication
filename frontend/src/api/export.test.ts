@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { exportUrl } from "./export";
+import { comparisonPdfUrl, exportUrl, pdfLimits } from "./export";
 
 const WEEKS = { unit: "week", from: "2026-W40", to: "2026-W41" } as const;
 const OCTOBER = { unit: "month", from: "2026-10", to: "2026-10" } as const;
@@ -36,4 +36,40 @@ it("date range AC20: the URLs of a date range", () => {
   expect(exportUrl("lines", range)).toBe(
     "/api/export/lines?unit=range&from=2026-10-15&to=2026-11-14",
   );
+});
+
+it("PDF export AC19: the URLs of the totals PDF files", () => {
+  expect(exportUrl("weeksPdf", OCTOBER)).toBe(
+    "/api/export/totals/pdf?unit=month&from=2026-10&to=2026-10&by=week",
+  );
+  expect(exportUrl("monthsPdf", OCTOBER)).toBe(
+    "/api/export/totals/pdf?unit=month&from=2026-10&to=2026-10&by=month",
+  );
+});
+
+it("PDF export AC21: the URL of the comparison PDF", () => {
+  expect(comparisonPdfUrl({ month: "2026-10", kind: "mid" })).toBe(
+    "/api/export/comparison/pdf?month=2026-10&period=mid",
+  );
+  expect(comparisonPdfUrl({ month: "2026-10", kind: "calendar" })).toBe(
+    "/api/export/comparison/pdf?month=2026-10&period=calendar",
+  );
+});
+
+it("PDF export AC20: a weekly PDF covers at most 31 days", () => {
+  expect(pdfLimits("2026-10-01", "2026-10-31").weeks).toBe(true);
+  expect(pdfLimits("2026-10-15", "2026-11-14").weeks).toBe(true);
+  expect(pdfLimits("2026-10-01", "2026-11-01").weeks).toBe(false);
+});
+
+it("PDF export AC20: a monthly PDF covers at most 366 days", () => {
+  expect(pdfLimits("2026-01-01", "2027-01-01").months).toBe(true);
+  expect(pdfLimits("2026-01-01", "2027-01-02").months).toBe(false);
+  expect(pdfLimits("2026-01-01", "2027-01-31").months).toBe(false);
+});
+
+it("PDF export AC20: a change to summer time does not move a day", () => {
+  // Finland moves to summer time on 29 March 2026; the period is 31 days.
+  expect(pdfLimits("2026-03-15", "2026-04-14").weeks).toBe(true);
+  expect(pdfLimits("2026-03-15", "2026-04-15").weeks).toBe(false);
 });

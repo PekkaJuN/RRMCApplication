@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { exportUrl, type ExportKind } from "../api/export";
+import { exportUrl, pdfLimits, type ExportKind } from "../api/export";
 import { getTotals, type Totals } from "../api/totals";
 import { fi } from "../i18n/fi";
 import { PAGE_PATHS } from "../navigation";
@@ -21,6 +21,25 @@ const EXPORT_LINKS: readonly [ExportKind, string][] = [
   ["months", fi.totals.exportMonths],
   ["lines", fi.totals.exportLines],
 ];
+
+/** The totals PDF links, or a text for a file whose period is over its limit (PDF export
+ * PC9). The backend checks the limits too. */
+function PdfLinks({ totals, period }: { totals: Totals; period: Period }) {
+  const limits = pdfLimits(totals.start_date, totals.end_date);
+  const files: [ExportKind, boolean, string, string][] = [
+    ["weeksPdf", limits.weeks, fi.totals.exportWeeksPdf, fi.totals.weeksPdfTooLong],
+    ["monthsPdf", limits.months, fi.totals.exportMonthsPdf, fi.totals.monthsPdfTooLong],
+  ];
+  return files.map(([kind, fits, text, tooLong]) =>
+    fits ? (
+      <a key={kind} href={exportUrl(kind, period)} download className="button">
+        {text}
+      </a>
+    ) : (
+      <span key={kind}>{tooLong} </span>
+    ),
+  );
+}
 
 const CURRENT_PERIOD: Record<PeriodUnit, (today: Date) => Period> = {
   month: currentMonth,
@@ -174,6 +193,7 @@ export function TotalsPage() {
               {text}
             </a>
           ))}
+          <PdfLinks totals={totals} period={shownPeriod} />
         </p>
       )}
       {error && <p role="alert">{error}</p>}

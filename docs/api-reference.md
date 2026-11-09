@@ -440,13 +440,16 @@ A float or a string as `amount_cents` answers 422 `invalid_request`.
 ### Export
 
 Implemented in @backend/app/export/routes.py; the package is
-[export](subsystems/export/README.md). Both endpoints take the period as `GET /api/totals`
-does and answer a CSV download for Finnish Excel (PRD FR-26).
+[export](subsystems/export/README.md). The CSV endpoints take the period as
+`GET /api/totals` does and answer a CSV download for Finnish Excel (PRD FR-26). The PDF
+endpoints answer a PDF download of the totals or of the budget comparison (PRD FR-48).
 
 | Method and path | Query | Success | Errors |
 |---|---|---|---|
 | `GET /api/export/lines` | `unit`, `from`, `to` as in `GET /api/totals` | 200, the lines file `kuittirivit_<from>_<to>.csv` | 422 `invalid_period` |
 | `GET /api/export/totals` | the same, and `by` `week` or `month` | 200, the totals file `summat_viikot_<from>_<to>.csv` or `summat_kuukaudet_<from>_<to>.csv` | 422 `invalid_period`, then 422 `invalid_request` |
+| `GET /api/export/totals/pdf` | the same as `GET /api/export/totals` | 200, `summat_viikot_<from>_<to>.pdf` (A4 landscape) or `summat_kuukaudet_<from>_<to>.pdf` (A4 portrait) | 422 `invalid_period`, then `invalid_request`, then `period_too_long` |
+| `GET /api/export/comparison/pdf` | `month` and `period` as in `GET /api/budget/comparison` | 200, `vertailu_<month>.pdf` or `vertailu_15-14_<month>.pdf` (A4 portrait) | 422 `invalid_period` |
 
 Every 200 answer has `Content-Type: text/csv; charset=utf-8`, `Content-Disposition:
 attachment; filename="<name>"` and `Cache-Control: no-store`. The content is UTF-8 with a
@@ -478,6 +481,14 @@ Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
 |---|---|---|---|
 | 422 | `invalid_period` | `Jakso on virheellinen.` | As in `GET /api/totals`; checked first |
 | 422 | `invalid_request` | `Pyyntö on virheellinen.` | `by` of the totals file is missing or not `week` or `month` |
+| 422 | `period_too_long` | `Jakso on liian pitkä PDF-tiedostoon.` | A totals PDF over 31 days (`by` `week`) or 366 days (`by` `month`); checked last |
+
+A PDF answer has `Content-Type: application/pdf` and the same `Content-Disposition` and
+`Cache-Control` as a CSV answer. The weekly PDF is one table of the week columns; the
+monthly PDF stacks a block per month, then `Koko jakso` for a period over 31 days; the
+comparison PDF is the Vertailu month table. A period without counted lines shows
+`Ei ostoksia valitulla jaksolla.` instead of a table. The layout is in
+[export](subsystems/export/README.md#pdf-layout).
 
 ## Subsystems
 
@@ -488,7 +499,7 @@ Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
 - [review](subsystems/review/README.md) — the receipt endpoints
 - [totals](subsystems/totals/README.md) — the totals endpoint
 - [budget](subsystems/budget/README.md) — the budget and comparison endpoints
-- [export](subsystems/export/README.md) — the CSV export endpoints
+- [export](subsystems/export/README.md) — the CSV and PDF export endpoints
 
 ## Related Documents
 
