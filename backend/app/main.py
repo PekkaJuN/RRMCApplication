@@ -14,7 +14,8 @@ from app.categorization.routes import create_catalog_router
 from app.engines.factory import Engines, create_engines
 from app.errors import add_error_handlers
 from app.export.csv_exporter import CsvExporter
-from app.export.exporter import Exporter
+from app.export.exporter import Exporter, ReportExporter
+from app.export.pdf_exporter import PdfExporter
 from app.export.routes import create_export_router
 from app.health.routes import create_health_router
 from app.health.service import HealthService, ModelLoader
@@ -41,14 +42,15 @@ def create_app(
     exporter: Exporter | None = None,
     clock: Callable[[], datetime] | None = None,
     failed_folder: FailedFolder | None = None,
+    report_exporter: ReportExporter | None = None,
 ) -> FastAPI:
     """Build the application.
 
-    `extra_routers`, `engines`, `migrations_dir`, `import_service`, `exporter`, `clock` and
-    `failed_folder` let tests add test-only endpoints, fake servers, throwaway migrations,
-    simulated file failures, a fixed exporter, a fixed time for new receipts and a failing
-    move of a failed image; production passes none of them, and the engines then follow
-    `settings.engines`.
+    `extra_routers`, `engines`, `migrations_dir`, `import_service`, `exporter`, `clock`,
+    `failed_folder` and `report_exporter` let tests add test-only endpoints, fake servers,
+    throwaway migrations, simulated file failures, a fixed exporter, a fixed time for new
+    receipts and PDF files, a failing move of a failed image and a fixed PDF exporter;
+    production passes none of them, and the engines then follow `settings.engines`.
     """
     settings = settings or load_settings()
     engines = engines or create_engines(settings)
@@ -81,10 +83,21 @@ def create_app(
     app.include_router(create_review_router(settings, clock, failed_folder))
     app.include_router(create_totals_router(settings))
     app.include_router(create_budget_router(settings))
-    app.include_router(create_export_router(settings, exporter or CsvExporter()))
+    app.include_router(
+        create_export_router(
+            settings,
+            exporter or CsvExporter(),
+            report_exporter or PdfExporter(),
+            clock or _utc_now,
+        )
+    )
     for router in extra_routers:
         app.include_router(router)
     return app
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def _seed_catalog(settings: Settings) -> None:

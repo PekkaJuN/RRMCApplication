@@ -212,9 +212,11 @@ it("totals P6: an older answer arriving last is not shown", async () => {
   expect(screen.getByText("Tarkistamattomia kuitteja jaksolla: 3")).toBeInTheDocument();
 });
 
+/** The CSV links; the PDF export spec added PDF links after them (PDF export PC9). */
 function exportLinks(): [string, string | null, string | null][] {
   return screen
     .getAllByRole("link")
+    .filter((link) => link.textContent?.endsWith("(CSV)"))
     .map((link) => [
       link.textContent ?? "",
       link.getAttribute("href"),
@@ -261,7 +263,7 @@ it("export AC14: the links are shown for a period without lines", async () => {
   render(<TotalsPage />);
 
   await screen.findByText("Ei ostoksia valitulla jaksolla.");
-  expect(screen.getAllByRole("link")).toHaveLength(3);
+  expect(exportLinks()).toHaveLength(3);
 });
 
 it("export AC14: no link while the period is refused", async () => {
@@ -320,7 +322,8 @@ it("styling AC1: the Yhteenveto page has no inline style", async () => {
   const { container } = render(<TotalsPage />);
 
   await screen.findByRole("table", { name: "Viikot" });
-  expect(screen.getAllByRole("link")).toHaveLength(3);
+  // Three CSV and two PDF links (PDF export PC9).
+  expect(screen.getAllByRole("link")).toHaveLength(5);
   expect(container.querySelectorAll("[style]")).toHaveLength(0);
 });
 
@@ -499,4 +502,95 @@ it("date range AC19: Alkaen after Päättyen shows the error, no tables and no l
   expect(await screen.findByRole("alert")).toHaveTextContent("Jakso on virheellinen.");
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+// PDF export (PDF export spec PC9).
+
+function linkTexts(): string[] {
+  return screen.getAllByRole("link").map((link) => link.textContent ?? "");
+}
+
+it("PDF export AC19: two PDF links after the CSV links, for the shown period", async () => {
+  answerTotals();
+  window.history.replaceState(null, "", "/yhteenveto?unit=month&from=2026-10&to=2026-10");
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  expect(linkTexts()).toEqual([
+    "Vie viikkosummat (CSV)",
+    "Vie kuukausisummat (CSV)",
+    "Vie rivit (CSV)",
+    "Vie viikkosummat (PDF)",
+    "Vie kuukausisummat (PDF)",
+  ]);
+  const weekly = screen.getByRole("link", { name: "Vie viikkosummat (PDF)" });
+  expect(weekly).toHaveAttribute(
+    "href",
+    "/api/export/totals/pdf?unit=month&from=2026-10&to=2026-10&by=week",
+  );
+  expect(weekly).toHaveAttribute("download", "");
+  expect(screen.getByRole("link", { name: "Vie kuukausisummat (PDF)" })).toHaveAttribute(
+    "href",
+    "/api/export/totals/pdf?unit=month&from=2026-10&to=2026-10&by=month",
+  );
+  expect(screen.queryByText(/jakso enintään/)).not.toBeInTheDocument();
+});
+
+it("PDF export AC19: no PDF link while the totals answer is an error", async () => {
+  answerTotals(() =>
+    HttpResponse.json(
+      { error: "invalid_period", message: "Jakso on virheellinen." },
+      { status: 422 },
+    ),
+  );
+  render(<TotalsPage />);
+
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("link", { name: /PDF/ })).not.toBeInTheDocument();
+  expect(screen.queryByText(/jakso enintään/)).not.toBeInTheDocument();
+});
+
+it("PDF export AC20: over both limits, the texts replace the PDF links", async () => {
+  answerTotals(() =>
+    HttpResponse.json({
+      ...OCTOBER,
+      from: "2026-01",
+      to: "2027-01",
+      start_date: "2026-01-01",
+      end_date: "2027-01-31",
+    }),
+  );
+  window.history.replaceState(null, "", "/yhteenveto?unit=month&from=2026-01&to=2027-01");
+  render(<TotalsPage />);
+  await screen.findByRole("table", { name: "Viikot" });
+
+  expect(screen.queryByRole("link", { name: /PDF/ })).not.toBeInTheDocument();
+  expect(screen.getByText("Viikkosummien PDF: jakso enintään 31 päivää.")).toBeInTheDocument();
+  expect(screen.getByText("Kuukausisummien PDF: jakso enintään 366 päivää.")).toBeInTheDocument();
+});
+
+it("PDF export AC20: a 31-day range shows the weekly link; 32 days shows its text", async () => {
+  answerTotals((params) =>
+    HttpResponse.json({
+      ...OCTOBER,
+      unit: "range",
+      from: params.get("from"),
+      to: params.get("to"),
+      start_date: params.get("from"),
+      end_date: params.get("to"),
+    }),
+  );
+  window.history.replaceState(null, "", "/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14");
+  const { unmount } = render(<TotalsPage />);
+
+  expect(await screen.findByRole("link", { name: "Vie viikkosummat (PDF)" })).toBeInTheDocument();
+  unmount();
+
+  window.history.replaceState(null, "", "/yhteenveto?unit=range&from=2026-10-15&to=2026-11-15");
+  render(<TotalsPage />);
+  expect(
+    await screen.findByText("Viikkosummien PDF: jakso enintään 31 päivää."),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Vie viikkosummat (PDF)" })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Vie kuukausisummat (PDF)" })).toBeInTheDocument();
 });

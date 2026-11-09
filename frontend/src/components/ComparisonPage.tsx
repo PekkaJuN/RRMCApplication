@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { getComparison, type Comparison } from "../api/budget";
+import { comparisonPdfUrl } from "../api/export";
 import {
   comparisonFromSearch,
   comparisonToSearch,
@@ -108,6 +109,16 @@ export function ComparisonPage() {
               formatDate(comparison.start_date),
               formatDate(comparison.end_date),
             )}
+          </p>
+          <p>
+            {/* The period of the shown answer, not of the controls (PDF export PC10). */}
+            <a
+              href={comparisonPdfUrl({ month: comparison.month, kind: comparison.period })}
+              download
+              className="button"
+            >
+              {fi.comparison.exportPdf}
+            </a>
           </p>
           {comparison.unreviewed_receipts > 0 && (
             <p role="status">{fi.comparison.unreviewed(comparison.unreviewed_receipts)}</p>

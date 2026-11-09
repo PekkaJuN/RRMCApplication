@@ -55,7 +55,7 @@ The endpoint, its shape and its error code are in the
   [categorization](../categorization/README.md) (the category list order),
   [storage](../storage/README.md).
 - Used by: the [UI](../ui/README.md) Yhteenveto page; [export](../export/README.md) for
-  the totals file; [budget](../budget/README.md) for `ColumnOut` and `InvalidPeriodError`.
+  the totals file and the totals PDF; [budget](../budget/README.md) for `ColumnOut` and `InvalidPeriodError`.
 
 ## Modules
 

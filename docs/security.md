@@ -20,7 +20,7 @@ computer. It does not protect data from someone who can already use the computer
 | Receipt images | Import, done and failed folders on this computer | `source/import`, `source/import_done`, `source/import_failed` |
 | Receipts, lines, products, raw OCR text | SQLite database | Docker volume `rrmc_rrmc-data` |
 | Evaluation images and results | Evaluation folder (development tool) | `source/eval` |
-| CSV exports | Wherever the browser saves them | The user's download folder |
+| CSV and PDF exports | Wherever the browser saves them | The user's download folder |
 | Logs | Standard output of the containers | Docker's log of each container |
 | Settings | `.env` file | Project root |
 
@@ -57,6 +57,7 @@ account and disk encryption.
 | Image files | The file's signature must match a JPEG or PNG; the images are served with `Cache-Control: no-store` |
 | Model output | Validated against a schema; invalid output is a failure, not stored data (FR-8) |
 | CSV cells | User text that Excel could run as a formula gets a leading `'` (@backend/app/export/csv_exporter.py) |
+| PDF files | Group and category names and sums only, no product or store names; names are escaped before layout; the metadata holds the title only, no author or user name (@backend/app/export/pdf_exporter.py) |
 
 ## Logs and errors
 

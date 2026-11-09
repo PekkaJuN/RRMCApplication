@@ -20,3 +20,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 13 | [Monthly budget](features/budget.md) | Done | FR-50 (new) |
 | 14 | [Finnish date field](features/date-field.md) | Done | FR-51 (new) |
 | 15 | [Free date range for totals](features/date-range-totals.md) | Done | FR-49 |
+| 16 | [PDF export](features/pdf-export.md) | Done | FR-48 |

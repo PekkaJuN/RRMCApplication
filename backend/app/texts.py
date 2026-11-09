@@ -62,6 +62,43 @@ INVALID_STORE = "Kaupan nimi saa olla enintään 100 merkkiä."
 INVALID_PERIOD = "Jakso on virheellinen."
 
 NO_CATEGORY = "Ei kategoriaa"
+PARTIAL = "(osittainen)"
+TOTAL = "Yhteensä"
+
+# PDF export (PDF export spec)
+PERIOD_TOO_LONG = "Jakso on liian pitkä PDF-tiedostoon."
+WEEKLY_TITLE = "Viikkosummat"
+MONTHLY_TITLE = "Kuukausisummat"
+COMPARISON_TITLE = "Budjettivertailu"
+PERIOD_LABEL = "Jakso:"
+CREATED = "Luotu"
+CATEGORY = "Kategoria"
+AMOUNT = "Summa"
+PERIOD_BLOCK = "Koko jakso"
+CONTINUED = "(jatkuu)"
+PERIOD_KIND = "Jakson tyyppi:"
+CALENDAR_MONTH = "Kalenterikuukausi"
+MID_PERIOD = "15.–14."
+COMPARISON_COLUMNS = ("Budjetti", "Toteutunut", "Jäljellä")
+OVER_BUDGET = "Ylitetty"
+NO_PURCHASES = "Ei ostoksia valitulla jaksolla."
+
+
+def unreviewed_in_period(count: int) -> str:
+    return f"Tarkistamattomia kuitteja jaksolla: {count}"
+
+
+def unreviewed_left_out(count: int) -> str:
+    return f"Tarkistamattomia kuitteja, ei mukana: {count}"
+
+
+def undated_left_out(count: int) -> str:
+    return f"Kuitteja ilman päivää (ei mukana): {count}"
+
+
+def page_number(number: int, total: int) -> str:
+    return f"Sivu {number}/{total}"
+
 
 # Monthly budget (budget spec)
 NOT_A_BUDGET_ROW = "Budjetin voi asettaa vain ryhmälle tai ryhmättömälle kategorialle."

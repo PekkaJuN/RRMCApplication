@@ -12,7 +12,7 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-11-06
+Last reviewed: 2026-11-09
 
 ## Summary
 
@@ -33,7 +33,7 @@ Last reviewed: 2026-11-06
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | Done |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md) | 3 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 | 19 | Security | [docs/security.md](security.md) | Stored data, protection and known limits | 3, 5, 6 | Done |
 
@@ -58,7 +58,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Done |
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | Done |
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | Done |
-| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines` and `/totals`: CSV files of a period behind the exporter interface; Google Sheets later | 4, 13, 18 | Done |
+| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf` and `/comparison/pdf`: CSV and PDF files of a period behind the exporter interfaces; Google Sheets later | 4, 13, 18 | Done |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | Done |
@@ -117,6 +117,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The free date range spec is Done (audited 2026-11-06): the `range` period in calculation, its
   use in totals and the CSV export, and `Aikaväli` on the Yhteenveto page. The calculation,
   totals, export, UI, API and glossary docs describe it.
+- The PDF export spec is Done (audited 2026-11-09): the weekly, monthly and
+  comparison PDF files, the PDF links on the Yhteenveto and Vertailu pages and ADR 0005.
+  The export, totals, budget, UI, API, architecture, security and glossary docs describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

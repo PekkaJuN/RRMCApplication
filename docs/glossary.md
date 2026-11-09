@@ -52,6 +52,10 @@ gives the Finnish word the user sees.
 | Undated count | — | All receipts without a purchase date; they are in no period |
 | Lines file | kuittirivit | The CSV export of every line of the receipts dated in a period, deposit refunds included ([export](subsystems/export/README.md)) |
 | Totals file | summat | The CSV export of a period's category totals by week (`summat_viikot`) or by month (`summat_kuukaudet`), in long format |
+| Totals PDF | viikkosummat, kuukausisummat | The PDF export of a period's category totals: the weekly PDF is one landscape table, the monthly PDF stacks month blocks ([export](subsystems/export/README.md#pdf-layout)) |
+| Month block | — | One month's two-column table (`Kategoria`, `Summa`) in the monthly PDF; kept whole on one page unless it is taller than a page, then it continues with `(jatkuu)` |
+| Period block | Koko jakso | The last block of a monthly PDF: each row's sum over the whole period; only for a period over 31 days |
+| Comparison PDF | budjettivertailu | The PDF export of the Vertailu page's month table for one comparison period |
 | Long format | pitkä muoto | One row per column and category, with the period column's key in a cell, instead of one column per week or month; suited to a pivot table |
 | Budget row | budjettirivi | A group or a category without a group; a category inside a group is not one ([budget](subsystems/budget/README.md)) |
 | Monthly budget | kuukausibudjetti | The amount of one budget row in integer cents; the same for every month, without history |
@@ -61,7 +65,7 @@ gives the Finnish word the user sees.
 | Weekly budget | viikkobudjetti | A row's monthly budget divided by the period's days, times the week's days in the period; the weeks add up to the monthly budget |
 | Actual spending | toteutunut | The spending of reviewed receipts, by the totals' rules |
 | Remaining | jäljellä | The budget minus the actual spending; negative when the row is over budget |
-| Exporter | — | The interface that turns a period's lines or totals into a file; CSV now, Google Sheets later (FR-27) |
+| Exporter | — | The interfaces that turn a period's lines, totals or comparison into a file: `Exporter` for CSV (Google Sheets later), `ReportExporter` for the PDF files (FR-27) |
 
 ## Subsystems
 

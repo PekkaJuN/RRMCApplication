@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
 
+from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
 from app.calculation.period_totals import PeriodTotals
 
@@ -36,3 +37,36 @@ class Exporter(Protocol):
     def totals_file(self, totals: PeriodTotals, by: Unit) -> ExportFile:
         """The totals of the week columns (`by` `week`) or the month columns (`month`)."""
         ...
+
+
+@dataclass(frozen=True)
+class TotalsReport:
+    """What the Yhteenveto page shows of a period, and the day the file is made."""
+
+    totals: PeriodTotals
+    unreviewed_receipts: int
+    undated_receipts: int
+    created: date
+
+
+@dataclass(frozen=True)
+class ComparisonReport:
+    """What the Vertailu page shows of a comparison period (`kind` `calendar` or `mid`)."""
+
+    comparison: Comparison
+    kind: str
+    unreviewed_receipts: int
+    undated_receipts: int
+    created: date
+
+
+class ReportExporter(Protocol):
+    """Files of a whole report (PDF export spec PC1, P2), beside the CSV `Exporter`.
+
+    Two small protocols instead of one: a report file has no lines file, and the CSV totals
+    file needs no counts.
+    """
+
+    def totals_report(self, report: TotalsReport, by: Unit) -> ExportFile: ...
+
+    def comparison_report(self, report: ComparisonReport) -> ExportFile: ...

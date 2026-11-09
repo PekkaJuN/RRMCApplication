@@ -68,7 +68,8 @@ budget.
   [categorization](../categorization/README.md) (the category list order, `NotFoundError`),
   [storage](../storage/README.md), [totals](../totals/README.md) (`ColumnOut`,
   `InvalidPeriodError`).
-- Used by: the [UI](../ui/README.md) Budjetti and Vertailu pages.
+- Used by: the [UI](../ui/README.md) Budjetti and Vertailu pages;
+  [export](../export/README.md) for the comparison PDF (`BudgetService.comparison`).
 
 ## Modules
 
@@ -80,8 +81,8 @@ None yet.
   out unreviewed receipts. The page shows how many it left out.
 - The same month name means different dates in the two kinds of period, so the page always
   shows the covered dates.
-- The 15–14 period exists only here. The Yhteenveto page and the CSV export use calendar
-  periods until PRD FR-49 brings a free date range.
+- The 15–14 period is a ready choice only here. The Yhteenveto page and its exports reach
+  the same days as a free date range (PRD FR-49).
 
 ## Related Documents
 
