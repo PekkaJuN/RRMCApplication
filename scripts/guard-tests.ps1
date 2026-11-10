@@ -284,6 +284,29 @@ $s = New-GuardState
 1..3 | ForEach-Object { Invoke-Edit $s @("backend/app/x.py", "backend/app/y.py"); Invoke-Run $s $false }
 Write-Check "AC14 several files reset the same-file count" ($s.g6Count -eq 0) "count $($s.g6Count)"
 
+# AC28: paths changed by shell commands count like file tool edits.
+function Invoke-ShellRun($State, [string[]]$Changed) {
+    Update-GuardAfterRun -State $State -Command $BackendTests -ExitOk $false -Now $Now -ChangedPaths $Changed
+}
+$s = New-GuardState
+1..3 | ForEach-Object { Invoke-ShellRun $s @("backend/app/x.py") }
+Assert-Call "AC28 same file changed by the shell three times" $editCall "G6" $s
+$s = New-GuardState
+1..3 | ForEach-Object { Invoke-ShellRun $s @("backend/tests/unit/test_x.py") }
+Write-Check "AC28 a shell-changed test file is not counted for G5" ($s.g5Count -eq 0) "count $($s.g5Count)"
+Write-Check "AC28 a shell-changed test file counts for G6" ($s.tripped -eq "G6") "tripped $($s.tripped)"
+$s = New-GuardState
+1..3 | ForEach-Object { Invoke-Edit $s @("backend/app/x.py"); Invoke-ShellRun $s @("backend/app/x.py") }
+Assert-Call "AC28 a file edited by both a tool and the shell is one path" $editCall "G6" $s
+$s = New-GuardState
+Invoke-ShellRun $s @("backend/app/x.py")
+Write-Check "AC28 a check run sets scanFrom" ($s.scanFrom -eq $Now.ToString("o")) "scanFrom $($s.scanFrom)"
+$s = New-GuardState
+Reset-GuardOnUserMessage -State $s -Now $Now
+Write-Check "AC28 the first user message sets scanFrom" ($s.scanFrom -eq $Now.ToString("o")) "scanFrom $($s.scanFrom)"
+Reset-GuardOnUserMessage -State $s -Now $Now.AddHours(1)
+Write-Check "AC28 a later user message keeps scanFrom" ($s.scanFrom -eq $Now.ToString("o")) "scanFrom $($s.scanFrom)"
+
 # Check runs are recognized; other commands do not change the counts.
 $s = New-GuardState
 Invoke-Run $s $false "git status"
@@ -477,6 +500,41 @@ $r = Invoke-Hook claude Stop $stopInput $Repo
 Write-Check "claude Stop refused with G8" ($r.Exit -eq 2 -and $r.Stderr -like "Guardrail G8: run the backend checks: *") "exit $($r.Exit) $($r.Stderr)"
 $r = Invoke-Hook claude Stop $stopInput $Repo
 Write-Check "claude second Stop allowed" ($r.Exit -eq 0) "exit $($r.Exit) $($r.Stderr)"
+
+# AC28 (Claude Code): files changed between red runs are found through Git.
+function Invoke-RedRun([string]$Session) {
+    $failed = New-ClaudeInput PostToolUseFailure Bash @{ command = $BackendTests } $Session
+    $failed.error = "Exit code 1"
+    Invoke-Hook claude PostToolUseFailure $failed $Repo | Out-Null
+}
+function Invoke-UserMessage([string]$Session) {
+    Invoke-Hook claude UserPromptSubmit @{ session_id = $Session; hook_event_name = "UserPromptSubmit"; prompt = "go" } $Repo | Out-Null
+}
+function Read-HookState([string]$Session) { Get-Content -Raw (Join-Path $StateDir "$Session.json") | ConvertFrom-Json }
+function Write-RepoFile([string]$Path, [string]$Text) {
+    $full = Join-Path $Repo $Path
+    New-Item -ItemType Directory -Force -Path (Split-Path $full) | Out-Null
+    [System.IO.File]::WriteAllText($full, $Text)
+}
+Write-RepoFile ".gitignore" "*.log`n"
+Write-RepoFile "backend/app/old.py" "old = 1`n"
+(Get-Item (Join-Path $Repo "backend\app\old.py")).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-1)
+Invoke-UserMessage "claude-shell"
+foreach ($i in 1..3) { Write-RepoFile "backend/app/x.py" "x = $i`n"; Invoke-RedRun "claude-shell" }
+$r = Invoke-Hook claude PreToolUse (New-ClaudeInput PreToolUse Edit @{ file_path = "$Repo\backend\app\y.py" } "claude-shell") $Repo
+Assert-HookBlock "claude shell change of one file three times" $r "G6"
+Invoke-UserMessage "claude-shell-test"
+foreach ($i in 1..3) { Write-RepoFile "backend/tests/unit/test_x.py" "t = $i`n"; Invoke-RedRun "claude-shell-test" }
+$saved = Read-HookState "claude-shell-test"
+Write-Check "claude shell change of a test file is not counted for G5" ($saved.g5Count -eq 0) "count $($saved.g5Count)"
+Write-Check "claude shell change of a test file trips G6" ($saved.tripped -eq "G6") "tripped $($saved.tripped)"
+Invoke-UserMessage "claude-shell-skip"
+Invoke-RedRun "claude-shell-skip"
+$saved = Read-HookState "claude-shell-skip"
+Write-Check "claude files older than the first user message are not counted" ($saved.g6Count -eq 0) "count $($saved.g6Count) path $($saved.g6Path)"
+foreach ($i in 1..2) { Write-RepoFile "backend/app/run.log" "line $i`n"; Invoke-RedRun "claude-shell-skip" }
+$saved = Read-HookState "claude-shell-skip"
+Write-Check "claude ignored files are not counted" ($saved.g6Count -eq 0 -and $saved.tripped -eq "G5") "count $($saved.g6Count) tripped $($saved.tripped)"
 $stopInput.session_id = "claude-stop-2"; $stopInput.stop_hook_active = $true
 $r = Invoke-Hook claude Stop $stopInput $Repo
 Write-Check "claude Stop with stop_hook_active allowed" ($r.Exit -eq 0) "exit $($r.Exit) $($r.Stderr)"

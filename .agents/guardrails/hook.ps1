@@ -43,24 +43,42 @@ function Get-Branch {
     return "$branch".Trim()
 }
 
-# The newest write time of the changed files of each part, from `git status`.
-function Get-PartChanges {
-    $changes = @{ backend = $null; frontend = $null }
+# The changed files of the repository with their write times, from `git status` (ignored
+# files excluded). Deleted files have no write time and are left out.
+function Get-ChangedFiles {
+    $files = New-Object System.Collections.Generic.List[object]
     $ErrorActionPreference = "Continue"
     $lines = & git -C $ProjectRoot status --porcelain --untracked-files=all 2>$null
-    if ($LASTEXITCODE -ne 0) { return $changes }
+    if ($LASTEXITCODE -ne 0) { return @() }
     foreach ($line in @($lines)) {
         if ("$line".Length -lt 4) { continue }
         $path = "$line".Substring(3).Trim('"')
         if ($path -match ' -> (.+)$') { $path = $Matches[1].Trim('"') }
-        $part = ($path -split '/')[0].ToLowerInvariant()
-        if (-not $changes.ContainsKey($part)) { continue }
         $full = Join-Path $ProjectRoot $path
         if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-        $time = (Get-Item -LiteralPath $full).LastWriteTimeUtc
-        if ($null -eq $changes[$part] -or $time -gt $changes[$part]) { $changes[$part] = $time }
+        $files.Add([pscustomobject]@{ Path = $path; Time = (Get-Item -LiteralPath $full).LastWriteTimeUtc })
+    }
+    # PowerShell 5.1 cannot wrap a List[object] in @(); ToArray() avoids that.
+    return $files.ToArray()
+}
+
+# The newest write time of the changed files of each part.
+function Get-PartChanges {
+    $changes = @{ backend = $null; frontend = $null }
+    foreach ($file in @(Get-ChangedFiles)) {
+        $part = ($file.Path -split '/')[0].ToLowerInvariant()
+        if (-not $changes.ContainsKey($part)) { continue }
+        if ($null -eq $changes[$part] -or $file.Time -gt $changes[$part]) { $changes[$part] = $file.Time }
     }
     return $changes
+}
+
+# The files that changed since the state's scanFrom (AC28); none while scanFrom is empty.
+function Get-ShellChanges($State) {
+    if (-not $State.scanFrom) { return @() }
+    $from = [datetime]::Parse($State.scanFrom, [Globalization.CultureInfo]::InvariantCulture,
+        [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    return @(Get-ChangedFiles | Where-Object { $_.Time -gt $from } | ForEach-Object { $_.Path })
 }
 
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
@@ -87,7 +105,9 @@ switch ($Event) {
                 Add-Content -Path (Join-Path $StateDir "test-edits.log") -Value $lines -Encoding UTF8
             }
         } elseif ($call.Kind -eq "shell" -and $null -ne $call.ExitOk) {
-            Update-GuardAfterRun -State $state -Command $call.Command -ExitOk $call.ExitOk -Now ([datetime]::UtcNow)
+            $now = [datetime]::UtcNow
+            $changed = if ($null -ne (Get-CheckRun $call.Command)) { @(Get-ShellChanges $state) } else { @() }
+            Update-GuardAfterRun -State $state -Command $call.Command -ExitOk $call.ExitOk -Now $now -ChangedPaths $changed
         }
     }
     "UserPromptSubmit" { Reset-GuardOnUserMessage -State $state }

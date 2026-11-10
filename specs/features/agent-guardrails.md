@@ -14,6 +14,11 @@
   ([learnings](../../docs/learnings.md)). T17 done: with the hooks on, all 341 guard tests
   pass and the formerly blocked commands run live. The user deferred AC24 until Codex is
   taken into use; the spec is Done for Claude Code.
+  The user asked G6 to count shell changes: AC28 and tasks T18–T20 added
+  ([Spec change 2](#spec-change-2-shell-changes-count-as-edits)) and approved by the user;
+  T18 and T19 done (guard tests 352 passed with the hooks off; the hook takes a median
+  664 ms at a red check run with the Git scan, within AC20). T20 done: with the hooks on, all
+  355 guard tests pass.
 - **Depends on:** [Test container isolation](test-isolation.md)
 - **Implements:** NFR-1, NFR-4 and the Guardrails of [AGENTS.md](../../AGENTS.md#guardrails)
   for AI coding agents; the user's decision of 2026-11-10 to let agents run on their own from
@@ -322,6 +327,18 @@ affected.)
 **Then** each call is blocked with `G1`: the files searched, and a pattern file given with
 `-f`, are still checked.
 
+### AC28: Shell changes count as edits
+**Given** the guardrails are on and the project is a Git repository
+**When** between check runs the agent changes only `backend/app/x.py` with a shell command
+(for example `Set-Content`, `sed -i` or a script), the next check run is red, and this
+happens three times in a row
+**Then** G6 blocks after the third red run, as in AC14.
+**When** the file changed that way is `backend/tests/unit/test_x.py`
+**Then** G5 does not count the red run, as in AC13, and G6 counts it.
+**When** a file is ignored by Git, or was last written before the previous check run (or,
+before the first check run, before the session's first user message)
+**Then** it does not count as an edit.
+
 ### AC24: Codex runs in its sandbox
 **Given** the project's Codex configuration and a trusted project
 **When** Codex starts in the repository on this computer
@@ -379,6 +396,7 @@ allow, block with an ID, or a reminder.
 | AC25 | decision | recursive search | each AC25 command from the root; from `backend` and `docs` | decide | block G1; allow | none |
 | AC26 | decision | redirections | each allowed and each blocked AC26 command | decide | allow; block G4 | none |
 | AC27 | decision | search patterns | each allowed and each blocked AC27 command | decide | allow; block G1 | none |
+| AC28 | counter + hook | shell changes | changed paths passed to the run update; the hook against a temporary Git repository with files written between runs | record and decide | G6 at the third red; test file not counted for G5; ignored and older files not counted | temporary repository in `%TEMP%` |
 | AC5 | decision | app services | each AC5 command | decide | block G2 | none |
 | AC6 | decision | test services | each AC6 command | decide | allow | none |
 | AC7 | decision | app ports | each AC7 call; port 18000 | decide | block G2; allow | none |
@@ -521,6 +539,11 @@ Order: G4, G3, G1, G2, then the G5/G6 trip; the first block wins.
   `editsSinceRun`. If `lastRunRed` and a path is a test file (`backend/tests/`,
   `frontend/src/**/*.test.ts(x)`, `frontend/e2e/`), remind with G7 and append
   `<ISO time><TAB><branch><TAB><path>` to `state/test-edits.log`.
+- **Shell changes (spec change 2):** at a check run, the files of
+  `git status --porcelain --untracked-files=all` (ignored files excluded) whose write time is
+  after `scanFrom` are added to `editsSinceRun` before the counts change. `scanFrom` is set to
+  the time of each check run, and at a user message while it is empty. G7 stays with file
+  tool edits: a shell change of a test file gets no reminder and no log line.
 - **After a check run:** green: `g5Count = 0`, `g6Count = 0`, `lastGreen[check] = now`. Red:
   `g5Count += 1` unless `editsSinceRun` holds a test file; if `editsSinceRun` is exactly one
   path, `g6Count += 1` when it equals `g6Path`, else `g6Path` is that path and `g6Count = 1`;
@@ -687,6 +710,29 @@ file tools instead.
   in a non-read command's text, heredoc bodies). Guard tests pass. Then the user restores
   `.claude/settings.json`, and the guard tests are run once more with the hooks on.
 
+### Spec change 2: shell changes count as edits
+Asked by the user after spec change 1. G6 saw only file tool edits, so a fix loop through
+`Set-Content` or `sed -i` never tripped it. Reading the write targets from the command text
+cannot cover scripts and programs, so the hook asks Git which files changed, by write time
+(Plan P3, "Shell changes"). The same edits feed G5's test-file rule. A quote-aware split of
+shell commands, which would remove the `\|` false positive in a quoted grep pattern, is left
+out on purpose: it would hide `bash -c "...; rm -rf x"` from the part checks.
+
+- **Files to Modify:** `Guard.psm1` (the run update takes the changed paths; `scanFrom` in
+  the state), `hook.ps1` (the Git scan at a check run), `scripts/guard-tests.ps1`,
+  `docs/security.md` (G6 row), this spec and `specs/README.md`. The user turns off
+  `PreToolUse` and the G4 deny rules for the guard files while the change is made and
+  restores them with `git restore .claude/settings.json`.
+
+- [x] **T18 Counting (AC28).** Unit rows: changed paths passed to the run update count for
+  G5 and G6 like file tool edits; then the change in `Guard.psm1`.
+- [x] **T19 Git scan (AC28).** Hook rows against a temporary Git repository: three red runs
+  with one file written between them trip G6; a test file is not counted for G5; an ignored
+  file and a file older than `scanFrom` are not counted. Then the change in `hook.ps1`.
+- [x] **T20 Docs and check.** security.md G6 row; guard tests pass and the hook time stays
+  within AC20; the user restores `.claude/settings.json`; the guard tests run once more with
+  the hooks on.
+
 ## Progress
 
 - **T1–T11 (2026-11-10):** guard, adapters, hook entry point and Codex configuration written
@@ -714,7 +760,9 @@ file tools instead.
 ## Audit
 
 ### Summary
-- Acceptance criteria: 26/27 met; AC24 deferred by the user until Codex is taken into use
+- Acceptance criteria: 27/28 met; AC24 deferred by the user until Codex is taken into use
+- Spec change 2 (AC28): guard tests 355 passed with the hooks on; hook median 664 ms at a
+  red check run with the Git scan
 - Spec change 1 (AC26, AC27): guard tests 341 passed with the hooks on; the formerly blocked
   commands ran through the live hook
 - Tests at the first audit: guard tests 310 passed (unit and integration for both tools, timing median about
@@ -738,6 +786,7 @@ file tools instead.
 | AC21 | ✅ | `scripts/guard-tests.ps1` exits 0 |
 | AC22, AC23 | ✅ | AGENTS.md, skills; security.md "Agent guardrails"; development.md "Agent guardrails" |
 | AC24 | ⏸ | Deferred by the user until Codex is taken into use |
+| AC28 | ✅ | AC28 unit rows; hook rows against a temporary Git repository (one file three times trips G6; a test file not counted for G5; older and ignored files not counted) |
 | AC26, AC27 | ✅ | AC26 and AC27 unit rows, case-sensitive option rows; live hook run of `ls <guard dir> 2>/dev/null` and `grep -c` with a pattern |
 
 | # | Severity | File | Finding | Recommendation |

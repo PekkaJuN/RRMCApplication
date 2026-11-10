@@ -105,8 +105,8 @@ guardrails therefore keep the agent away from real data, not only from changing 
 | G3 | Volume removal and pruning, recursive or forced deletes, `restore-db.ps1`, `git push`, hard resets, `clean`, discarding changes, history rewrites, remote changes | Deletes through other programs or scripts |
 | G4 | Writes to `.claude/settings.json`, `.claude/hooks/`, `.codex/`, `.agents/guardrails/`, `scripts/guard-tests.ps1` | Writes through a script file the guard cannot see into |
 | G5 | Every call but reading files after three red check runs in a row, until the user writes | Failures of commands that are not in the Commands table |
-| G6 | The same, when the edits between those runs touched one and the same file | Edits made through shell commands (only file tool edits are tracked) |
-| G7 | Nothing: a test edit after a red run gets a reminder and is recorded for the audit | — |
+| G6 | The same, when the edits between those runs touched one and the same file, through file tools or shell commands (shell changes are found through `git status` and write times at each check run) | Changes to files Git ignores; a change outside a Git repository |
+| G7 | Nothing: a test edit after a red run gets a reminder and is recorded for the audit | Test edits made through shell commands (no reminder, not recorded) |
 | G8 | Ending a turn once, when a changed part's checks were not green since the change | — |
 
 Layers:

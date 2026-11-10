@@ -480,7 +480,8 @@ function Test-GuardConfigWrite($Call, [string]$ProjectRoot) {
 
 function New-GuardState {
     [pscustomobject]@{ editsSinceRun = @(); g5Count = 0; g6Path = ""; g6Count = 0
-        lastRunRed = $false; lastGreen = [pscustomobject]@{}; stopReminded = $false; tripped = "" }
+        lastRunRed = $false; lastGreen = [pscustomobject]@{}; stopReminded = $false; tripped = ""
+        scanFrom = "" }
 }
 
 # Check runs: the Commands table of AGENTS.md and its documented variants. `full` is false
@@ -553,13 +554,16 @@ function Set-LastGreen($State, [string]$Check, [datetime]$Now) {
     else { $State.lastGreen | Add-Member -NotePropertyName $Check -NotePropertyValue $value }
 }
 
-# After a shell call. Only check runs change the counts (Plan P3).
+# After a shell call. Only check runs change the counts (Plan P3). ChangedPaths are the files
+# that shell commands changed since scanFrom, found by the hook through Git.
 function Update-GuardAfterRun {
-    param($State, [string]$Command, [bool]$ExitOk, [datetime]$Now)
+    param($State, [string]$Command, [bool]$ExitOk, [datetime]$Now, [string[]]$ChangedPaths = @())
     $run = Get-CheckRun $Command
     if ($null -eq $run) { return }
-    $edits = @($State.editsSinceRun | ForEach-Object { $_ -replace '\\', '/' } | Sort-Object -Unique)
+    $edits = @(@($State.editsSinceRun) + @($ChangedPaths) | Where-Object { $_ } |
+        ForEach-Object { $_ -replace '\\', '/' } | Sort-Object -Unique)
     $State.editsSinceRun = @()
+    $State.scanFrom = $Now.ToUniversalTime().ToString("o")
     if ($ExitOk) {
         $State.g5Count = 0; $State.g6Count = 0; $State.g6Path = ""; $State.lastRunRed = $false
         foreach ($check in $run.Full) { Set-LastGreen $State $check $Now }
@@ -621,9 +625,11 @@ function Get-GuardStopDecision {
 }
 
 function Reset-GuardOnUserMessage {
-    param($State)
+    param($State, [datetime]$Now = [datetime]::UtcNow)
     $State.tripped = ""; $State.g5Count = 0; $State.g6Count = 0; $State.g6Path = ""
     $State.stopReminded = $false
+    # Before the first check run, shell changes count from the session's first message.
+    if (-not $State.scanFrom) { $State.scanFrom = $Now.ToUniversalTime().ToString("o") }
 }
 
 function Get-TrippedBlock($Call, $State, [string]$ProjectRoot) {
