@@ -257,13 +257,14 @@ system font, so the UI loads nothing from another host.
   |---|---|---|
   | `amount` | money cells and headings, amount inputs (`EditableField`'s `className`) | Right aligned, tabular figures |
   | `table-box` | a `div` around each table | A wide table scrolls inside it, not the page |
+  | `table-box-wide` | the Vertailu week table's box | Spans the window, not only `main`; the table is centred in it |
   | `button` | the download links | The button look |
   | `row-group`, `row-category`, `row-total` | totals table rows | Bold group and total rows; categories indented under the group name (the toggle has a fixed width) |
   | `receipt-columns`, `receipt-image`, `receipt-lines` | receipt page | Side by side from 900 px, stacked below |
   | `confirm-delete` | a line's delete confirmation | Keeps the question and its buttons on one row |
   | `new-receipt-preview` | new receipt form | Keeps the preview small, so the form's buttons stay in sight |
 
-- `main` is at most 1200 px wide and centred; the header wraps on a narrow window.
+- `main` is at most 1200 px wide and centred (only the Vertailu week table is wider); the header wraps on a narrow window.
 - The input rule's `font` shorthand resets `font-variant-numeric`, so `input.amount` comes
   after it.
 
