@@ -527,7 +527,7 @@ $script:GuardFiles = @(".claude/settings.json", ".claude/settings.local.json", "
 $script:GuardFolders = @(".claude/hooks", ".codex", ".agents/guardrails")
 $script:ReadCommands = @("cat", "type", "get-content", "gc", "head", "tail", "less", "more",
     "select-string", "sls", "grep", "rg", "ls", "dir", "get-childitem", "gci", "wc", "test-path",
-    "get-item", "get-filehash", "import-module")
+    "get-item", "get-filehash", "import-module", "test", "[")
 $script:ReadGitCommands = @("diff", "log", "show", "status", "add", "blame", "ls-files")
 
 function Test-GuardConfigPath([string]$Path) {

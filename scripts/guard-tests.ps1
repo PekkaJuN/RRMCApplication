@@ -234,9 +234,11 @@ foreach ($c in @("Set-Content .claude/settings.json x", "sed -i s/a/b/ .codex/co
 foreach ($c in @("cat .claude/settings.json", "Get-Content .codex/config.toml", "git diff .agents/guardrails",
         "git add .agents/guardrails scripts/guard-tests.ps1", "ls .agents/guardrails",
         "powershell -ExecutionPolicy Bypass -File scripts/guard-tests.ps1",
-        "Select-String -Path .agents/guardrails/Guard.psm1 -Pattern G4")) {
+        "Select-String -Path .agents/guardrails/Guard.psm1 -Pattern G4",
+        "test -f .agents/guardrails/Guard.psm1", "[ -f .codex/config.toml ]", "test -d .claude/hooks")) {
     Assert-Shell $c ""
 }
+Assert-Shell "test -f x > .codex/a.txt" "G4"
 # AC26: a redirection is a write only when its target is guard config.
 foreach ($c in @("ls .agents/guardrails 2>/dev/null", 'Get-Content .codex/config.toml 2>$null',
         "cat .claude/settings.json 2>&1", "ls .agents/guardrails >NUL",

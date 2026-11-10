@@ -2,6 +2,18 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-10: `test -f` on a guard path was blocked as a write
+
+- **Context:** The branch audit of the agent guardrails checked whether a test-edit log
+  existed under the guard folder.
+- **Symptom:** `test -f <guard path>` was blocked with G4, although it only reads.
+- **Root cause:** G4 lets a part that names guard config run only when its command is in the
+  read commands of @.agents/guardrails/Guard.psm1. `test` and `[` were missing.
+- **Solution:** `test` and `[` added to the read commands; a redirection into guard config
+  still blocks them.
+- **Prevention:** guard test rows for `test -f`, `[ -f ... ]` and `test -d` in
+  @scripts/guard-tests.ps1. A new read-only command that names guard paths needs a row there.
+
 ## 2026-11-10: The guard read grep's -c as -C
 
 - **Context:** Spec change 1 of the agent guardrails stopped G1 from reading a search
