@@ -66,18 +66,89 @@ function Test-ProtectedPath([string]$Path) {
 # --- Shell text -------------------------------------------------------------------------
 
 # Splits a shell command into its simple commands, so that each part is checked on its own:
-# on &&, ||, ;, |, newlines, and the brackets of ( ), $( ) and backticks.
+# on &&, ||, ;, |, newlines, the brackets of ( ), $( ) and backticks, and a single `&`
+# (background in Bash, the call operator in PowerShell) that is not part of a redirection
+# such as `2>&1` or `&>`.
 function Split-ShellParts([string]$Command) {
-    @($Command -split '&&|\|\||;|\||\r?\n|\$\(|\(|\)|`' |
+    @($Command -split '&&|\|\||;|\||\r?\n|\$\(|\(|\)|`|(?<![>&\d])&(?![&>\d])' |
         ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
 }
 
 # Splits one simple command into words, keeping quoted text together and removing quotes.
 function Split-ShellWords([string]$Part) {
+    # Only the outer pair of quotes goes, so `"sh -c 'x'"` keeps the inner quotes (AC31).
     $words = [regex]::Matches($Part, '"[^"]*"|''[^'']*''|[^\s"'']+') | ForEach-Object {
-        $_.Value.Trim('"', "'")
+        $value = $_.Value
+        if ($value.Length -ge 2 -and $value[0] -in @('"', "'") -and $value[-1] -eq $value[0]) {
+            $value.Substring(1, $value.Length - 2)
+        } else { $value }
     }
     return @($words)
+}
+
+# Words before a command that only change how it runs (spec change 3, AC31). An assignment
+# `NAME=value` is dropped too; the whole text is still checked for COMPOSE_FILE (AC30).
+$script:PrefixWords = @("env", "command", "builtin", "exec", "sudo", "nohup", "time")
+$script:PrefixValueOptions = @("-u", "--unset", "-C", "--chdir", "-g", "--group", "--user")
+$script:PrefixPattern = '^\s*(?<word>[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|''[^'']*''|\S*)|-\S+|\S+)(\s+|$)'
+
+# Drops the prefix words of a part, keeping the rest of its text (and its quotes) unchanged.
+function Remove-CommandPrefix([string]$Part) {
+    $rest = $Part
+    $inPrefix = $false
+    while ($rest -match $script:PrefixPattern) {
+        $word = $Matches.word
+        $length = $Matches[0].Length
+        $isAssignment = $word -match '^[A-Za-z_][A-Za-z0-9_]*='
+        $isPrefix = $script:PrefixWords -contains $word.ToLowerInvariant()
+        $isOption = $inPrefix -and $word.StartsWith("-")
+        if (-not ($isAssignment -or $isPrefix -or $isOption)) { break }
+        $rest = $rest.Substring($length)
+        if ($isOption -and $script:PrefixValueOptions -ccontains $word -and $rest -match $script:PrefixPattern) {
+            $rest = $rest.Substring($Matches[0].Length)
+        }
+        if ($isPrefix) { $inPrefix = $true }
+    }
+    return $rest.Trim()
+}
+
+# The command text that a shell wrapper runs, or $null: `bash -c "..."`, `pwsh -Command ...`,
+# `cmd /c ...`, `Invoke-Expression ...` (AC31).
+function Get-WrappedCommand([string[]]$Words) {
+    $command = Get-CommandName $Words
+    for ($i = 1; $i -lt $Words.Count; $i++) {
+        $word = $Words[$i]
+        if ($command -in @("bash", "sh", "zsh", "dash") -and $word -cmatch '^-[a-zA-Z]*c$') {
+            if ($i + 1 -lt $Words.Count) { return $Words[$i + 1] }
+            return $null
+        }
+        if ($command -in @("powershell", "pwsh") -and $word -match '^(?i)-c(o(m(m(a(n(d)?)?)?)?)?)?$') {
+            return (@($Words | Select-Object -Skip ($i + 1)) -join " ")
+        }
+        if ($command -eq "cmd" -and $word -match '^(?i)/[ck]$') {
+            return (@($Words | Select-Object -Skip ($i + 1)) -join " ")
+        }
+    }
+    if ($command -in @("invoke-expression", "iex")) {
+        return (@($Words | Select-Object -Skip 1 | Where-Object { $_ -notmatch '^(?i)-command$' }) -join " ")
+    }
+    return $null
+}
+
+# The parts every rule checks: each simple command without its prefix words, and, for a shell
+# wrapper, the wrapper itself and the parts of the command it runs, unwrapped again.
+function Get-ShellParts([string]$Command, [int]$Depth = 0) {
+    $result = New-Object System.Collections.Generic.List[string]
+    foreach ($part in @(Split-ShellParts $Command)) {
+        $stripped = Remove-CommandPrefix $part
+        if ($stripped -eq "") { continue }
+        $result.Add($stripped)
+        $inner = Get-WrappedCommand @(Split-ShellWords $stripped)
+        if ($inner -and $Depth -lt 5) {
+            foreach ($innerPart in @(Get-ShellParts $inner ($Depth + 1))) { $result.Add($innerPart) }
+        }
+    }
+    return @($result)
 }
 
 # The words of a part that may name a file: each word, its value after `=`, and the parts
@@ -257,7 +328,7 @@ function Test-ProtectedData($Call, [string]$ProjectRoot) {
         if (Test-ProtectedPath (ConvertTo-GuardPath $path $ProjectRoot)) { return $true }
     }
     if ($Call.Kind -eq "shell") {
-        return Test-ShellProtectedData @(Split-ShellParts $Call.Command) $ProjectRoot
+        return Test-ShellProtectedData @(Get-ShellParts $Call.Command) $ProjectRoot
     }
     return $false
 }
@@ -265,7 +336,6 @@ function Test-ProtectedData($Call, [string]$ProjectRoot) {
 # --- G2 ---------------------------------------------------------------------------------
 
 $script:TestServices = @("backend-test", "frontend-test", "backend-e2e", "e2e")
-$script:TestProject = "rrmc-test"
 # Compose subcommands that start, enter or show an app service.
 $script:ServiceCommands = @("up", "start", "restart", "run", "exec", "logs", "cp", "attach",
     "top", "create", "config", "port", "events", "watch", "pause", "unpause", "kill", "rm")
@@ -280,27 +350,47 @@ $script:SubcommandValues = @("-e", "--env", "-v", "--volume", "-w", "--workdir",
     "--cap-drop", "--format")
 # Subcommands whose first service name is followed by a command, not by more services.
 $script:OneServiceCommands = @("run", "exec")
+# Setting COMPOSE_FILE points Compose at another service definition (AC30).
+$script:ComposeFileSetting = '(?i)(^|[^A-Za-z0-9_])COMPOSE_FILE\s*=|env:COMPOSE_FILE([^A-Za-z0-9_]|$)'
 $script:AppUrl = '(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]|host\.docker\.internal):(8000|5173)(?!\d)'
 
-# Returns @{ Project; Subcommand; Arguments } for a `docker compose` or `docker-compose` part,
-# or $null for any other part.
+# Returns @{ Globals; Subcommand; Arguments } for a `docker compose` or `docker-compose` part,
+# or $null for any other part. Globals are the words before the subcommand.
 function Get-ComposeCall([string[]]$Words) {
     $command = Get-CommandName $Words
     $start = -1
     if ($command -eq "docker-compose") { $start = 1 }
     elseif ($command -eq "docker" -and $Words.Count -gt 1 -and $Words[1] -eq "compose") { $start = 2 }
     if ($start -lt 0) { return $null }
-    $project = ""
     for ($i = $start; $i -lt $Words.Count; $i++) {
         $word = $Words[$i]
-        if ($word -in @("-p", "--project-name") -and $i + 1 -lt $Words.Count) { $project = $Words[$i + 1] }
-        if ($word -match '^--project-name=(.+)$') { $project = $Matches[1] }
         if ($script:ComposeGlobalValues -contains $word) { $i++; continue }
         if ($word.StartsWith("-")) { continue }
-        return @{ Project = $project; Subcommand = $word
+        return @{ Globals = @($Words | Select-Object -Skip $start -First ($i - $start)); Subcommand = $word
             Arguments = @($Words | Select-Object -Skip ($i + 1)) }
     }
-    return @{ Project = $project; Subcommand = ""; Arguments = @() }
+    return @{ Globals = @($Words | Select-Object -Skip $start); Subcommand = ""; Arguments = @() }
+}
+
+# A compose file or project folder other than this project's `compose.yaml` (AC30).
+function Test-OtherComposeFile([string[]]$Globals) {
+    return [bool]($Globals | Where-Object { $_ -cin @("-f", "--file", "--project-directory") -or
+        $_ -match '^(--file|--project-directory)=' -or $_ -cmatch '^-f.' })
+}
+
+# An extra mount for `run` or `create`, given before the service name (AC30).
+function Test-ExtraMount([string]$Subcommand, [string[]]$Arguments) {
+    if ($Subcommand -notin @("run", "create")) { return $false }
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        $word = $Arguments[$i]
+        if ($word -cin @("-v", "--volume", "--mount") -or $word -match '^(--volume|--mount)=' -or
+                $word -cmatch '^-v.') {
+            return $true
+        }
+        if ($script:SubcommandValues -contains $word) { $i++; continue }
+        if (-not $word.StartsWith("-")) { return $false }
+    }
+    return $false
 }
 
 # The services a compose subcommand names. `cp` names them as `service:path`.
@@ -323,7 +413,10 @@ function Get-ComposeServices([string]$Subcommand, [string[]]$Arguments) {
 function Test-AppServiceCall([string[]]$Words) {
     $compose = Get-ComposeCall $Words
     if ($null -ne $compose) {
-        if ($compose.Project -ieq $script:TestProject) { return $false }
+        # The test project is no exemption (AC29): its app services read .env and mount the real
+        # import folders unless the container tests script passes its own settings file.
+        if (Test-OtherComposeFile $compose.Globals) { return $true }
+        if (Test-ExtraMount $compose.Subcommand $compose.Arguments) { return $true }
         if ($script:ServiceCommands -notcontains $compose.Subcommand) { return $false }
         if ($compose.Subcommand -eq "config" -and
                 ($compose.Arguments -contains "--services" -or $compose.Arguments -contains "--profiles")) {
@@ -349,7 +442,8 @@ function Test-AppService($Call) {
     }
     if ($Call.Kind -ne "shell") { return $false }
     if ($Call.Command -match $script:AppUrl) { return $true }
-    foreach ($part in @(Split-ShellParts $Call.Command)) {
+    if ($Call.Command -match $script:ComposeFileSetting) { return $true }
+    foreach ($part in @(Get-ShellParts $Call.Command)) {
         if (Test-AppServiceCall @(Split-ShellWords $part)) { return $true }
     }
     return $false
@@ -376,7 +470,11 @@ function Test-HardGitCall($Git) {
     switch ($Git.Subcommand) {
         { $_ -in @("push", "clean", "rebase", "filter-branch", "filter-repo") } { return $true }
         "reset" { return $a -contains "--hard" }
-        "checkout" { return $a -contains "--" }
+        # `.`, `-f` and `--force` throw away uncommitted changes as `--` does (AC32).
+        "checkout" { return [bool]($a | Where-Object { $_ -in @("--", ".", "--force") -or $_ -ceq "-f" }) }
+        "switch" { return [bool]($a | Where-Object { $_ -in @("--force", "--discard-changes") -or $_ -ceq "-f" }) }
+        "stash" { return $a.Count -gt 0 -and $a[0] -in @("drop", "clear") }
+        "rm" { return [bool]($a | Where-Object { $_ -eq "--force" -or $_ -cmatch '^-[a-zA-Z]*f[a-zA-Z]*$' }) }
         "restore" { return -not ($a -contains "--staged") -or ($a -contains "--worktree") -or ($a -contains "-W") }
         "branch" { return [bool]($a | Where-Object { $_ -ceq "-D" -or $_ -eq "--force" }) }
         "commit" { return $a -contains "--amend" }
@@ -417,7 +515,7 @@ function Test-DeletionCall([string[]]$Words) {
 
 function Test-Deletion($Call) {
     if ($Call.Kind -ne "shell") { return $false }
-    foreach ($part in @(Split-ShellParts $Call.Command)) {
+    foreach ($part in @(Get-ShellParts $Call.Command)) {
         if (Test-DeletionCall @(Split-ShellWords $part)) { return $true }
     }
     return $false
@@ -461,7 +559,7 @@ function Test-GuardConfigWrite($Call, [string]$ProjectRoot) {
         return $false
     }
     if ($Call.Kind -ne "shell") { return $false }
-    foreach ($part in @(Split-ShellParts $Call.Command)) {
+    foreach ($part in @(Get-ShellParts $Call.Command)) {
         $split = Split-Redirections @(Split-ShellWords $part)
         foreach ($target in $split.Targets) {
             if (Test-GuardConfigPath (ConvertTo-GuardPath $target $ProjectRoot)) { return $true }

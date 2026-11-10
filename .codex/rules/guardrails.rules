@@ -40,6 +40,34 @@ prefix_rule(
     not_match = ["git branch -d x"],
 )
 prefix_rule(
+    pattern = ["git", "checkout", [".", "-f", "--force"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: the command discards uncommitted changes.",
+    match = ["git checkout .", "git checkout -f main"],
+    not_match = ["git checkout main", "git checkout -b x"],
+)
+prefix_rule(
+    pattern = ["git", "switch", ["-f", "--force", "--discard-changes"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: the command discards uncommitted changes.",
+    match = ["git switch --discard-changes main"],
+    not_match = ["git switch main", "git switch -c x"],
+)
+prefix_rule(
+    pattern = ["git", "stash", ["drop", "clear"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: dropped stashes cannot easily be restored.",
+    match = ["git stash drop", "git stash clear"],
+    not_match = ["git stash", "git stash pop"],
+)
+prefix_rule(
+    pattern = ["git", "rm", ["-f", "--force"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: a forced remove deletes uncommitted changes.",
+    match = ["git rm -f compose.yaml"],
+    not_match = ["git rm --cached x"],
+)
+prefix_rule(
     pattern = ["git", "remote", ["add", "remove", "rm", "rename", "set-url"]],
     decision = "forbidden",
     justification = "Guardrail G3: remotes are changed by the user.",

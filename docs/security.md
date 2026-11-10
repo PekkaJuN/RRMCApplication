@@ -101,8 +101,8 @@ guardrails therefore keep the agent away from real data, not only from changing 
 | ID | Blocks | Does not stop |
 |---|---|---|
 | G1 | File tools and shell commands that name `.env` or `.env.<x>` (not `.env.example`), `source/`, SQLite files or `service_account*.json`; recursive searches from the project root | A path built at run time (variables, string joins, encodings); a program that opens the files itself |
-| G2 | `docker compose` commands that start, enter, show the logs or configuration of, or copy from `backend`, `frontend` or `eval`; plain `docker run`, `exec`, `cp`, `logs`, `inspect`; calls to ports `8000` and `5173` | Other ports set in `.env` (the guard cannot read it); a script file that runs such commands |
-| G3 | Volume removal and pruning, recursive or forced deletes, `restore-db.ps1`, `git push`, hard resets, `clean`, discarding changes, history rewrites, remote changes | Deletes through other programs or scripts |
+| G2 | `docker compose` commands that start, enter, show the logs or configuration of, or copy from `backend`, `frontend` or `eval`, in any project, `rrmc-test` too (only the container tests script starts those); an extra mount for `run` or `create` (`-v`, `--volume`, `--mount`); another compose file or project folder (`-f`, `--file`, `--project-directory`, setting `COMPOSE_FILE`); plain `docker run`, `exec`, `cp`, `logs`, `inspect`; calls to ports `8000` and `5173` | Other ports set in `.env` (the guard cannot read it); a script file that runs such commands; `COMPOSE_FILE` inside a settings file |
+| G3 | Volume removal and pruning, recursive or forced deletes, `restore-db.ps1`, `git push`, hard resets, `clean`, discarding changes (`checkout --`, `checkout .`, `checkout -f`, `restore`, `switch -f` and `--discard-changes`, `stash drop` and `clear`, `rm -f`), history rewrites, remote changes | Deletes through other programs or scripts |
 | G4 | Writes to `.claude/settings.json`, `.claude/hooks/`, `.codex/`, `.agents/guardrails/`, `scripts/guard-tests.ps1` | Writes through a script file the guard cannot see into |
 | G5 | Every call but reading files after three red check runs in a row, until the user writes | Failures of commands that are not in the Commands table |
 | G6 | The same, when the edits between those runs touched one and the same file, through file tools or shell commands (shell changes are found through `git status` and write times at each check run) | Changes to files Git ignores; a change outside a Git repository |
@@ -123,6 +123,11 @@ Known limits of the guardrails:
 - **Shell rules match text.** On native Windows, Claude Code runs shell commands without a
   sandbox, and both the deny rules and the hook read the command text. A command written to
   hide its target gets past them. Only Codex's sandbox checks file access itself.
+- **Wrappers.** The hook drops prefix words (`&`, `NAME=value`, `env`, `command`, `sudo`,
+  `nohup`, `time`) and checks the command given to another shell (`bash -c`, `sh -c`,
+  `powershell -Command`, `pwsh -c`, `cmd /c`, `Invoke-Expression`) with every rule. It does not
+  see a command in `-EncodedCommand`, in a variable, built at run time, passed through `xargs`
+  or `Start-Process`, or written to a script file.
 - **Docker is outside every sandbox.** A `docker` command asks the Docker service, which has
   full access. G2 is the only layer for it.
 - **The hooks must be on.** Claude Code runs them after the workspace trust dialog; Codex

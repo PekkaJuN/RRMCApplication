@@ -131,10 +131,41 @@ foreach ($c in @("docker compose run --rm backend-test pytest",
         "docker compose run --rm frontend-test npm run typecheck", "docker compose --profile e2e run --rm e2e",
         "docker compose --profile e2e down", "docker compose restart backend-e2e",
         "docker compose build backend", "docker compose ps", "docker compose config --services",
-        "docker compose -p rrmc-test up -d --build backend", "docker compose -p rrmc-test logs backend",
         "docker compose --profile e2e up -d --force-recreate --no-deps backend-e2e",
         "docker ps", "docker images", "docker volume ls",
         "powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1")) {
+    Assert-Shell $c ""
+}
+# AC29: the test project gives the app services no exemption; by hand they read .env and
+# mount the real import folders. Only the container tests script starts them.
+foreach ($c in @("docker compose -p rrmc-test run --rm backend sh", "docker compose -p rrmc-test up -d",
+        "docker compose --project-name rrmc-test logs backend", "docker compose --project-name=rrmc-test up -d",
+        "COMPOSE_PROJECT_NAME=rrmc-test docker compose up -d backend",
+        "docker compose -p rrmc-test up -d --build backend", "docker compose -p rrmc-test logs backend")) {
+    Assert-Shell $c "G2"
+}
+foreach ($c in @("docker compose -p rrmc-test ps", "docker compose -p rrmc-test down",
+        "docker compose -p rrmc-test run --rm backend-test pytest",
+        "powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1")) {
+    Assert-Shell $c ""
+}
+# AC30: a test service gets no mount and no service definition beyond compose.yaml.
+foreach ($c in @("docker compose run --rm -v ./source:/s backend-test ls /s",
+        "docker compose run --rm --volume rrmc_rrmc-data:/d backend-test ls /d",
+        "docker compose run --rm --volume=rrmc_rrmc-data:/d backend-test ls /d",
+        "docker compose run --rm --mount type=volume,source=rrmc_rrmc-data,target=/d backend-test ls",
+        "docker compose create -v C:\Data:/d backend-test",
+        "docker compose -f x.yaml run --rm backend-test ls", "docker compose --file x.yaml up -d",
+        "docker compose --file=x.yaml run --rm backend-test ls",
+        "docker compose --project-directory ../other run --rm backend-test ls",
+        "COMPOSE_FILE=x.yaml docker compose run --rm backend-test ls",
+        "export COMPOSE_FILE=x.yaml", 'set COMPOSE_FILE=x.yaml',
+        '$env:COMPOSE_FILE = "x.yaml"; docker compose run --rm backend-test ls',
+        'Set-Item env:COMPOSE_FILE x.yaml')) {
+    Assert-Shell $c "G2"
+}
+foreach ($c in @("docker compose run --rm backend-test ls -v /app", "docker compose logs -f backend-e2e",
+        "grep -rn COMPOSE_FILE docs", "docker compose --profile e2e run --rm e2e")) {
     Assert-Shell $c ""
 }
 # AC7: the running app's ports, through the shell, web fetch and a browser tool.
@@ -173,6 +204,17 @@ foreach ($c in @("git status", "git diff", "git log --oneline -5", "git add -A",
         "powershell -File scripts/backup-db.ps1", "git stash list")) {
     Assert-Shell $c ""
 }
+# AC32: more ways to discard changes (spec change 3).
+foreach ($c in @("git checkout .", "git checkout -f main", "git checkout --force main",
+        "git switch -f main", "git switch --force main", "git switch --discard-changes main",
+        "git stash drop", "git stash drop stash@{1}", "git stash clear", "git rm -f compose.yaml",
+        "git rm --force compose.yaml", "git rm -rf docs")) {
+    Assert-Shell $c "G3"
+}
+foreach ($c in @("git checkout main", "git checkout -b x", "git switch main", "git switch -c x",
+        "git stash", "git stash list", "git stash pop", "git rm --cached x", "git rm -r --cached docs")) {
+    Assert-Shell $c ""
+}
 
 # --- G4 guard config (AC10) --------------------------------------------------------------
 foreach ($p in @("$Root\.claude\settings.json", ".claude/settings.local.json", "$Root\.claude\hooks\x.ps1",
@@ -205,6 +247,26 @@ foreach ($c in @("echo x > .agents/guardrails/a.txt", "cat x 2> .codex/err.txt",
         "Get-Content x >> .claude/settings.json", "ls 1>.codex/list.txt",
         "echo x 2>/dev/null > .agents/guardrails/a.txt")) {
     Assert-Shell $c "G4"
+}
+
+# --- Wrappers and prefixes (AC31, spec change 3) ----------------------------------------
+# A command after a prefix word or inside another shell's string gets its own ID.
+foreach ($c in @("& git push", "FOO=1 git push", "env git push", "env -i FOO=1 git push",
+        "command git reset --hard", "sudo git push", "nohup git push", "time git push",
+        'bash -c "git push"', 'powershell -Command "git push"', "cmd /c git push",
+        'cmd.exe /k "git push"', 'Invoke-Expression "git push"', "echo x & git push")) {
+    Assert-Shell $c "G3"
+}
+Assert-Shell "sh -c 'docker compose up -d backend'" "G2"
+Assert-Shell 'pwsh -c "cat .env"' "G1"
+Assert-Shell "iex 'cat .env'" "G1"
+Assert-Shell 'bash -c "sh -c ''git push''"' "G3"
+Assert-Shell 'powershell -Command "Set-Content .claude/settings.json x"' "G4"
+foreach ($c in @("& docker compose run --rm backend-test pytest", 'bash -c "ls docs"',
+        'powershell -Command "Get-Date"', "cmd /c dir docs",
+        "powershell -ExecutionPolicy Bypass -File scripts/guard-tests.ps1",
+        "docker compose run --rm backend-test pytest 2>&1 | tail -5", "ls &>/dev/null")) {
+    Assert-Shell $c ""
 }
 
 # --- G5 and G6 counters (AC11-AC14)------------------------------------------------------
@@ -577,6 +639,9 @@ Write-Check "codex config denies .env and source" ($codexConfig -match '"\.env" 
 $rules = if (Test-Path (Join-Path $codexDir "rules\guardrails.rules")) { Get-Content -Raw (Join-Path $codexDir "rules\guardrails.rules") } else { "" }
 Write-Check "codex rules forbid git push and volume removal" `
     ($rules -match 'pattern = \["git", "push"\]' -and $rules -match '"docker", "volume"')
+Write-Check "codex rules forbid discarding changes (AC32)" `
+    ($rules -match '"git", "stash", \["drop", "clear"\]' -and $rules -match '"git", "checkout", \["\.", "-f", "--force"\]' -and
+        $rules -match '"git", "switch", \["-f", "--force", "--discard-changes"\]' -and $rules -match '"git", "rm", \["-f", "--force"\]')
 
 # --- Claude Code configuration (Plan P4) -------------------------------------------------
 $claudeSettings = $null
@@ -595,7 +660,8 @@ foreach ($event in @("PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPro
     }
 }
 $deny = if ($null -ne $claudeSettings) { @($claudeSettings.permissions.deny) } else { @() }
-foreach ($rule in @("Read(/.env)", "Read(/source/**)", "Edit(/.codex/**)", "Edit(/.agents/guardrails/**)", "Bash(git push:*)")) {
+foreach ($rule in @("Read(/.env)", "Read(/source/**)", "Edit(/.codex/**)", "Edit(/.agents/guardrails/**)", "Bash(git push:*)",
+        "Bash(git checkout .:*)", "Bash(git stash clear:*)", "PowerShell(git checkout .:*)", "PowerShell(git stash clear:*)")) {
     Write-Check "claude deny rule $rule" ($deny -contains $rule)
 }
 

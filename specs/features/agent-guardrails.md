@@ -19,6 +19,11 @@
   T18 and T19 done (guard tests 352 passed with the hooks off; the hook takes a median
   664 ms at a red check run with the Git scan, within AC20). T20 done: with the hooks on, all
   355 guard tests pass.
+  The branch audit of 2026-11-10 found normal commands that get past G1, G2 and G3 (the test
+  project, extra mounts and compose files, command wrappers, more ways to discard changes):
+  AC29–AC32 and tasks T21–T25 added
+  ([Spec change 3](#spec-change-3-gaps-found-by-the-branch-audit)) and approved by the user;
+  T21–T25 done; re-audited (PASS).
 - **Depends on:** [Test container isolation](test-isolation.md)
 - **Implements:** NFR-1, NFR-4 and the Guardrails of [AGENTS.md](../../AGENTS.md#guardrails)
   for AI coding agents; the user's decision of 2026-11-10 to let agents run on their own from
@@ -62,8 +67,9 @@ blocking changes to it.
 - **App services:** the Compose services `backend`, `frontend` and `eval` of the project
   `rrmc`, and the running app at `127.0.0.1:8000` and `127.0.0.1:5173` (or the ports set in
   `.env`). They hold or show real data.
-- **Test services:** `backend-test`, `frontend-test`, `backend-e2e` and `e2e`, and anything in
-  the Compose project `rrmc-test` used by the container tests.
+- **Test services:** `backend-test`, `frontend-test`, `backend-e2e` and `e2e`. The app
+  services of the Compose project `rrmc-test` are started only by the container tests script
+  (spec change 3): run by hand, they read `.env` and mount the real import folders.
 - **Guard config:** the files that set up the guardrails: `.claude/settings.json`, the hook
   scripts, the Codex configuration under `.codex/`, and the shared guard code.
 - **Check run:** one run of a command of the Commands table in
@@ -288,7 +294,8 @@ read from a file.
 **Given** the repository
 **When** the guard test command from `docs/development.md` runs
 **Then** it exits with code 0 and runs at least one test per AC1–AC15, AC17–AC20 and AC25 case,
-using synthetic tool calls only.
+using synthetic tool calls only. Since spec change 3 it also runs at least one test per
+AC29–AC32 case.
 
 ### AC22: The autonomy rule is written down
 **Given** `AGENTS.md` and the spec, tdd and review-audit skills
@@ -338,6 +345,56 @@ happens three times in a row
 **When** a file is ignored by Git, or was last written before the previous check run (or,
 before the first check run, before the session's first user message)
 **Then** it does not count as an edit.
+
+### AC29: The test project does not open the app services
+**Given** the guardrails are on
+**When** the agent runs `docker compose -p rrmc-test run --rm backend sh`,
+`docker compose -p rrmc-test up -d`, `docker compose --project-name rrmc-test logs backend` or
+`COMPOSE_PROJECT_NAME=rrmc-test docker compose up -d backend`
+**Then** each call is blocked with `G2`, as without the project name.
+**When** the agent runs `docker compose -p rrmc-test ps`, `docker compose -p rrmc-test down`,
+`docker compose -p rrmc-test run --rm backend-test pytest` or
+`powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1`
+**Then** each call runs.
+
+### AC30: No extra mounts or compose files for Compose
+**Given** the guardrails are on
+**When** the agent runs `docker compose run --rm -v ./source:/s backend-test ls /s`,
+`docker compose run --rm --volume rrmc_rrmc-data:/d backend-test ls /d`,
+`docker compose run --rm --mount type=volume,source=rrmc_rrmc-data,target=/d backend-test ls`,
+`docker compose -f x.yaml run --rm backend-test ls`,
+`docker compose --file x.yaml up -d`,
+`docker compose --project-directory ../other run --rm backend-test ls`,
+`COMPOSE_FILE=x.yaml docker compose run --rm backend-test ls` or
+`$env:COMPOSE_FILE = "x.yaml"; docker compose run --rm backend-test ls`
+**Then** each call is blocked with `G2`: a test service gets no mount and no service
+definition beyond `compose.yaml`.
+**When** the agent runs any command of AC6
+**Then** each call still runs.
+
+### AC31: Wrappers and prefixes do not hide a command
+**Given** the guardrails are on
+**When** the agent runs `& git push`, `FOO=1 git push`, `env git push`, `env -i FOO=1 git push`,
+`command git reset --hard`, `sudo git push`, `nohup git push`, `time git push`,
+`bash -c "git push"`, `sh -c 'docker compose up -d backend'`,
+`powershell -Command "git push"`, `pwsh -c "cat .env"`, `cmd /c git push`,
+`cmd.exe /k "git push"`, `Invoke-Expression "git push"` or `iex 'cat .env'`
+**Then** each call is blocked with the ID that the command inside would get on its own
+(`G3` for `git push`, `G2` for the `up`, `G1` for `.env`).
+**When** the agent runs `& docker compose run --rm backend-test pytest`,
+`bash -c "ls docs"`, `powershell -Command "Get-Date"`, `cmd /c dir docs` or
+`powershell -ExecutionPolicy Bypass -File scripts/guard-tests.ps1`
+**Then** each call runs.
+
+### AC32: More ways to discard changes are blocked
+**Given** the guardrails are on
+**When** the agent runs `git checkout .`, `git checkout -f main`, `git checkout --force main`,
+`git switch -f main`, `git switch --discard-changes main`, `git stash drop`,
+`git stash clear`, `git rm -f compose.yaml` or `git rm --force compose.yaml`
+**Then** each call is blocked with `G3`.
+**When** the agent runs `git checkout main`, `git checkout -b x`, `git switch main`,
+`git switch -c x`, `git stash`, `git stash list`, `git stash pop` or `git rm --cached x`
+**Then** each call runs.
 
 ### AC24: Codex runs in its sandbox
 **Given** the project's Codex configuration and a trusted project
@@ -397,6 +454,10 @@ allow, block with an ID, or a reminder.
 | AC26 | decision | redirections | each allowed and each blocked AC26 command | decide | allow; block G4 | none |
 | AC27 | decision | search patterns | each allowed and each blocked AC27 command | decide | allow; block G1 | none |
 | AC28 | counter + hook | shell changes | changed paths passed to the run update; the hook against a temporary Git repository with files written between runs | record and decide | G6 at the third red; test file not counted for G5; ignored and older files not counted | temporary repository in `%TEMP%` |
+| AC29 | decision | test project | each blocked and each allowed AC29 command | decide | block G2; allow | none |
+| AC30 | decision | extra mounts and compose files | each AC30 command; the AC6 commands | decide | block G2; allow | none |
+| AC31 | decision | wrappers and prefixes | each blocked and each allowed AC31 command | decide | block with the inner command's ID; allow | none |
+| AC32 | decision | discarding changes | each blocked and each allowed AC32 command | decide | block G3; allow | none |
 | AC5 | decision | app services | each AC5 command | decide | block G2 | none |
 | AC6 | decision | test services | each AC6 command | decide | allow | none |
 | AC7 | decision | app ports | each AC7 call; port 18000 | decide | block G2; allow | none |
@@ -633,6 +694,7 @@ addresses). AC21 also covers AC25.
 | AC22 | P5 AGENTS.md and skills |
 | AC23 | P5 security.md and development.md |
 | AC24 | P4 Codex `config.toml`; user check |
+| AC29–AC32 | [Spec change 3](#spec-change-3-gaps-found-by-the-branch-audit): command words, G2, G3, native rules |
 
 ## Tasks
 
@@ -733,6 +795,80 @@ out on purpose: it would hide `bash -c "...; rm -rf x"` from the part checks.
   within AC20; the user restores `.claude/settings.json`; the guard tests run once more with
   the hooks on.
 
+### Spec change 3: gaps found by the branch audit
+The branch audit of 2026-11-10 ran the decision function on synthetic commands and found
+ordinary commands, not commands written to hide their target, that the guard allowed:
+
+1. `-p rrmc-test` exempted every Compose command (Plan P2, G2). Without the container tests'
+   settings file, `backend` in that project reads `.env` and mounts the import folders it
+   names, or `./source/import` by default, so `docker compose -p rrmc-test run --rm backend sh`
+   reaches real receipts.
+2. A test service could get real data through `-v ./source:/s` (the colon kept G1 from seeing
+   the `source` segment), `-v rrmc_rrmc-data:/d` (the volume is protected data but not a
+   path), another compose file (`-f`, `COMPOSE_FILE`) or another project directory.
+3. A word before the command hid it from every rule: `& git push`, `FOO=1 docker compose up`,
+   `env git push`, `command git reset --hard`. A command passed as one string to another shell
+   was not checked either: `bash -c "git push"`, `powershell -Command "git push"`,
+   `cmd /c git push`, `Invoke-Expression "git push"`.
+4. G3 missed `git checkout .`, `git checkout -f`, `git switch --discard-changes`,
+   `git stash drop` and `clear`, and `git rm -f`, although security.md says G3 blocks
+   discarding changes.
+
+Changes:
+
+- **Concepts:** the test project no longer makes a command a test service command (see Test
+  services). The container tests script runs its Compose commands inside the script, which
+  the hook does not see, so it still runs (AC6, AC29).
+- **Command words (P2, new step before the rules):** each part is unwrapped before it is
+  checked. Leading words are dropped while they are an assignment `NAME=value`, `&`, `env`
+  (with its options and assignments), `command`, `builtin`, `exec`, `sudo`, `nohup` or `time`.
+  The string after `-c` of `bash`, `sh`, `zsh` or `dash`, after `-Command` or `-c` of
+  `powershell` or `pwsh`, the words after `/c` or `/k` of `cmd`, and the argument of
+  `Invoke-Expression` or `iex` are checked as a whole command of their own, with every rule,
+  again unwrapped (AC31). The G4 read check of `powershell -File` stays. An assignment that is
+  dropped is still checked: `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and the other words keep
+  their meaning for AC29 and AC30.
+- **G2 (P2, changed):** `-p rrmc-test`, `--project-name rrmc-test` and
+  `COMPOSE_PROJECT_NAME=rrmc-test` no longer exempt a command; the service rule decides as for
+  any project (AC29). Blocked as well: `docker compose run` or `create` with `-v`, `--volume`
+  or `--mount`; `docker compose` with `-f`, `--file` or `--project-directory`; a part that sets
+  `COMPOSE_FILE` (`COMPOSE_FILE=...` before a command, `export COMPOSE_FILE=...`,
+  `$env:COMPOSE_FILE = ...`, `set COMPOSE_FILE=...`) (AC30).
+- **G3 (P2, changed):** also `git checkout` with `-f`, `--force` or an argument `.`;
+  `git switch` with `-f`, `--force` or `--discard-changes`; `git stash drop` and
+  `git stash clear`; `git rm` with `-f` or `--force` (AC32).
+- **Native rules (P4):** the plain forms of AC32 (`git checkout .`, `git checkout -f`,
+  `git switch --discard-changes`, `git stash drop`, `git stash clear`, `git rm -f`) are added
+  to the Claude Code `Bash` and `PowerShell` deny prefixes and to the Codex
+  `rules/guardrails.rules`, each with `match` and `not_match` examples.
+- **Guard tests whose expected result changes (G7):** the AC6 rows
+  `docker compose -p rrmc-test up -d --build backend` and
+  `docker compose -p rrmc-test logs backend` expect `G2` from now on. AC29 backs the change.
+- **Known limits left:** a command hidden in an encoded form (`-EncodedCommand`), in a
+  variable, built at run time, passed through `xargs` or `Start-Process`, or written to a
+  script file. security.md names them.
+- **Files to Modify:** `Guard.psm1`, `scripts/guard-tests.ps1`, `.claude/settings.json` (deny
+  prefixes), `.codex/rules/guardrails.rules`, `docs/security.md` (G2 and G3 rows, known
+  limits), this spec and `specs/README.md`. The hooks and the G4 deny rules are off while the
+  change is made (turned off by the user on 2026-11-10); the user restores them with
+  `git restore .claude/settings.json` and then applies the new deny prefixes, or approves
+  their write first.
+
+- [x] **T21 Wrappers and prefixes (AC31).** Unit rows for each blocked and each allowed AC31
+  command, then the unwrap step in `Guard.psm1`. All earlier rows stay green.
+- [x] **T22 Test project (AC29).** Unit rows for each AC29 command; the two AC6 rows of the
+  test project change to `G2` (backed by AC29). Then the G2 change.
+- [x] **T23 Extra mounts and compose files (AC30).** Unit rows for each AC30 command and the AC6
+  commands. Then the G2 change.
+- [x] **T24 Discarding changes (AC32).** Unit rows for each blocked and each allowed AC32
+  command, then the G3 change; the deny prefixes and the Codex rules with their `match` and
+  `not_match` examples.
+- [x] **T25 Docs and check.** security.md G2 and G3 rows and known limits; `specs/README.md`.
+  Guard tests pass and the hook time stays within AC20; container tests pass. The user
+  restores `.claude/settings.json`; the guard tests run once more with the hooks on, and the
+  probes of the audit (findings 1–4) are blocked by the live hook. Then the `review-audit`
+  skill.
+
 ## Progress
 
 - **T1–T11 (2026-11-10):** guard, adapters, hook entry point and Codex configuration written
@@ -756,6 +892,21 @@ out on purpose: it would hide `bash -c "...; rm -rf x"` from the part checks.
 - **T13 (2026-11-10):** AGENTS.md, the spec, tdd and review-audit skills, security.md,
   development.md, ADR 0006 and content-plan.md updated.
 - **T14 (2026-11-10):** guard tests 310 passed; container tests passed.
+- **T21–T24 (2026-11-10, spec change 3, hooks and the G4 deny rules for the guard files off):**
+  the unwrap step, the AC29 and AC30 G2 rules and the AC32 G3 rules written test first. The
+  two AC6 rows of the test project now expect `G2` (backed by AC29). `Split-ShellWords` now
+  removes only the outer pair of quotes, so a nested `sh -c '...'` keeps its own. Guard tests:
+  all decision rows pass; the three configuration rows that need the hooks and the G4 deny
+  rules on fail while they are off, so the user agreed that a run whose only failures are those
+  rows counts as green for G5 and G6. G6 was reached once before that agreement (three red
+  runs after edits of `Guard.psm1` only, while fixing a regex); the agent stopped and asked.
+- **T24, T25 (2026-11-10):** the deny rule `Edit(/.codex/**)` stayed on, so the user added the
+  AC32 rules to `.codex/rules/guardrails.rules` and, after restoring `.claude/settings.json`,
+  its AC32 deny prefixes. With the hooks on, all 434 guard tests pass (hook median 420 ms);
+  container tests pass. Through the live hook, `bash -c "git stash drop ..."`,
+  `FOO=1 git rm -f ...` and PowerShell `& git stash drop ...` were blocked with `G3`. The
+  user declined a live `docker compose -p rrmc-test logs backend` probe; AC29 rests on the
+  unit rows.
 
 ## Audit
 
@@ -799,3 +950,32 @@ out on purpose: it would hide `bash -c "...; rm -rf x"` from the part checks.
 
 Verdict: PASS for everything the agent can check. The user deferred AC24 and finding 2 until
 Codex is taken into use, so the spec is Done for Claude Code.
+
+### Branch audit and spec change 3 (2026-11-10)
+The branch audit ran every check of the Commands table (backend 1416 passed, frontend 341,
+E2E 40, container and guard tests pass; `pip-audit` clean) and probed the decision function
+with synthetic commands. It found the gaps of spec change 3; after T21–T25:
+
+- Acceptance criteria: 31/32 met; AC24 still deferred
+- Tests: guard tests 434 passed with the hooks on, hook median 420 ms; container tests pass.
+  No app code changed.
+- Security: the four findings of spec change 3 (2 high, 2 medium) are resolved; 2 low later
+- Recorded test edits (G7): the log does not exist, because the test edits of T21–T24 were
+  made with the hooks off. The only changed expectations are the two AC6 rows of the test
+  project, now `G2`, backed by AC29.
+- Docs updated: security.md; spec status: Done, AC24 deferred
+
+| AC | Result | Evidence |
+|---|---|---|
+| AC29 | ✅ | AC29 unit rows, including the two changed AC6 rows |
+| AC30 | ✅ | AC30 unit rows; `-v` after the service name and `logs -f` still run |
+| AC31 | ✅ | AC31 unit rows, nested `bash -c "sh -c '...'"`; three live hook probes |
+| AC32 | ✅ | AC32 unit rows; deny prefixes and Codex rules checked by configuration rows |
+
+| # | Severity | File | Finding | Recommendation |
+|---|---|---|---|---|
+| 6 | Low (later) | `.agents/guardrails/Guard.psm1` | `test -f <guard path>` is blocked as G4: `test` is not in the read commands. A quoted `\|` in a grep pattern splits the part and also blocks as G4 (known, spec change 2). | Add `test` and `[` to the read commands in a later guard change; meanwhile use the file tools. |
+| 7 | Low (later) | `.agents/guardrails/Guard.psm1` | A single `&` now splits a part, so a quoted URL with `&` is checked in pieces. More parts can only block more, never allow more. | None now. |
+| 8 | Info | process | G6 was reached once during T23 (three red runs after edits of `Guard.psm1` only, a regex written with backspace characters by a Python script). The agent stopped and asked; the user agreed that runs whose only failures are the configuration rows waiting for the hooks count as green. | Edit guard files with the file tools, not scripts. |
+
+Verdict: PASS. Spec change 3 is done; AC24 stays deferred until Codex is taken into use.
