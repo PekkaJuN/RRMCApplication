@@ -89,7 +89,7 @@ source/import/           incoming receipt images        (default; gitignored, re
 source/import_done/      imported images               (default; gitignored, real data)
 source/import_failed/    images that failed to import   (default; gitignored, real data)
 source/eval/             evaluation receipts, truth files, results (default; gitignored, real data)
-compose.yaml             Docker Compose: backend and frontend; profiles e2e and eval
+compose.yaml             Docker Compose: backend and frontend; profiles test, e2e and eval
 .env.example             committed example settings file; the real .env is not committed
 ```
 
@@ -301,6 +301,9 @@ interface keeps that choice inside receipt-reading.
   lives in a Docker volume, because SQLite file locking is unreliable on Windows folders
   mounted into Linux containers.
 - All settings are in one `.env` file in the project root (FR-32).
+- The `backend-test` and `frontend-test` services (profile `test`) run the test, lint, type
+  check and audit commands without real data or `.env`; see
+  [development.md](development.md#test-containers).
 - The `eval` service (profile `eval`) runs the model evaluation tool on demand. It publishes
   no port and calls only `RRMC_OLLAMA_URL`; see
   [development.md](development.md#model-evaluation).

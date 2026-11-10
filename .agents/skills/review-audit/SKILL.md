@@ -40,6 +40,10 @@ completeness checks, and is the final gate.
 Run the review, then also check:
 
 - every AC met; every listed file changed; docs and `docs/content-plan.md` updated;
+- recorded test edits (guardrail G7): list each line of
+  `.agents/guardrails/state/test-edits.log` whose branch is the current branch, and say for
+  each file whether the spec backs the change. A test change the spec does not back is a
+  must-fix finding;
 - the `document` skill in scan-only mode finds no undocumented or orphaned items for this change;
 - full test suite, lint and type checks pass; no skipped or TODO tests;
 - spec status set to `Done` in the spec and in `specs/README.md`.

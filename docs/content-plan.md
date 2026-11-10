@@ -33,7 +33,7 @@ Last reviewed: 2026-11-09
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | Done |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md) | 3 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md); 0006: [agent guardrails](adr/0006-agent-guardrails.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 | 19 | Security | [docs/security.md](security.md) | Stored data, protection and known limits | 3, 5, 6 | Done |
 
@@ -120,6 +120,14 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The PDF export spec is Done (audited 2026-11-09): the weekly, monthly and
   comparison PDF files, the PDF links on the Yhteenveto and Vertailu pages and ADR 0005.
   The export, totals, budget, UI, API, architecture, security and glossary docs describe it.
+- The test container isolation spec is Done (audited 2026-11-10): the `backend-test` and
+  `frontend-test` services, `backend-e2e` without `.env`, and pytest's refusal next to real
+  data. The development, security and architecture docs, the UI README and AGENTS.md
+  describe it.
+- The agent guardrails spec is Done for Claude Code (2026-11-10): the guard G1-G8 for Claude
+  Code and Codex, the autonomy rule and ADR 0006. The Codex check (AC24) is deferred until
+  Codex is taken into use. AGENTS.md, the spec, tdd and review-audit skills,
+  security.md and development.md describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

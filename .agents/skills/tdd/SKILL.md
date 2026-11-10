@@ -11,6 +11,14 @@ Develop step of SDD. Implements `specs/features/<feature>.md` task by task, test
 
 - A spec with status **Approved**, a complete Testing Strategy and a `## Tasks` section.
   If any is missing, stop and say what. Do not start without approval.
+
+**Autonomy rule.** After the user approves the Tasks, the agent works through the tasks and
+the audit without asking. It stops only when an AC must change, the spec does not cover a
+case, a guardrail blocks, G5 or G6 trips, or the audit fails three times. It does not
+commit, push or open a PR unless the user asked.
+
+The guardrails G1–G8 of `AGENTS.md` are enforced by hooks. A block line names its ID; stop
+and ask the user, and never work around it.
 - For a bug fix without a spec: the error report.
 
 ## Tools

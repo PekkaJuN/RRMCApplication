@@ -43,6 +43,29 @@ services:
       # Keeps the Linux node_modules of the image apart from the Windows folder.
       - rrmc-node-modules:/app/node_modules
 
+  # Test, lint, type check and audit commands: `docker compose run --rm backend-test pytest`.
+  # They never see real data: no import folders, no rrmc-data, no settings file, and /data is
+  # a temporary filesystem (specs/features/test-isolation.md). The image is the app's own.
+  backend-test:
+    profiles: [test]
+    build: ./backend
+    image: rrmc-backend
+    environment:
+      RRMC_ENGINES: fake
+    volumes:
+      - ./backend:/app
+    tmpfs:
+      - /data
+
+  # Frontend checks: `docker compose run --rm frontend-test npm test`. No settings file.
+  frontend-test:
+    profiles: [test]
+    build: ./frontend
+    image: rrmc-frontend
+    volumes:
+      - ./frontend:/app
+      - rrmc-node-modules:/app/node_modules
+
   # E2E tests: `docker compose --profile e2e run --rm e2e`.
   backend-e2e:
     profiles: [e2e]
@@ -53,9 +76,8 @@ services:
       sh -c "mkdir -p /data/import /data/import_done /data/import_failed
       && python -m app.prestart
       && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --no-access-log"
-    env_file:
-      - path: ${RRMC_ENV_FILE:-.env}
-        required: true
+    # No settings file: every setting but the engines takes its default
+    # (specs/features/test-isolation.md, PC6).
     environment:
       RRMC_ENGINES: fake
     volumes:

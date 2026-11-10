@@ -1,0 +1,129 @@
+# Command rules for Codex (specs/features/agent-guardrails.md, Plan P4).
+# They stop the plain forms of guardrails G2 and G3 before the hook runs. The hook
+# (.agents/guardrails/hook.ps1) also sees compound commands and PowerShell forms.
+# Only the user changes this file (guardrail G4).
+
+# G3: hard-to-reverse Git actions.
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Guardrail G3: pushing is for the user. Stop and ask the user.",
+    match = ["git push", "git push --force origin main"],
+    not_match = ["git status"],
+)
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Guardrail G3: a hard reset cannot easily be undone.",
+    match = ["git reset --hard HEAD~1"],
+    not_match = ["git reset HEAD x"],
+)
+prefix_rule(
+    pattern = ["git", ["clean", "rebase", "filter-branch", "filter-repo"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: the command deletes files or rewrites history.",
+    match = ["git clean -fd", "git rebase main"],
+    not_match = ["git checkout -b x"],
+)
+prefix_rule(
+    pattern = ["git", "commit", "--amend"],
+    decision = "forbidden",
+    justification = "Guardrail G3: amending rewrites history.",
+    match = ["git commit --amend -m x"],
+    not_match = ["git commit -m x"],
+)
+prefix_rule(
+    pattern = ["git", "branch", "-D"],
+    decision = "forbidden",
+    justification = "Guardrail G3: forced branch deletion cannot easily be undone.",
+    match = ["git branch -D x"],
+    not_match = ["git branch -d x"],
+)
+prefix_rule(
+    pattern = ["git", "checkout", [".", "-f", "--force"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: the command discards uncommitted changes.",
+    match = ["git checkout .", "git checkout -f main"],
+    not_match = ["git checkout main", "git checkout -b x"],
+)
+prefix_rule(
+    pattern = ["git", "switch", ["-f", "--force", "--discard-changes"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: the command discards uncommitted changes.",
+    match = ["git switch --discard-changes main"],
+    not_match = ["git switch main", "git switch -c x"],
+)
+prefix_rule(
+    pattern = ["git", "stash", ["drop", "clear"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: dropped stashes cannot easily be restored.",
+    match = ["git stash drop", "git stash clear"],
+    not_match = ["git stash", "git stash pop"],
+)
+prefix_rule(
+    pattern = ["git", "rm", ["-f", "--force"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: a forced remove deletes uncommitted changes.",
+    match = ["git rm -f compose.yaml"],
+    not_match = ["git rm --cached x"],
+)
+prefix_rule(
+    pattern = ["git", "remote", ["add", "remove", "rm", "rename", "set-url"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: remotes are changed by the user.",
+    match = ["git remote set-url origin x"],
+    not_match = ["git remote -v"],
+)
+
+# G3: deleting Docker data.
+prefix_rule(
+    pattern = ["docker", "compose", "down", ["-v", "--volumes"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: removing volumes deletes the receipt database.",
+    match = ["docker compose down -v"],
+    not_match = ["docker compose down"],
+)
+prefix_rule(
+    pattern = ["docker", "volume", ["rm", "remove", "prune"]],
+    decision = "forbidden",
+    justification = "Guardrail G3: removing volumes deletes the receipt database.",
+    match = ["docker volume rm rrmc_rrmc-data", "docker volume prune"],
+    not_match = ["docker volume ls"],
+)
+prefix_rule(
+    pattern = ["docker", ["system", "image", "builder"], "prune"],
+    decision = "forbidden",
+    justification = "Guardrail G3: pruning deletes Docker data.",
+    match = ["docker system prune"],
+    not_match = ["docker system df"],
+)
+
+# G2: the app services and containers hold or show real receipt data.
+prefix_rule(
+    pattern = ["docker", "compose", "up"],
+    decision = "forbidden",
+    justification = "Guardrail G2: the app holds real receipt data. Use the test services.",
+    match = ["docker compose up -d backend"],
+    not_match = ["docker compose ps"],
+)
+prefix_rule(
+    pattern = ["docker", "compose", ["run", "exec", "logs"], ["backend", "frontend", "eval"]],
+    decision = "forbidden",
+    justification = "Guardrail G2: the app services hold real receipt data. Use backend-test or frontend-test.",
+    match = ["docker compose exec backend sh", "docker compose logs backend"],
+    not_match = ["docker compose run --rm backend-test pytest"],
+)
+prefix_rule(
+    pattern = ["docker", "compose", "run", "--rm", ["backend", "frontend", "eval"]],
+    decision = "forbidden",
+    justification = "Guardrail G2: the app services hold real receipt data. Use backend-test or frontend-test.",
+    match = ["docker compose run --rm backend pytest"],
+    not_match = ["docker compose run --rm frontend-test npm test"],
+)
+prefix_rule(
+    pattern = ["docker", ["inspect", "cp", "exec", "logs", "run", "attach"]],
+    decision = "forbidden",
+    justification = "Guardrail G2: plain docker commands can reach the app's data and settings.",
+    match = ["docker inspect rrmc-backend-1", "docker cp rrmc-backend-1:/data/db ."],
+    not_match = ["docker ps"],
+)

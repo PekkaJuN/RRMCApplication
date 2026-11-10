@@ -29,8 +29,13 @@ Create folders on first use. Do not scaffold empty specs.
 
 ## Phases
 
-Do not start a phase until the user agrees to the previous one, unless they said to proceed
-autonomously.
+Do not start a phase until the user agrees to the previous one. The user approves Specify,
+Plan and Tasks, each in turn.
+
+**Autonomy rule.** After the user approves the Tasks, the agent works through the tasks and
+the audit without asking. It stops only when an AC must change, the spec does not cover a
+case, a guardrail blocks, G5 or G6 trips, or the audit fails three times. It does not
+commit, push or open a PR unless the user asked.
 
 ### 1. Specify (what and why, never how)
 
@@ -59,7 +64,7 @@ Files to Modify. Ask for approval.
 
 Append `## Tasks`: small, ordered, independently verifiable tasks as `- [ ]` checkboxes.
 Each task names the AC IDs it satisfies and the test that proves it. Ask for approval, then
-hand over to the `tdd` skill.
+hand over to the `tdd` skill. From here on the autonomy rule applies.
 
 ## Status
 

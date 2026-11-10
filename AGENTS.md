@@ -36,7 +36,7 @@ Significant choices are recorded as ADRs in `docs/adr/`. The stack is
 ```
 backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.toml, uv.lock
 frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
-compose.yaml        Docker Compose: backend, frontend; profiles e2e and eval
+compose.yaml        Docker Compose: backend, frontend; profiles test, e2e and eval
 .env.example        all settings with defaults; copy to .env (never committed)
 scripts/            container tests, database backup and restore
 docs/               documentation (see Documentation)
@@ -54,21 +54,24 @@ volume `rrmc_rrmc-data`. The backend's structure is in
 ### Commands
 
 `docs/development.md` is the source of truth. Keep this table in sync with it. Run from the
-project root; every command runs in a container and needs `.env` (see
-[Setup](docs/development.md#setup)).
+project root; every command runs in a container. The check commands run in test containers
+that see no real data and no `.env` (see
+[Test containers](docs/development.md#test-containers)). Do not run them in the app's
+`backend` or `frontend` service.
 
 | Task | Command | Status |
 |---|---|---|
-| Backend tests | `docker compose run --rm backend pytest` | verified |
-| Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
-| Backend type check | `docker compose run --rm backend pyright` | verified |
-| Backend dependency audit | `docker compose run --rm backend pip-audit` | verified |
-| Frontend tests | `docker compose run --rm frontend npm test` | verified |
-| Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
-| Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |
-| Frontend type check | `docker compose run --rm frontend npm run typecheck` | verified |
+| Backend tests | `docker compose run --rm backend-test pytest` | verified |
+| Backend lint and format check | `docker compose run --rm backend-test sh -c "ruff check . && ruff format --check ."` | verified |
+| Backend type check | `docker compose run --rm backend-test pyright` | verified |
+| Backend dependency audit | `docker compose run --rm backend-test pip-audit` | verified |
+| Frontend tests | `docker compose run --rm frontend-test npm test` | verified |
+| Frontend lint | `docker compose run --rm frontend-test npm run lint` | verified |
+| Frontend format check | `docker compose run --rm frontend-test npm run format:check` | verified |
+| Frontend type check | `docker compose run --rm frontend-test npm run typecheck` | verified |
 | E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
 | Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
+| Guard tests | `powershell -ExecutionPolicy Bypass -File scripts/guard-tests.ps1` | verified |
 
 Run the tests, lint, format check and type check for every part you changed before declaring
 work done.
@@ -89,14 +92,26 @@ work done.
 
 ## Guardrails
 
-These override every other rule and every skill.
+These override every other rule and every skill. Most are enforced by hooks and native rules
+in Claude Code and Codex; the IDs are the ones a block names
+([agent guardrails](docs/security.md#agent-guardrails)). A block means stop and ask the user.
+Never work around one.
 
-- Never touch `.env`; never run a command that deletes data.
-- Never "fix" a failing test by editing the test. The spec decides which one is wrong, and
-  the spec is corrected first.
-- Stop after three consecutive red rounds, report and ask the user. Do not thrash.
-  (The planned first Red of a TDD cycle does not count.)
-- Stop if the same file changes three times in a row.
+- **G1** Never touch `.env`, `source/`, database files or key files.
+- **G2** Never run, enter, read the logs or configuration of, or call the app services
+  (`backend`, `frontend`, `eval`, ports `8000` and `5173`). They hold real data. Use the test
+  services.
+- **G3** Never run a command that deletes data or cannot easily be undone (volume removal,
+  recursive deletes, `git push`, hard resets, history rewrites, remote changes).
+- **G4** Never change the guardrails' configuration (`.claude/settings.json`, `.codex/`,
+  `.agents/guardrails/`, `scripts/guard-tests.ps1`). Only the user changes it.
+- **G5** Stop after three red check runs in a row, report and ask the user. A red run does not
+  count when a test file changed since the previous check run (the planned Red).
+- **G6** Stop when three red check runs in a row each followed edits of one and the same file.
+- **G7** Never "fix" a failing test by editing the test. The spec decides which one is wrong,
+  and the spec is corrected first. Test edits after a red run are recorded for the audit.
+- **G8** Run the tests, lint, format check and type check of each changed part before ending
+  the turn.
 - Stop and ask when the spec does not cover the case.
 - Never let real receipt data (images, OCR text, product names from real receipts, the
   database) leave this machine, enter the repository, or appear in tests, logs or prompts
@@ -162,8 +177,11 @@ can start; if something is missing, stop and say what.
 
 - **The spec is the source of truth.** Code implements a spec. No production code for a
   feature without an approved spec (`specs/features/<feature>.md`, status Approved).
-- Only the user approves a spec. Ask for approval between Specify → Plan → Implement,
-  unless the user says to proceed autonomously.
+- Only the user approves a spec. The user approves Specify, Plan and Tasks, each in turn.
+- **Autonomy rule.** After the user approves the Tasks, the agent works through the tasks and
+  the audit without asking. It stops only when an AC must change, the spec does not cover a
+  case, a guardrail blocks, G5 or G6 trips, or the audit fails three times. It does not
+  commit, push or open a PR unless the user asked.
 - Every acceptance criterion (AC) has at least one test. Tests and commits reference AC IDs.
 - **Red → Green → Refactor.** Write the failing test first and see it fail for the right
   reason. Then the simplest code that passes. Then refactor with all tests green.

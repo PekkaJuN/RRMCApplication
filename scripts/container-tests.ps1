@@ -61,6 +61,42 @@ function Invoke-Compose([string]$SettingsFile, [string[]]$Arguments) {
     return Invoke-Docker (@("compose", "-p", $Project, "--env-file", $SettingsFile) + $Arguments)
 }
 
+# Test isolation (specs/features/test-isolation.md): returns the problems of one service in
+# the output of `docker compose config --format json`. Mounts are compared with an allow list
+# of "type:source->target" entries; a bind source is relative to the project root.
+function Get-IsolationProblems($Config, [string]$Service, [string[]]$AllowedMounts,
+        [bool]$ExpectTmpfs, [hashtable]$AllowedEnv) {
+    $problems = New-Object System.Collections.Generic.List[string]
+    $definition = $Config.services.$Service
+    if ($null -eq $definition) {
+        $problems.Add("service $Service is missing")
+        return $problems
+    }
+    foreach ($mount in @($definition.volumes | Where-Object { $null -ne $_ })) {
+        $source = "$($mount.source)"
+        if ($mount.type -eq "bind" -and $source.StartsWith($ProjectRoot)) {
+            $source = $source.Substring($ProjectRoot.Length).TrimStart("\", "/") -replace "\\", "/"
+        }
+        $key = "$($mount.type):$source->$($mount.target)"
+        if ($AllowedMounts -notcontains $key) { $problems.Add("mount $key") }
+    }
+    if ($ExpectTmpfs -and @($definition.tmpfs) -notcontains "/data") {
+        $problems.Add("/data is not tmpfs")
+    }
+    if ($null -ne $definition.environment) {
+        foreach ($variable in $definition.environment.PSObject.Properties) {
+            $allowed = $AllowedEnv.ContainsKey($variable.Name) -and
+                $AllowedEnv[$variable.Name] -eq "$($variable.Value)"
+            if (-not $allowed) { $problems.Add("environment $($variable.Name)") }
+        }
+    }
+    return $problems
+}
+
+$BackendTestMounts = @("bind:backend->/app")
+$FrontendTestMounts = @("bind:frontend->/app", "volume:rrmc-node-modules->/app/node_modules")
+$FakeEngines = @{ RRMC_ENGINES = "fake" }
+
 function Wait-Health {
     for ($i = 0; $i -lt 60; $i++) {
         try {
@@ -130,6 +166,60 @@ Wait-Health | Out-Null
 $count = (Invoke-Compose $Settings @("exec", "-T", "backend", "python", "-c", $read)).Trim()
 Write-Result "AC11 data survives down and up --build" ($count -eq "1") "count: $count"
 Invoke-Compose $Settings @("down") | Out-Null
+
+# Test isolation AC1, AC2, AC5: the test containers mount no real data and get no settings
+# file values.
+$isolationConfig = Invoke-Compose $Settings @("--profile", "test", "--profile", "e2e",
+    "config", "--format", "json") | ConvertFrom-Json
+$problems = Get-IsolationProblems $isolationConfig "backend-test" $BackendTestMounts $true $FakeEngines
+Write-Result "Isolation AC1 AC5 backend-test mounts and environment" ($problems.Count -eq 0) ($problems -join "; ")
+$problems = Get-IsolationProblems $isolationConfig "frontend-test" $FrontendTestMounts $false @{}
+Write-Result "Isolation AC2 AC5 frontend-test mounts and environment" ($problems.Count -eq 0) ($problems -join "; ")
+$problems = Get-IsolationProblems $isolationConfig "backend-e2e" @("bind:backend->/app",
+    "volume:rrmc-e2e-import->/data/import", "volume:rrmc-e2e-failed->/data/import_failed") `
+    $true $FakeEngines
+Write-Result "Isolation AC5 AC10 backend-e2e gets no settings file values" ($problems.Count -eq 0) ($problems -join "; ")
+
+# Isolation AC11: a test container that mounts a data folder is reported.
+$override = Join-Path $WorkDir "isolation-broken.yaml"
+[System.IO.File]::WriteAllLines($override, [string[]]@(
+    "services:", "  backend-test:", "    volumes:",
+    "      - $((Join-Path $WorkDir 'import') -replace '\\', '/'):/data/import"))
+$env:RRMC_ENV_FILE = $Settings
+$brokenConfig = Invoke-Docker @("compose", "-p", $Project, "--env-file", $Settings,
+    "-f", "compose.yaml", "-f", $override, "--profile", "test", "config", "--format", "json") |
+    ConvertFrom-Json
+$problems = Get-IsolationProblems $brokenConfig "backend-test" $BackendTestMounts $true $FakeEngines
+Write-Result "Isolation AC11 a mounted data folder is reported" `
+    (@($problems | Where-Object { $_ -like "mount bind:*->/data/import" }).Count -eq 1) ($problems -join "; ")
+
+# Isolation AC4: the test containers start without a settings file.
+$env:RRMC_ENV_FILE = Join-Path $WorkDir "does-not-exist.env"
+$backendOk = Invoke-Docker @("compose", "-p", $Project, "--env-file", $Settings, "run", "--rm",
+    "backend-test", "python", "-c", "print('isolation-ok')")
+$frontendOk = Invoke-Docker @("compose", "-p", $Project, "--env-file", $Settings, "run", "--rm",
+    "frontend-test", "node", "-e", "console.log('isolation-ok')")
+Write-Result "Isolation AC4 test containers start without a settings file" `
+    ($backendOk -match "isolation-ok" -and $frontendOk -match "isolation-ok")
+
+# Isolation AC3: /data is empty in backend-test, although the test import folder holds a file
+# and the test database volume exists (AC11 above).
+[System.IO.File]::WriteAllText((Join-Path $WorkDir "import\isolation-check.jpg"), "synthetic")
+$listing = "from pathlib import Path; print(sorted(p.name for p in Path('/data').rglob('*')))"
+# Compose prints its progress lines into the same output, so take the printed list only.
+$listingOutput = Invoke-Compose $Settings @("run", "--rm", "backend-test", "python", "-c", $listing)
+$dataFiles = "$($listingOutput -split "`n" | Where-Object { $_ -match "^\s*\[" } |
+    Select-Object -Last 1)".Trim()
+Write-Result "Isolation AC3 /data is empty in backend-test" ($dataFiles -eq "[]") "got $dataFiles"
+
+# Isolation AC7: pytest refuses to run in the app's backend service, which mounts data.
+$refusal = Invoke-Compose $Settings @("run", "--rm", "backend", "pytest", "-q", "-p", "no:cacheprovider")
+$exitCode = $LASTEXITCODE
+$refusalLines = @($refusal -split "`n" | Where-Object { $_ -match "Refusing to run tests" })
+Write-Result "Isolation AC7 pytest refuses next to data" `
+    ($exitCode -eq 2 -and $refusalLines.Count -eq 1 -and
+        $refusalLines[0] -match "docker compose run --rm backend-test pytest" -and
+        $refusal -notmatch "passed") "exit $exitCode"
 
 # AC27: private files are ignored, .env.example is not.
 $ignored = @(".env", "source/import/a.jpg", "source/import_failed/a.jpg", "data/rrmc.db",

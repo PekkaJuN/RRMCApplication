@@ -40,3 +40,6 @@ frontend/playwright-report/
 
 # Google Sheets service-account keys (keep them outside the repository)
 service_account*.json
+
+# Agent guardrails: local state and the record of test edits (specs/features/agent-guardrails.md)
+.agents/guardrails/state/

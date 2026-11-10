@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event PreToolUse",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event PreToolUse",
+            "timeout": 10,
+            "statusMessage": "Guardrails"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event PostToolUse",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event PostToolUse",
+            "timeout": 10,
+            "statusMessage": "Guardrails"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event UserPromptSubmit",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event UserPromptSubmit",
+            "timeout": 10,
+            "statusMessage": "Guardrails"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event Stop",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .agents/guardrails/hook.ps1 -Tool codex -Event Stop",
+            "timeout": 10,
+            "statusMessage": "Guardrails"
+          }
+        ]
+      }
+    ]
+  }
+}
