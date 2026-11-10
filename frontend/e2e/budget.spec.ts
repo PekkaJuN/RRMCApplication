@@ -94,6 +94,33 @@ test("AC26, AC31: compare a period from the 15th to the 14th", async ({ page }) 
   expect(await actualCents(page)).toBe(before + 125);
 });
 
+test("AC34: the week table uses the window's width", async ({ page }) => {
+  const widths = (target: Page) =>
+    target.evaluate(() => {
+      const box = document.querySelector("table[aria-label='Viikot']")?.parentElement;
+      return {
+        page: document.documentElement.scrollWidth,
+        scroll: box?.scrollWidth ?? 0,
+        client: box?.clientWidth ?? 0,
+      };
+    });
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  // March 2026 holds six ISO weeks: W09 (Sunday 1.3.) to W14.
+  await page.goto("/vertailu?month=2026-03");
+  await page.getByRole("button", { name: "Näytä viikot" }).click();
+  await expect(page.getByRole("table", { name: "Viikot" })).toBeVisible();
+  const wide = await widths(page);
+  expect(wide.client).toBeGreaterThan(1200);
+  expect(wide.scroll).toBe(wide.client);
+  expect(wide.page).toBeLessThanOrEqual(1920);
+
+  await page.setViewportSize({ width: 600, height: 800 });
+  const narrow = await widths(page);
+  expect(narrow.page).toBeLessThanOrEqual(600);
+  expect(narrow.scroll).toBeGreaterThan(narrow.client);
+});
+
 test("NFR-16: the budget pages have no WCAG 2.1 AA violation", async ({ page }) => {
   await page.goto("/budjetti");
   await expect(page.getByRole("textbox", { name: "Auto" })).toBeVisible();

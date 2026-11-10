@@ -5,7 +5,9 @@
 - **Created:** 2026-11-05
 - **Depends on:** [Category totals](totals.md), [Product management](product-management.md),
   [Receipt review](receipt-review.md)
-- **Updated:** 2026-11-06: user request and answers: the comparison can also use a fixed
+- **Updated:** 2026-11-10: user request: the week table did not fit on the screen. User
+  decision: it uses the window's width instead of the 1200 px content width (PC6, AC34).
+  2026-11-06: user request and answers: the comparison can also use a fixed
   period from the 15th to the 14th of the next month, chosen on the Vertailu page and named
   after its starting month. Specify changes, the Plan and the Tasks approved by the user.
   User decisions after the audit: budget saves run one at a time; a well-formed month the
@@ -108,6 +110,11 @@ be a calendar month or a period from the 15th to the 14th of the next month.
   Both have the row `Yhteensä`. A negative `Jäljellä` is shown with the text `Ylitetty` as
   well as the sign, so the meaning does not depend on color. In the week table, a
   `Toteutunut` value over the week's budget has the same text.
+
+  The week table is not held to the 1200 px content width of `main` (styling PC2). Its box
+  is as wide as the window less a margin on each side, and the table is centred in it, so a
+  period of six weeks fits on a window 1920 px wide. On a narrower window the table still
+  scrolls inside its box, and the page does not scroll sideways.
 - **PC7 Lines without a category.** Lines of reviewed receipts without a category form the
   last row `Ei kategoriaa`, budget 0, so `Yhteensä` shows the full reviewed spending. The
   row is shown only when such lines exist.
@@ -419,6 +426,14 @@ the table `Viikot` is not shown. **And** a reload keeps a chosen month, and
 the table open if it was open and hidden if it was hidden, pressing the button again hides
 it, and after a reload it is hidden
 
+### AC34: The week table uses the window's width
+**Given** a window of 1920 × 1080 px and the Vertailu page of `2026-03`, a period with six
+ISO weeks
+**When** the user presses `Näytä viikot`
+**Then** the box of the table `Viikot` is wider than 1200 px and does not scroll sideways
+(`scrollWidth` equals `clientWidth`), and the page does not scroll sideways. **And** on a
+window of 600 × 800 px the page does not scroll sideways and the box scrolls
+
 ### AC20: Counts on the page
 **Given** an answer with `unreviewed_receipts` 2 and `undated_receipts` 1
 **When** the page shows it
@@ -466,6 +481,7 @@ Refined by the Plan.
 | `frontend/src/components/ImportPage.test.tsx`, `docs/learnings.md` | The new test files exposed a timing race in the AC28 polling test (user decision 2026-11-06) |
 | `docs/api-reference.md`, `docs/datamodel.md`, `docs/architecture.md`, `docs/glossary.md` | Endpoints, table, component map, terms |
 | `docs/content-plan.md`, `specs/README.md` | Status, new Tier 2 row |
+| `frontend/src/styles.css`, `specs/features/styling.md`, `docs/subsystems/ui/README.md` | The wide week table (AC34, 2026-11-10) |
 
 ## Risk
 - **What could break:** the user may read Vertailu and Yhteenveto as disagreeing, because
@@ -543,6 +559,7 @@ Real SQLite (temporary file) and real FastAPI app.
 | AC | Journey | Steps | Expected outcome |
 |---|---|---|---|
 | AC17, AC19, AC7 | set a budget and compare | set a budget on Budjetti, type in a synthetic receipt dated 2026-03-10, open Vertailu for its month, confirm the receipt, open Vertailu again | the row shows the budget; the spending grows by the receipt only after it is confirmed |
+| AC34 | wide week table | 1920 × 1080 px, Vertailu `2026-03`, `Näytä viikot`; then 600 × 800 px | AC34 widths |
 | AC26, AC31 | compare a 15–14 period | choose `15.–14.` and `2026-02`, the period that holds a synthetic receipt dated 2026-03-10, then type in and confirm one | the spending grows by the receipt and the page shows the dates 15.2.2026–14.3.2026 |
 
 ### Coverage target
@@ -698,7 +715,10 @@ item leaving a group shows 0 (AC24). A rename touches nothing (AC16).
   and period changes and resets on a reload, and pressing the button sends no request.
 - `ComparisonTable.tsx`: the month and week tables inside `.table-box`. The week table has
   two heading rows, with `colSpan={2}` and `scope="colgroup"` over `Budjetti` and
-  `Toteutunut`.
+  `Toteutunut`. Its box also has `.table-box-wide` (AC34): width `100vw` less two
+  `--space-4` margins, moved left by `50% - 50vw` plus one margin, so it is centred on
+  `main`; the table inside has `margin: 0 auto`. `100vw` includes the vertical scroll bar,
+  and the margins are wider than half of it, so the box stays inside the window.
 - The heading of a partial column moves from `TotalsTable.tsx` to `columnHeading` in
   `period.ts`, so both tables use it. Its comment still holds: a partial column lies within
   one month.
@@ -795,6 +815,9 @@ Paths are under `backend/` or `frontend/` as the group says.
   (P8). Test: `BudgetPage.test.tsx`.
 - [x] **T22 A month the backend refuses** (AC33). No code change; the behavior is fixed by
   the spec. Test: `ComparisonPage.test.tsx`.
+
+- [x] **T23 Wide week table** (AC34). `.table-box-wide` in `styles.css` and on the week
+  table's box in `components/ComparisonTable.tsx` (P8). Test: `e2e/budget.spec.ts`.
 
 ### Docs and closing
 

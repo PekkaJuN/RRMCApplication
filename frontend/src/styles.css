@@ -105,6 +105,19 @@ a {
   overflow-x: auto;
 }
 
+/* The Vertailu week table may be wider than `main` (budget PC6): its box spans the window
+   less a margin on each side. `100vw` includes the vertical scroll bar; the margins are
+   wider than half of it, so the box stays inside the window. */
+.table-box-wide {
+  width: calc(100vw - 2 * var(--space-4));
+  max-width: none;
+  margin-left: calc(50% - 50vw + var(--space-4));
+}
+
+.table-box-wide table {
+  margin: 0 auto;
+}
+
 table {
   border-collapse: collapse;
 }

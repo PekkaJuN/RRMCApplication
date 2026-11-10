@@ -42,7 +42,8 @@ accessibility check (WCAG 2.1 level AA) of every page to the E2E tests.
   from another host (NFR-1).
 - **PC2 Layout.** The header holds the title, the navigation and the status line; on a
   window at least 900 px wide they are on one row. The content of `main` is at most
-  1200 px wide and centred. The page never scrolls sideways at a window width of 600 px or
+  1200 px wide and centred; the Vertailu week table is the one exception
+  ([budget](budget.md) PC6). The page never scrolls sideways at a window width of 600 px or
   more: a table wider than the window scrolls inside its own box.
 - **PC3 Navigation.** The current page's link (`aria-current="page"`) is bold and
   underlined with a 3 px accent-colored line; the other links are not bold and have no

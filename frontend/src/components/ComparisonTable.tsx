@@ -91,7 +91,7 @@ export function ComparisonWeekTable({ comparison }: Props) {
   }
 
   return (
-    <div className="table-box">
+    <div className="table-box table-box-wide">
       <table aria-label={fi.comparison.weeks}>
         <caption>{fi.comparison.weeks}</caption>
         <thead>
