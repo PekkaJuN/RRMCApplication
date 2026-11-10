@@ -1,7 +1,7 @@
 # Feature: Agent guardrails
 
 ## Overview
-- **Status:** In Progress
+- **Status:** Done (AC24 deferred)
 - **Created:** 2026-11-10
 - **Updated:** 2026-11-10: the user decided the G5 and G6 counting rules, left the WSL2
   sandbox out, and will check the Codex ACs by hand. Specify approved by the user; Plan added.
@@ -12,7 +12,8 @@
   and approved by the user; T15 and T16 done. The live check of T17 found that grep's `-c`,
   `-F` and `-E` were matched as `-C`, `-f` and `-e` (case-insensitive); fixed with unit rows
   ([learnings](../../docs/learnings.md)). T17 done: with the hooks on, all 341 guard tests
-  pass and the formerly blocked commands run live.
+  pass and the formerly blocked commands run live. The user deferred AC24 until Codex is
+  taken into use; the spec is Done for Claude Code.
 - **Depends on:** [Test container isolation](test-isolation.md)
 - **Implements:** NFR-1, NFR-4 and the Guardrails of [AGENTS.md](../../AGENTS.md#guardrails)
   for AI coding agents; the user's decision of 2026-11-10 to let agents run on their own from
@@ -327,6 +328,9 @@ affected.)
 **Then** its status shows the Windows sandbox in elevated mode with workspace write access,
 and a shell command in Codex that reads `.env` fails because of the sandbox even when the
 hook is turned off. (Checked by the user; Codex is not installed for the agent.)
+**Deferred** (the user, 2026-11-10): checked when Codex is taken into use, together with the
+Codex steps of [development.md](../../docs/development.md#agent-guardrails) and the Codex exit
+code field (audit finding 2).
 
 ### AC23: Known limits and setup are documented
 **Given** `docs/security.md` and `docs/development.md`
@@ -710,12 +714,14 @@ file tools instead.
 ## Audit
 
 ### Summary
-- Acceptance criteria: 24/25 met; AC24 open (the user's check in Codex)
-- Tests: guard tests 310 passed (unit and integration for both tools, timing median about
+- Acceptance criteria: 26/27 met; AC24 deferred by the user until Codex is taken into use
+- Spec change 1 (AC26, AC27): guard tests 341 passed with the hooks on; the formerly blocked
+  commands ran through the live hook
+- Tests at the first audit: guard tests 310 passed (unit and integration for both tools, timing median about
   410 ms); container tests pass. No app code changed, so the backend and frontend suites
   were not rerun.
 - Security: 0 critical, 0 high, 2 medium, 2 low
-- Docs updated: yes; spec status: In Progress until AC24 is checked
+- Docs updated: yes; spec status: Done, AC24 deferred
 
 | AC | Result | Evidence |
 |---|---|---|
@@ -731,15 +737,16 @@ file tools instead.
 | AC20 | ✅ | median 407–412 ms over 20 calls |
 | AC21 | ✅ | `scripts/guard-tests.ps1` exits 0 |
 | AC22, AC23 | ✅ | AGENTS.md, skills; security.md "Agent guardrails"; development.md "Agent guardrails" |
-| AC24 | ⏳ | Codex is not installed for the agent; the user checks the sandbox status and the denied read |
+| AC24 | ⏸ | Deferred by the user until Codex is taken into use |
+| AC26, AC27 | ✅ | AC26 and AC27 unit rows, case-sensitive option rows; live hook run of `ls <guard dir> 2>/dev/null` and `grep -c` with a pattern |
 
 | # | Severity | File | Finding | Recommendation |
 |---|---|---|---|---|
-| 1 | Medium | `.agents/guardrails/Guard.psm1` | False positives in use (Progress, findings 1–3): redirections such as `2>/dev/null` next to a guard path count as writes; any text naming a guard path in a non-read command blocks; `.env` or `source` in a search pattern block. The agent then has to stop and ask. | The user decides whether to narrow G4 to the redirection target and G1 to the arguments after the pattern; it is a guard change, so the user makes it or turns the hooks off for it. |
+| 1 | Medium | `.agents/guardrails/Guard.psm1` | False positives in use (Progress, findings 1–3): redirections such as `2>/dev/null` next to a guard path count as writes; any text naming a guard path in a non-read command blocks; `.env` or `source` in a search pattern block. The agent then has to stop and ask. | The user decides whether to narrow G4 to the redirection target and G1 to the arguments after the pattern; it is a guard change, so the user makes it or turns the hooks off for it. **Resolved** for redirections and search patterns by spec change 1; a guard path in a non-read command's text still blocks, on purpose. |
 | 2 | Medium | `.codex/` | The Codex configuration is untested end to end: the permission profile keys, the hooks file and the rules follow the docs read on 2026-11-10, but `codex execpolicy check` and a Codex session could not be run here. The Codex exit code field is a guess. | The user runs the development.md Codex steps and AC24. |
 | 3 | Low | `.claude/settings.json` | Plan P4 named one command string; the file uses `command` plus `args`, so the hook does not depend on the shell. The Plan text was not changed (Progress T12 records it). | None. |
 | 4 | Low | process | The `.claude/settings.json` write was not shown to the user for approval in this session (auto mode let it through), although the Tasks said the user approves it. | The user reviews the file in the diff before committing. |
 | 5 | Info | process | T8's tests passed at once (the reminder was written in T7), and each rule task wrote its rows in one step, not one test at a time. Every row was seen failing on its assertion before the code was written. | None. |
 
-Verdict: PASS for everything the agent can check; AC24 is open. The spec becomes Done after
-the user's Codex check.
+Verdict: PASS for everything the agent can check. The user deferred AC24 and finding 2 until
+Codex is taken into use, so the spec is Done for Claude Code.

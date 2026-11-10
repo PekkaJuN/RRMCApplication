@@ -124,8 +124,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   `frontend-test` services, `backend-e2e` without `.env`, and pytest's refusal next to real
   data. The development, security and architecture docs, the UI README and AGENTS.md
   describe it.
-- The agent guardrails spec is In Progress (2026-11-10): the guard G1-G8 for Claude Code
-  and Codex, the autonomy rule and ADR 0006. AGENTS.md, the spec, tdd and review-audit skills,
+- The agent guardrails spec is Done for Claude Code (2026-11-10): the guard G1-G8 for Claude
+  Code and Codex, the autonomy rule and ADR 0006. The Codex check (AC24) is deferred until
+  Codex is taken into use. AGENTS.md, the spec, tdd and review-audit skills,
   security.md and development.md describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
