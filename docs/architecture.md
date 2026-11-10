@@ -82,7 +82,7 @@ frontend/                React + Vite + TypeScript UI
   src/i18n/fi.ts         all Finnish UI texts
   src/test/              MSW setup and test data for component tests
   e2e/                   Playwright tests
-scripts/                 container tests
+scripts/                 container tests, database backup and restore
 docs/                    documentation (see content-plan.md)
 specs/                   PRD and feature specs
 source/import/           incoming receipt images        (default; gitignored, real data)

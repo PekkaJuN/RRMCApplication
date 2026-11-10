@@ -38,7 +38,7 @@ backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.to
 frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
 compose.yaml        Docker Compose: backend, frontend; profiles e2e and eval
 .env.example        all settings with defaults; copy to .env (never committed)
-scripts/            container tests
+scripts/            container tests, database backup and restore
 docs/               documentation (see Documentation)
 specs/              feature specs (see Workflows)
 source/import/      incoming receipt images      (gitignored, real data)

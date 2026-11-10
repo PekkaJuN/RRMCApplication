@@ -66,20 +66,26 @@ at <http://127.0.0.1:8000/api/health>.
 - The database is in the Docker volume `rrmc_rrmc-data`, not in a Windows folder. It survives
   `down`, `up` and rebuilds. Only `docker compose down -v` deletes it: never run that unless
   you mean to delete all receipt data.
-- Migrations are forward-only. Before starting a version with a new migration, copy the
-  database out of the volume. The copy goes to `rrmc-backup` in your user folder, outside
-  the repository; it holds real receipt data, so keep it out of cloud-synced folders. The
-  command uses SQLite's backup, so the copy is consistent even while the app runs, and it
-  opens the database read-only:
+- Migrations are forward-only. Before starting a version with a new migration, back up
+  the database. The backup goes to `rrmc-backup` in your user folder, outside the
+  repository; it holds real receipt data, so keep it out of cloud-synced folders. The script
+  uses SQLite's backup API, so the copy is consistent even while the app runs; it opens the
+  database read-only, checks the copy with `PRAGMA integrity_check` and never overwrites an
+  existing file. `-BackupDir` picks another folder.
 
   ```powershell
-  New-Item -ItemType Directory -Force "$env:USERPROFILE\rrmc-backup" | Out-Null
-  $d = Get-Date -Format yyyy-MM-dd
-  docker compose run --rm --no-deps -v "$env:USERPROFILE\rrmc-backup:/backup" backend python -c "import sqlite3; sqlite3.connect('file:/data/db/rrmc.db?mode=ro', uri=True).backup(sqlite3.connect('/backup/rrmc-$d.db'))"
+  powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1
   ```
 
-  To roll back, stop the app, copy the file back over `/data/db/rrmc.db` the same way and
-  run the previous version. That replaces all data in the volume, so do it only on purpose.
+  To roll back, restore a backup and run the version it came from. The restore replaces all
+  data in the volume, so it asks you to type `RESTORE`. It checks the backup file first,
+  backs up the current database (suffix `before-restore`), stops the backend while it copies
+  and starts it again if it was running:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts/restore-db.ps1 -BackupFile $env:USERPROFILE\rrmc-backup\rrmc-2026-11-10_151500.db
+  ```
+
 - The import folders are the Windows folders in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` and
   `RRMC_FAILED_DIR`, mounted into the backend container as `/data/import`,
   `/data/import_done` and `/data/import_failed`.
