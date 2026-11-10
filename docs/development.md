@@ -94,19 +94,19 @@ at <http://127.0.0.1:8000/api/health>.
 
 This table is the source of truth; the Commands table in [AGENTS.md](../AGENTS.md#commands)
 mirrors it. Run the commands from the project root in PowerShell. Each one runs in a
-one-off container and needs nothing on the computer but Docker and `.env`. All were run on
-2026-10-26 with the result shown.
+one-off [test container](#test-containers) and needs nothing on the computer but Docker;
+none of them reads `.env`. All were run on 2026-11-10 with the result shown.
 
 | Task | Command | Status |
 |---|---|---|
-| Backend tests | `docker compose run --rm backend pytest` | verified |
-| Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
-| Backend type check | `docker compose run --rm backend pyright` | verified |
-| Backend dependency audit | `docker compose run --rm backend pip-audit` | verified |
-| Frontend tests | `docker compose run --rm frontend npm test` | verified |
-| Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
-| Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |
-| Frontend type check | `docker compose run --rm frontend npm run typecheck` | verified |
+| Backend tests | `docker compose run --rm backend-test pytest` | verified |
+| Backend lint and format check | `docker compose run --rm backend-test sh -c "ruff check . && ruff format --check ."` | verified |
+| Backend type check | `docker compose run --rm backend-test pyright` | verified |
+| Backend dependency audit | `docker compose run --rm backend-test pip-audit` | verified |
+| Frontend tests | `docker compose run --rm frontend-test npm test` | verified |
+| Frontend lint | `docker compose run --rm frontend-test npm run lint` | verified |
+| Frontend format check | `docker compose run --rm frontend-test npm run format:check` | verified |
+| Frontend type check | `docker compose run --rm frontend-test npm run typecheck` | verified |
 | E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
 | Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
 
@@ -117,19 +117,39 @@ Useful variants:
 
 ```powershell
 # Backend tests with line and branch coverage
-docker compose run --rm backend pytest --cov=app --cov=evaluation --cov-branch --cov-report=term-missing
+docker compose run --rm backend-test pytest --cov=app --cov=evaluation --cov-branch --cov-report=term-missing
 # Tests that need the real Tesseract (left out of the default run)
-docker compose run --rm backend pytest -m tesseract
+docker compose run --rm backend-test pytest -m tesseract
 # Frontend tests with coverage
-docker compose run --rm frontend npm run test:coverage
+docker compose run --rm frontend-test npm run test:coverage
 # Format the code instead of checking it
-docker compose run --rm backend ruff format .
-docker compose run --rm frontend npm run format
+docker compose run --rm backend-test ruff format .
+docker compose run --rm frontend-test npm run format
 ```
+
+### Test containers
+
+The check commands run in the services `backend-test` and `frontend-test` (profile `test`),
+not in the app's `backend` and `frontend`. The app's services mount the receipt folders, the
+database volume and `.env`; a test or a command run there could read real receipts or change
+the real database ([test isolation spec](../specs/features/test-isolation.md)).
+
+- They use the app's images (`rrmc-backend`, `rrmc-frontend`) and mount only `./backend` or
+  `./frontend` (and the `node_modules` volume), so results and in-place formatting are the
+  same.
+- `backend-test` has a temporary, empty `/data` and only `RRMC_ENGINES=fake`. Every other
+  setting takes its default. It does not reach Ollama.
+- Neither reads `.env`. They start even when `RRMC_ENV_FILE` names a missing file.
+- pytest refuses to run when anything is mounted under `/data`, for example in the app's
+  `backend`. It prints one line naming the safe command and exits with code 2
+  (@backend/tests/data_guard.py, wired in @backend/tests/conftest.py).
+- @scripts/container-tests.ps1 checks the mounts and the environment of the test services
+  and of `backend-e2e` against an allow list.
 
 ### E2E tests
 
-The E2E tests start `backend-e2e`, a backend with `RRMC_ENGINES=fake` and a temporary `/data`
+The E2E tests start `backend-e2e`, a backend without a settings file, with
+`RRMC_ENGINES=fake` and a temporary `/data`
 (new empty database and done folder each time the container starts; the import and failed
 folders are the volumes below, which stay), and run Playwright in the
 `e2e` container, which starts its own Vite server. `run --rm` leaves `backend-e2e` running,
@@ -233,7 +253,7 @@ Privacy rules:
 | Part | Lock file | After changing dependencies |
 |---|---|---|
 | Backend | `backend/uv.lock` | Rebuild: `docker compose build backend` |
-| Frontend | `frontend/package-lock.json` | Rebuild, then refresh the `node_modules` volume: `docker compose build frontend`, then `docker compose run --rm frontend npm ci` |
+| Frontend | `frontend/package-lock.json` | Rebuild, then refresh the `node_modules` volume: `docker compose build frontend`, then `docker compose run --rm frontend-test npm ci` |
 
 Change `backend/pyproject.toml`, then update the lock file with the uv version of the image:
 
@@ -244,7 +264,7 @@ docker run --rm -v "${PWD}/backend:/app" -w /app ghcr.io/astral-sh/uv:0.9.5-pyth
 Change frontend dependencies inside the container, so `package-lock.json` matches Linux:
 
 ```powershell
-docker compose run --rm frontend npm install --save-exact <package>@<version>
+docker compose run --rm frontend-test npm install --save-exact <package>@<version>
 ```
 
 Version constraints: TypeScript stays below 6.1 while `typescript-eslint` 8 requires it, and
@@ -263,7 +283,7 @@ image tag in `frontend/Dockerfile` must match the `@playwright/test` version.
 | Status line: `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | A folder in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` or `RRMC_FAILED_DIR` is missing or read-only. |
 | Status line: `Taustapalveluun ei saada yhteyttä.` | The backend container is not running. Check `docker compose ps` and `docker compose logs backend`. |
 | `port is already allocated` | Another program uses the port. Set `RRMC_BACKEND_PORT` or `RRMC_UI_PORT` in `.env`. |
-| Frontend errors about missing packages after a dependency change | The `node_modules` volume is stale. Run `docker compose run --rm frontend npm ci`. |
+| Frontend errors about missing packages after a dependency change | The `node_modules` volume is stale. Run `docker compose run --rm frontend-test npm ci`. |
 
 ## Code standards
 

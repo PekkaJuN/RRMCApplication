@@ -72,7 +72,10 @@ See [known limits](#known-limits) for the one accepted exception.
 ## Version control
 
 `.gitignore` keeps `.env`, `source/`, SQLite files and `service_account*.json` out of the
-repository. Tests use synthetic receipts only (NFR-12). The app has no secrets today. The
+repository. Tests use synthetic receipts only (NFR-12). The test, lint, type check and audit
+commands run in test containers that mount no receipt folder, no database volume and no
+`.env`, and pytest refuses to run where anything is mounted under `/data`
+([test containers](development.md#test-containers)). The app has no secrets today. The
 Google Sheets export will need a service-account key, stored outside the repository and
 outside cloud-synced folders (NFR-5).
 
@@ -81,8 +84,8 @@ outside cloud-synced folders (NFR-5).
 Check the backend and frontend dependencies for known vulnerabilities:
 
 ```powershell
-docker compose run --rm backend pip-audit
-docker compose run --rm frontend npm audit --omit=dev
+docker compose run --rm backend-test pip-audit
+docker compose run --rm frontend-test npm audit --omit=dev
 ```
 
 Both reported no known vulnerabilities on 2026-11-04.

@@ -36,7 +36,7 @@ Significant choices are recorded as ADRs in `docs/adr/`. The stack is
 ```
 backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.toml, uv.lock
 frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
-compose.yaml        Docker Compose: backend, frontend; profiles e2e and eval
+compose.yaml        Docker Compose: backend, frontend; profiles test, e2e and eval
 .env.example        all settings with defaults; copy to .env (never committed)
 scripts/            container tests, database backup and restore
 docs/               documentation (see Documentation)
@@ -54,19 +54,21 @@ volume `rrmc_rrmc-data`. The backend's structure is in
 ### Commands
 
 `docs/development.md` is the source of truth. Keep this table in sync with it. Run from the
-project root; every command runs in a container and needs `.env` (see
-[Setup](docs/development.md#setup)).
+project root; every command runs in a container. The check commands run in test containers
+that see no real data and no `.env` (see
+[Test containers](docs/development.md#test-containers)). Do not run them in the app's
+`backend` or `frontend` service.
 
 | Task | Command | Status |
 |---|---|---|
-| Backend tests | `docker compose run --rm backend pytest` | verified |
-| Backend lint and format check | `docker compose run --rm backend sh -c "ruff check . && ruff format --check ."` | verified |
-| Backend type check | `docker compose run --rm backend pyright` | verified |
-| Backend dependency audit | `docker compose run --rm backend pip-audit` | verified |
-| Frontend tests | `docker compose run --rm frontend npm test` | verified |
-| Frontend lint | `docker compose run --rm frontend npm run lint` | verified |
-| Frontend format check | `docker compose run --rm frontend npm run format:check` | verified |
-| Frontend type check | `docker compose run --rm frontend npm run typecheck` | verified |
+| Backend tests | `docker compose run --rm backend-test pytest` | verified |
+| Backend lint and format check | `docker compose run --rm backend-test sh -c "ruff check . && ruff format --check ."` | verified |
+| Backend type check | `docker compose run --rm backend-test pyright` | verified |
+| Backend dependency audit | `docker compose run --rm backend-test pip-audit` | verified |
+| Frontend tests | `docker compose run --rm frontend-test npm test` | verified |
+| Frontend lint | `docker compose run --rm frontend-test npm run lint` | verified |
+| Frontend format check | `docker compose run --rm frontend-test npm run format:check` | verified |
+| Frontend type check | `docker compose run --rm frontend-test npm run typecheck` | verified |
 | E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
 | Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
 

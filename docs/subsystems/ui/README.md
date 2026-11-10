@@ -307,7 +307,7 @@ None yet.
 - Tests that switch pages reset the address with `history.replaceState(null, "", "/")` in
   `beforeEach`, because jsdom keeps it between tests.
 - The `node_modules` folder lives in a Docker volume; after a dependency change run
-  `docker compose run --rm frontend npm ci` ([development.md](../../development.md#dependencies-and-lock-files)).
+  `docker compose run --rm frontend-test npm ci` ([development.md](../../development.md#dependencies-and-lock-files)).
 
 ## Related Documents
 

@@ -21,3 +21,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 14 | [Finnish date field](features/date-field.md) | Done | FR-51 (new) |
 | 15 | [Free date range for totals](features/date-range-totals.md) | Done | FR-49 |
 | 16 | [PDF export](features/pdf-export.md) | Done | FR-48 |
+| 17 | [Test container isolation](features/test-isolation.md) | Done | NFR-1, NFR-4, NFR-12 for development commands |

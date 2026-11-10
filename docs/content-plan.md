@@ -120,6 +120,10 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The PDF export spec is Done (audited 2026-11-09): the weekly, monthly and
   comparison PDF files, the PDF links on the Yhteenveto and Vertailu pages and ADR 0005.
   The export, totals, budget, UI, API, architecture, security and glossary docs describe it.
+- The test container isolation spec is Done (audited 2026-11-10): the `backend-test` and
+  `frontend-test` services, `backend-e2e` without `.env`, and pytest's refusal next to real
+  data. The development, security and architecture docs, the UI README and AGENTS.md
+  describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.
