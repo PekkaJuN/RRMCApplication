@@ -2,6 +2,21 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-10: The guard read grep's -c as -C
+
+- **Context:** Spec change 1 of the agent guardrails stopped G1 from reading a search
+  pattern as a path. All unit rows passed; the first live check with the hooks on did not.
+- **Symptom:** `grep -c <pattern> docs/security.md` was blocked with G1 when the pattern was
+  the word `source`, and `grep -c x .env` was allowed.
+- **Root cause:** PowerShell's `-contains` and `-in` ignore case. The guard matched `-c`
+  (count) against `-C` (context, takes a value), so the pattern was taken as `-C`'s value and
+  the file as the pattern. `-F` and `-E` were matched as `-f` and `-e` the same way. The unit
+  rows used no option before the pattern.
+- **Solution:** grep and rg options are compared case-sensitively (`Test-ValueOption`,
+  `-cin`) in @.agents/guardrails/Guard.psm1, both for patterns and for search roots.
+- **Prevention:** compare Unix options with `-ccontains`/`-cin`/`-ceq`. Unit rows in
+  @scripts/guard-tests.ps1 now put `-c`, `-F`, `-E` and `-A` before the pattern.
+
 ## 2026-11-06: Moving inside the date calendar counted as a pick
 
 - **Context:** The date field keeps a hidden native date input as its calendar. An independent

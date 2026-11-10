@@ -94,6 +94,35 @@ function Get-PathWords([string[]]$Words) {
     return $result
 }
 
+# Separates a part's redirections from its other words. Targets are the files written to;
+# a stream (`2>&1`) or a null device (`/dev/null`, `$null`, `NUL`) is no target, and an
+# input redirection (`< file`) stays a plain word, because it only reads.
+function Split-Redirections([string[]]$Words) {
+    $plain = New-Object System.Collections.Generic.List[string]
+    $targets = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $Words.Count; $i++) {
+        $rest = $Words[$i]
+        while ($rest -match '^(?<pre>[^<>]*?)(?<fd>[0-9&*]?)(?<op>>>?|<)(?<post>.*)$') {
+            $pre = $Matches.pre; $op = $Matches.op; $post = $Matches.post
+            if ($pre -ne "") { $plain.Add($pre) }
+            $target = $post
+            $next = ""
+            if ($target -match '^(?<t>[^<>]*)(?<more>[0-9&*]?(>>?|<).*)$') {
+                $target = $Matches.t; $next = $Matches.more
+            }
+            if ($target -eq "" -and $next -eq "" -and $i + 1 -lt $Words.Count) { $i++; $target = $Words[$i] }
+            if ($op -eq "<") { if ($target -ne "") { $plain.Add($target) } }
+            elseif ($target -ne "" -and $target -notmatch '^&\d*-?$' -and
+                    $target -notmatch '^(?i)(/dev/null|\$null|nul)$') {
+                $targets.Add($target)
+            }
+            $rest = $next
+        }
+        if ($rest -ne "") { $plain.Add($rest) }
+    }
+    return @{ Words = @($plain); Targets = @($targets) }
+}
+
 function Get-CommandName([string[]]$Words) {
     if ($Words.Count -eq 0) { return "" }
     $name = ($Words[0] -replace '\\', '/').Split('/')[-1]
@@ -114,6 +143,13 @@ $script:SearchValueOptions = @{
     "select-string" = @("-pattern", "-include", "-exclude", "-encoding", "-context")
     "sls" = @("-pattern", "-include", "-exclude", "-encoding", "-context")
     "tree" = @()
+}
+
+# grep and rg options are case-sensitive (`-c` counts, `-C` takes a value); PowerShell
+# parameters are not.
+function Test-ValueOption([string]$Command, [string[]]$Options, [string]$Word) {
+    if ($Command -in @("grep", "egrep", "fgrep", "rg")) { return $Options -ccontains $Word }
+    return $Options -contains $Word
 }
 
 function Test-RecursiveFlag([string]$Command, [string[]]$Arguments) {
@@ -138,8 +174,8 @@ function Get-SearchRoots([string]$Command, [string[]]$Arguments) {
             if ($i + 1 -lt $Arguments.Count) { $roots.Add($Arguments[$i + 1]); $i++ }
             continue
         }
-        if ($valueOptions -contains $word.ToLowerInvariant()) {
-            if ($word -in @("-e", "-f") -or $word -ieq "-pattern") { $patternSeen = $true }
+        if (Test-ValueOption $Command $valueOptions $word) {
+            if ($word -cin @("-e", "-f") -or $word -ieq "-pattern") { $patternSeen = $true }
             $i++
             continue
         }
@@ -166,13 +202,48 @@ function Test-RootSearch([string]$Command, [string[]]$Arguments, [string]$Projec
     return $false
 }
 
+# The indexes of a search command's arguments that are patterns, not files. A pattern file
+# (`-f`, `--file`) and the files searched are not patterns, so they are still checked.
+function Get-PatternIndexes([string]$Command, [string[]]$Arguments) {
+    $indexes = New-Object System.Collections.Generic.List[int]
+    $isGrep = $Command -in @("grep", "egrep", "fgrep", "rg")
+    $isSls = $Command -in @("select-string", "sls")
+    if (-not ($isGrep -or $isSls)) { return @() }
+    $patternSeen = $false
+    $optionsEnd = $false
+    $valueOptions = if ($isGrep) { @($script:SearchValueOptions["grep"]) + @($script:SearchValueOptions["rg"]) + @("--file") }
+        else { @($script:SearchValueOptions["select-string"]) + @("-path", "-literalpath") }
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        $word = $Arguments[$i]
+        $lower = $word.ToLowerInvariant()
+        if (-not $optionsEnd) {
+            if ($isGrep -and $word -eq "--") { $optionsEnd = $true; continue }
+            if (($isGrep -and $word -cin @("-e", "--regexp")) -or ($isSls -and $lower -eq "-pattern")) {
+                if ($i + 1 -lt $Arguments.Count) { $indexes.Add($i + 1) }
+                $patternSeen = $true; $i++; continue
+            }
+            if (($isGrep -and $word -match '^--regexp=') -or ($isSls -and $lower -match '^-pattern:')) {
+                $indexes.Add($i); $patternSeen = $true; continue
+            }
+            if ($isGrep -and $word -cin @("-f", "--file")) { $patternSeen = $true; $i++; continue }
+            if (Test-ValueOption $Command $valueOptions $(if ($isGrep) { $word } else { $lower })) { $i++; continue }
+            if ($word.StartsWith("-")) { continue }
+        }
+        if (-not $patternSeen) { $indexes.Add($i); $patternSeen = $true }
+    }
+    return @($indexes)
+}
+
 function Test-ShellProtectedData([string[]]$Parts, [string]$ProjectRoot) {
     foreach ($part in $Parts) {
         $words = @(Split-ShellWords $part)
         if ($words.Count -eq 0) { continue }
         $command = Get-CommandName $words
         $arguments = @($words | Select-Object -Skip 1)
-        $candidates = if ($command -in @("source", ".")) { @(Get-PathWords $arguments) } else { @(Get-PathWords $words) }
+        $patterns = @(Get-PatternIndexes $command $arguments)
+        $files = @(for ($i = 0; $i -lt $arguments.Count; $i++) { if ($patterns -notcontains $i) { $arguments[$i] } })
+        $candidates = if ($command -in @("source", ".")) { @(Get-PathWords $arguments) }
+            else { @(Get-PathWords (@($words[0]) + $files)) }
         foreach ($word in $candidates) {
             if (Test-ProtectedPath (ConvertTo-GuardPath $word $ProjectRoot)) { return $true }
         }
@@ -373,9 +444,7 @@ function Test-GuardConfigPath([string]$Path) {
 # A part that names guard config may only read it, list it, stage it or run a script in it.
 function Test-ReadOnlyPart([string[]]$Words) {
     $command = Get-CommandName $Words
-    if ($script:ReadCommands -contains $command) {
-        return -not ($Words | Where-Object { $_ -match '[<>]' })
-    }
+    if ($script:ReadCommands -contains $command) { return $true }
     $git = Get-GitCall $Words
     if ($null -ne $git) { return $script:ReadGitCommands -contains $git.Subcommand }
     if ($command -in @("powershell", "pwsh")) {
@@ -393,7 +462,11 @@ function Test-GuardConfigWrite($Call, [string]$ProjectRoot) {
     }
     if ($Call.Kind -ne "shell") { return $false }
     foreach ($part in @(Split-ShellParts $Call.Command)) {
-        $words = @(Split-ShellWords $part)
+        $split = Split-Redirections @(Split-ShellWords $part)
+        foreach ($target in $split.Targets) {
+            if (Test-GuardConfigPath (ConvertTo-GuardPath $target $ProjectRoot)) { return $true }
+        }
+        $words = @($split.Words)
         $named = $false
         foreach ($word in @(Get-PathWords $words)) {
             if (Test-GuardConfigPath (ConvertTo-GuardPath $word $ProjectRoot)) { $named = $true }

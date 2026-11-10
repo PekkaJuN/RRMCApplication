@@ -1,7 +1,7 @@
 # Security
 
 - **Status:** Done
-- **Updated:** 2026-11-04
+- **Updated:** 2026-11-10
 
 ## Overview
 
@@ -130,9 +130,11 @@ Known limits of the guardrails:
 - **Codex exit codes.** The Codex docs do not name the exit code field of a shell result. The
   guard reads `exit_code`, `exitCode` or an `Exit code: N` line; otherwise Codex check runs do
   not count for G5, G6 and G8.
-- **False positives.** A search pattern such as `.env` or `source` is read as a path (G1); a
-  redirection such as `2>/dev/null` next to a guard path counts as a write (G4). The agent
-  stops and asks; the user may run the command.
+- **False positives.** A search pattern (`grep`, `rg`, `Select-String`) and a redirection
+  to a stream, a null device or another file are not read as a path. A guard path in the
+  text of any command that is not a read, such as a heredoc body, still counts as a write
+  (G4), so that a script given on the command line cannot write guard config; edit such
+  files with the file tools. The agent stops and asks; the user may run the command.
 - **Not covered:** a WSL2 sandbox for Claude Code (left out on 2026-11-10; see the ADR).
 
 ## Known limits

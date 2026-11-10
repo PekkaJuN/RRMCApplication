@@ -7,6 +7,12 @@
   sandbox out, and will check the Codex ACs by hand. Specify approved by the user; Plan added.
   The Plan added AC25 and changed AC7 ([P7](#p7-spec-changes)); the user approved them and
   the Plan. Tasks added and approved by the user; implementation started.
+  Audit finding 1: the user asked to narrow G4 for redirections and G1 for search patterns;
+  AC26, AC27 and tasks T15–T17 added ([Spec change 1](#spec-change-1-fewer-false-positives))
+  and approved by the user; T15 and T16 done. The live check of T17 found that grep's `-c`,
+  `-F` and `-E` were matched as `-C`, `-f` and `-e` (case-insensitive); fixed with unit rows
+  ([learnings](../../docs/learnings.md)). T17 done: with the hooks on, all 341 guard tests
+  pass and the formerly blocked commands run live.
 - **Depends on:** [Test container isolation](test-isolation.md)
 - **Implements:** NFR-1, NFR-4 and the Guardrails of [AGENTS.md](../../AGENTS.md#guardrails)
   for AI coding agents; the user's decision of 2026-11-10 to let agents run on their own from
@@ -292,6 +298,29 @@ agent asks for approval between tasks or before the audit.
 `Get-ChildItem -Recurse docs` run. (The file search tools, which skip ignored files, are not
 affected.)
 
+### AC26: A redirection away from guard config is not a write
+**Given** the guardrails are on
+**When** the agent runs `ls .agents/guardrails 2>/dev/null`,
+`Get-Content .codex/config.toml 2>$null`, `cat .claude/settings.json 2>&1`,
+`ls .agents/guardrails >NUL` or `Get-ChildItem .codex 2>&1 | Out-Null`
+**Then** each call runs.
+**When** the agent runs `echo x > .agents/guardrails/a.txt`, `cat x 2> .codex/err.txt`,
+`Get-Content x >> .claude/settings.json`, `ls 1>.codex/list.txt` or
+`echo x 2>/dev/null > .agents/guardrails/a.txt`
+**Then** each call is blocked with `G4`: the target of a redirection is guard config.
+
+### AC27: A search pattern is not a path
+**Given** the guardrails are on
+**When** the agent runs `grep -n "\.env" AGENTS.md`, `grep -rn source docs`,
+`rg "\.env\.example" docs`, `grep -e .env -e source backend/app/settings.py` or
+`Select-String -Path docs/*.md -Pattern "source/"`
+**Then** each call runs: the pattern is not read as a path.
+**When** the agent runs `grep x .env`, `grep -f .env x.txt`, `grep -e foo .env`,
+`rg -e x source/import`, `Select-String -Path .env -Pattern x` or
+`Select-String -Pattern x -Path source/import/a.txt`
+**Then** each call is blocked with `G1`: the files searched, and a pattern file given with
+`-f`, are still checked.
+
 ### AC24: Codex runs in its sandbox
 **Given** the project's Codex configuration and a trusted project
 **When** Codex starts in the repository on this computer
@@ -344,6 +373,8 @@ allow, block with an ID, or a reminder.
 | AC3 | decision | data paths | each AC3 path and command | decide | block G1 | none |
 | AC4 | decision | compound | the two AC4 commands | decide | block G1 | none |
 | AC25 | decision | recursive search | each AC25 command from the root; from `backend` and `docs` | decide | block G1; allow | none |
+| AC26 | decision | redirections | each allowed and each blocked AC26 command | decide | allow; block G4 | none |
+| AC27 | decision | search patterns | each allowed and each blocked AC27 command | decide | allow; block G1 | none |
 | AC5 | decision | app services | each AC5 command | decide | block G2 | none |
 | AC6 | decision | test services | each AC6 command | decide | allow | none |
 | AC7 | decision | app ports | each AC7 call; port 18000 | decide | block G2; allow | none |
@@ -624,6 +655,33 @@ still change the guard.
   ADR 0006, content-plan.md and `specs/README.md`.
 - [x] **T14 Checks and audit.** Guard tests, container tests (no change expected), and the
   `review-audit` skill, which lists the branch's recorded test edits (AC16).
+
+### Spec change 1: fewer false positives
+Audit finding 1, items 1 and 3 of the Progress findings. Item 2 (a command whose text names
+a guard path, such as a heredoc) stays as it is on purpose: reading the heredoc body is what
+stops `python - <<EOF` scripts from writing guard config. Files and specs are edited with the
+file tools instead.
+
+- **G4 (P2, changed):** in a shell part that names guard config, a redirection is a write
+  only when its target is guard config. A redirection to `/dev/null`, `$null`, `NUL` or
+  another stream (`2>&1`), and one whose target is not guard config, does not make a read
+  command a write. The words of a redirection target are not counted as "naming" guard config
+  for the read check; a target that is guard config blocks whatever the command is.
+- **G1 (P2, changed):** for `grep`, `egrep`, `fgrep`, `rg`, `Select-String` and `sls`, the
+  search pattern is not checked as a path: the first word that is not an option (unless a
+  pattern was given with `-e` or `--regexp`), the values of `-e`, `--regexp` and `-Pattern`.
+  The files searched, `-Path` and `-LiteralPath` values, and the value of `-f` / `--file`
+  (a file of patterns) are checked as before.
+- **Files to Modify:** `Guard.psm1`, `scripts/guard-tests.ps1`, `docs/security.md` (False
+  positives), this spec. The hooks' `PreToolUse` and the G4 deny rules for these two files are
+  off while the change is made; the user restores them with `git restore .claude/settings.json`.
+
+- [x] **T15 Redirections (AC26).** Unit rows for each AC26 command, then the G4 change.
+- [x] **T16 Search patterns (AC27).** Unit rows for each AC27 command, then the G1 change.
+  All earlier G1 rows (AC1–AC4, AC25) stay green.
+- [x] **T17 Docs and check.** security.md "False positives" names what is left (a guard path
+  in a non-read command's text, heredoc bodies). Guard tests pass. Then the user restores
+  `.claude/settings.json`, and the guard tests are run once more with the hooks on.
 
 ## Progress
 

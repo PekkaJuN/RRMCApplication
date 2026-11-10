@@ -90,6 +90,24 @@ foreach ($c in @("grep -r x backend", "Get-ChildItem -Recurse docs", "find backe
         "grep -rn x docs specs", "rg x", "Get-ChildItem -Recurse -Path frontend/src -Filter *.tsx")) {
     Assert-Shell $c ""
 }
+# AC27: a search pattern is not a path; the files searched and a pattern file still are.
+foreach ($c in @('grep -n "\.env" AGENTS.md', "grep -rn source docs", 'rg "\.env\.example" docs',
+        "grep -e .env -e source backend/app/settings.py",
+        'Select-String -Path docs/*.md -Pattern "source/"')) {
+    Assert-Shell $c ""
+}
+foreach ($c in @("grep x .env", "grep -f .env x.txt", "grep -e foo .env", "rg -e x source/import",
+        "Select-String -Path .env -Pattern x", "Select-String -Pattern x -Path source/import/a.txt")) {
+    Assert-Shell $c "G1"
+}
+# grep and rg options are case-sensitive: -c is not -C, -F is not -f, -E is not -e.
+foreach ($c in @("grep -c source docs/security.md", "grep -F source docs/a.md", 'grep -E "\.env" AGENTS.md',
+        "grep -A 2 source docs/a.md", "grep -rc x docs", "grep -rF x docs")) {
+    Assert-Shell $c ""
+}
+foreach ($c in @("grep -c x .env", "grep -F x source/a.txt", "grep -rc x .", "grep -rE x")) {
+    Assert-Shell $c "G1"
+}
 
 # --- G2 app services (AC5-AC7) -----------------------------------------------------------
 foreach ($c in @("docker compose up", "docker compose up -d backend", "docker compose up --build",
@@ -177,8 +195,19 @@ foreach ($c in @("cat .claude/settings.json", "Get-Content .codex/config.toml", 
         "Select-String -Path .agents/guardrails/Guard.psm1 -Pattern G4")) {
     Assert-Shell $c ""
 }
+# AC26: a redirection is a write only when its target is guard config.
+foreach ($c in @("ls .agents/guardrails 2>/dev/null", 'Get-Content .codex/config.toml 2>$null',
+        "cat .claude/settings.json 2>&1", "ls .agents/guardrails >NUL",
+        "Get-ChildItem .codex 2>&1 | Out-Null")) {
+    Assert-Shell $c ""
+}
+foreach ($c in @("echo x > .agents/guardrails/a.txt", "cat x 2> .codex/err.txt",
+        "Get-Content x >> .claude/settings.json", "ls 1>.codex/list.txt",
+        "echo x 2>/dev/null > .agents/guardrails/a.txt")) {
+    Assert-Shell $c "G4"
+}
 
-# --- G5 and G6 counters (AC11-AC14) ------------------------------------------------------
+# --- G5 and G6 counters (AC11-AC14)------------------------------------------------------
 $BackendTests = "docker compose run --rm backend-test pytest"
 $Now = [datetime]::new(2026, 11, 10, 12, 0, 0, [DateTimeKind]::Utc)
 
