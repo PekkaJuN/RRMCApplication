@@ -1,0 +1,34 @@
+# Agent guardrails for Codex (specs/features/agent-guardrails.md, PC1 and PC13).
+# Codex loads this file, hooks.json and rules/ only after the user marks the project as
+# trusted, and runs each hook only after it is reviewed in /hooks (docs/development.md).
+# Only the user changes these files (guardrail G4).
+
+approval_policy = "on-request"
+default_permissions = "rrmc-guarded"
+
+[features]
+hooks = true
+
+[windows]
+sandbox = "elevated"
+
+# Workspace write access; protected data is denied at the file-system level, and the guard
+# configuration is read-only. The hook (hooks.json) checks the same paths for each call.
+[permissions.rrmc-guarded]
+description = "Workspace write; receipt data and settings denied; guard configuration read-only"
+extends = ":workspace"
+
+[permissions.rrmc-guarded.filesystem.":workspace_roots"]
+"." = "write"
+".env" = "deny"
+".env.local" = "deny"
+".env.production" = "deny"
+"source/**" = "deny"
+"**/*.db" = "deny"
+"**/*.sqlite" = "deny"
+"**/*.sqlite3" = "deny"
+"**/service_account*.json" = "deny"
+".codex/**" = "read"
+".agents/guardrails/**" = "read"
+".claude/settings.json" = "read"
+"scripts/guard-tests.ps1" = "read"

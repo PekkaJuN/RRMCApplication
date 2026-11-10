@@ -1,0 +1,100 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/.env)",
+      "Edit(/.env)",
+      "Read(/source/**)",
+      "Edit(/source/**)",
+      "Read(**/*.db)",
+      "Edit(**/*.db)",
+      "Read(**/*.sqlite)",
+      "Edit(**/*.sqlite)",
+      "Read(**/*.sqlite3)",
+      "Edit(**/*.sqlite3)",
+      "Read(**/service_account*.json)",
+      "Edit(**/service_account*.json)",
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/settings.local.json)",
+      "Edit(/.claude/hooks/**)",
+      "Edit(/.codex/**)",
+        "Edit(/.agents/guardrails/**)",
+        "Edit(/scripts/guard-tests.ps1)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(docker compose down -v:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(docker system prune:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git reset --hard:*)",
+      "PowerShell(docker compose down -v:*)",
+      "PowerShell(docker volume rm:*)",
+      "PowerShell(docker system prune:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.agents/guardrails/hook.ps1", "-Tool", "claude", "-Event", "PreToolUse"],
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.agents/guardrails/hook.ps1", "-Tool", "claude", "-Event", "PostToolUse"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.agents/guardrails/hook.ps1", "-Tool", "claude", "-Event", "PostToolUseFailure"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.agents/guardrails/hook.ps1", "-Tool", "claude", "-Event", "UserPromptSubmit"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.agents/guardrails/hook.ps1", "-Tool", "claude", "-Event", "Stop"],
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

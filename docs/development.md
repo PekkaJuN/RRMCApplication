@@ -50,6 +50,38 @@ Open the UI at <http://127.0.0.1:5173>. The status line under the heading tells 
 the database, the image folders, Tesseract and the model are available. The backend API is
 at <http://127.0.0.1:8000/api/health>.
 
+### Agent guardrails
+
+AI coding agents work in this repository under the guardrails G1–G8 of
+[AGENTS.md](../AGENTS.md#guardrails). What they block and what they do not is in
+[security.md](security.md#agent-guardrails). They need nothing beyond the prerequisites above:
+the guard is Windows PowerShell 5.1 (@.agents/guardrails/hook.ps1).
+
+**Claude Code** reads @.claude/settings.json (deny rules and hooks). Accept the workspace
+trust dialog when Claude Code first opens the project; hooks do not run before that. To see
+that they are on, run `/hooks` in Claude Code: `PreToolUse`, `PostToolUse`,
+`PostToolUseFailure`, `UserPromptSubmit` and `Stop` call `hook.ps1 -Tool claude`. A blocked
+call shows `Blocked by guardrail G<n>: ...`.
+
+**Codex** reads @.codex/config.toml (Windows sandbox, permission profile), @.codex/hooks.json
+and @.codex/rules/guardrails.rules only when the project is trusted:
+
+1. Start Codex in the project root and mark the project as trusted when asked (or set
+   `trust_level = "trusted"` for the project in your own `~/.codex/config.toml`).
+2. Run `/hooks` and review and trust the four hooks. Codex skips a hook until it is trusted,
+   and again after it changes.
+3. Check that the status shows the Windows sandbox in elevated mode, and test the rules with
+   `codex execpolicy check --rules .codex/rules/guardrails.rules git push`.
+
+**Changing the guard.** G4 blocks agents from changing these files. To change them, edit
+them yourself, or turn the hooks off for that change (Claude Code: take the `hooks` and the
+G4 `Edit(...)` deny rules out of @.claude/settings.json yourself; Codex: disable the hooks in
+`/hooks`), let the agent make the change with the guard tests, and put them back.
+
+The guard keeps its state per session in `.agents/guardrails/state/` (ignored by Git). The
+file `test-edits.log` there lists test files edited after a red check run (G7); the audit
+reads it.
+
 ## Running the app
 
 | Task | Command |
@@ -109,6 +141,7 @@ none of them reads `.env`. All were run on 2026-11-10 with the result shown.
 | Frontend type check | `docker compose run --rm frontend-test npm run typecheck` | verified |
 | E2E tests | `docker compose --profile e2e run --rm e2e` | verified |
 | Container tests | `powershell -ExecutionPolicy Bypass -File scripts/container-tests.ps1` | verified |
+| Guard tests | `powershell -ExecutionPolicy Bypass -File scripts/guard-tests.ps1` | verified |
 
 Before declaring work done, run the tests, lint, format check and type check for every part
 you changed.
