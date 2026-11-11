@@ -2,6 +2,19 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-11: The frontend format check failed on untouched files
+
+- **Context:** The checks of the comparison CSV export on a Windows checkout.
+- **Symptom:** `npm run format:check` reported almost every frontend file, also files the
+  change did not touch, while lint, types and tests passed.
+- **Root cause:** `core.autocrlf=true` gives the working tree CRLF line endings while the
+  repository stores LF. Prettier's default `endOfLine` is `lf`, so it reported each CRLF
+  file.
+- **Solution:** `"endOfLine": "auto"` in @frontend/.prettierrc: Prettier keeps the line
+  ending a file already has, so the check reads the style, not the checkout's line endings.
+- **Prevention:** run the plain `format:check`; if it fails on many untouched files again,
+  check the setting first.
+
 ## 2026-11-10: `test -f` on a guard path was blocked as a write
 
 - **Context:** The branch audit of the agent guardrails checked whether a test-edit log
