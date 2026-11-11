@@ -464,8 +464,8 @@ included, in purchase date order, then import order, then position:
 
 ```text
 Päivä;Viikko;Kuukausi;Kauppa;Tuote;Summa;Ryhmä;Kategoria;Pantinpalautus;Kuitin tila
-2026-10-06;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu
-2026-10-06;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu
+06.10.2026;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu
+06.10.2026;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu
 ```
 
 The totals file is in long format: one row per week or month column (`by`) and category
@@ -475,8 +475,8 @@ lines):
 
 ```text
 Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
-2026-W40;2026-10-01;2026-10-04;kyllä;Ruoka;Maitotuotteet;1,25
-2026-W41;2026-10-05;2026-10-11;ei;;Juomat;2,50
+2026-W40;01.10.2026;04.10.2026;kyllä;Ruoka;Maitotuotteet;1,25
+2026-W41;05.10.2026;11.10.2026;ei;;Juomat;2,50
 ```
 
 The comparison file lists the budget comparison of the Vertailu page (reviewed receipts

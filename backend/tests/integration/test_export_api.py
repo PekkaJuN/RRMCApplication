@@ -125,11 +125,11 @@ def test_ac1_lines_file_of_a_month(api: TestClient, db: sqlite3.Connection) -> N
     assert response.status_code == 200
     assert text(response) == (
         f"{LINES_HEADER}\n"
-        "2026-10-02;2026-W40;2026-10;Testikauppa;Maito;1,25;Ruoka;Maitotuotteet;ei;Tarkistamaton\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Limu;2,50;;Juomat;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Tuntematon;1,99;;;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu\n"
+        "02.10.2026;2026-W40;2026-10;Testikauppa;Maito;1,25;Ruoka;Maitotuotteet;ei;Tarkistamaton\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Limu;2,50;;Juomat;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Tuntematon;1,99;;;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu\n"
     )
 
 
@@ -141,10 +141,10 @@ def test_ac2_weekly_totals_file_of_a_month(api: TestClient, db: sqlite3.Connecti
     assert response.status_code == 200
     assert text(response) == (
         f"{TOTALS_HEADER}\n"
-        "2026-W40;2026-10-01;2026-10-04;kyllä;Ruoka;Maitotuotteet;1,25\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;Ruoka;Leivät;3,00\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;;Juomat;2,50\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;;Ei kategoriaa;1,99\n"
+        "2026-W40;01.10.2026;04.10.2026;kyllä;Ruoka;Maitotuotteet;1,25\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;Ruoka;Leivät;3,00\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;;Juomat;2,50\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;;Ei kategoriaa;1,99\n"
     )
 
 
@@ -156,10 +156,10 @@ def test_ac16_monthly_totals_file_of_a_month(api: TestClient, db: sqlite3.Connec
     assert response.status_code == 200
     assert text(response) == (
         f"{TOTALS_HEADER}\n"
-        "2026-10;2026-10-01;2026-10-31;ei;Ruoka;Leivät;3,00\n"
-        "2026-10;2026-10-01;2026-10-31;ei;Ruoka;Maitotuotteet;1,25\n"
-        "2026-10;2026-10-01;2026-10-31;ei;;Juomat;2,50\n"
-        "2026-10;2026-10-01;2026-10-31;ei;;Ei kategoriaa;1,99\n"
+        "2026-10;01.10.2026;31.10.2026;ei;Ruoka;Leivät;3,00\n"
+        "2026-10;01.10.2026;31.10.2026;ei;Ruoka;Maitotuotteet;1,25\n"
+        "2026-10;01.10.2026;31.10.2026;ei;;Juomat;2,50\n"
+        "2026-10;01.10.2026;31.10.2026;ei;;Ei kategoriaa;1,99\n"
     )
 
 
@@ -196,23 +196,23 @@ def test_ac4_week_period_with_partial_months(api: TestClient, db: sqlite3.Connec
     week_40 = "unit=week&from=2026-W40&to=2026-W40"
 
     assert rows(totals_file(api, week_40, "week")) == [
-        ["2026-W40", "2026-09-28", "2026-10-04", "ei", "Ruoka", "Leivät", "3,00"]
+        ["2026-W40", "28.09.2026", "04.10.2026", "ei", "Ruoka", "Leivät", "3,00"]
     ]
     assert rows(totals_file(api, week_40, "month")) == [
-        ["2026-09", "2026-09-28", "2026-09-30", "kyllä", "Ruoka", "Leivät", "1,00"],
-        ["2026-10", "2026-10-01", "2026-10-04", "kyllä", "Ruoka", "Leivät", "2,00"],
+        ["2026-09", "28.09.2026", "30.09.2026", "kyllä", "Ruoka", "Leivät", "1,00"],
+        ["2026-10", "01.10.2026", "04.10.2026", "kyllä", "Ruoka", "Leivät", "2,00"],
     ]
-    assert [row[0] for row in rows(lines_file(api, week_40))] == ["2026-09-30", "2026-10-01"]
+    assert [row[0] for row in rows(lines_file(api, week_40))] == ["30.09.2026", "01.10.2026"]
 
 
 def test_ac5_a_category_summing_to_zero(api: TestClient, db: sqlite3.Connection) -> None:
     add_receipt(db, "2026-10-05", [("Ruisleipä", 300, "Leivät"), ("Hyvitys", -300, "Leivät")])
 
     assert rows(totals_file(api, OCTOBER, "week")) == [
-        ["2026-W41", "2026-10-05", "2026-10-11", "ei", "Ruoka", "Leivät", "0,00"]
+        ["2026-W41", "05.10.2026", "11.10.2026", "ei", "Ruoka", "Leivät", "0,00"]
     ]
     assert rows(totals_file(api, OCTOBER, "month")) == [
-        ["2026-10", "2026-10-01", "2026-10-31", "ei", "Ruoka", "Leivät", "0,00"]
+        ["2026-10", "01.10.2026", "31.10.2026", "ei", "Ruoka", "Leivät", "0,00"]
     ]
 
 
@@ -404,7 +404,7 @@ def test_date_range_ac10_lines_file(api: TestClient, db: sqlite3.Connection) -> 
         response.headers["Content-Disposition"]
         == 'attachment; filename="kuittirivit_2026-10-15_2026-11-14.csv"'
     )
-    assert [row[0] for row in rows(response)] == ["2026-10-15", "2026-11-14"]
+    assert [row[0] for row in rows(response)] == ["15.10.2026", "14.11.2026"]
 
 
 def test_date_range_ac11_totals_files(api: TestClient, db: sqlite3.Connection) -> None:
@@ -423,8 +423,8 @@ def test_date_range_ac11_totals_files(api: TestClient, db: sqlite3.Connection) -
     )
     assert rows(weeks)[-1] == [
         "2026-W46",
-        "2026-11-09",
-        "2026-11-14",
+        "09.11.2026",
+        "14.11.2026",
         "kyllä",
         "Ruoka",
         "Leivät",
@@ -432,8 +432,8 @@ def test_date_range_ac11_totals_files(api: TestClient, db: sqlite3.Connection) -
     ]
     assert rows(months)[-1] == [
         "2026-11",
-        "2026-11-01",
-        "2026-11-14",
+        "01.11.2026",
+        "14.11.2026",
         "kyllä",
         "Ruoka",
         "Leivät",
@@ -467,3 +467,25 @@ def test_date_range_ac12_a_file_cannot_be_by_range(api: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json() == INVALID_REQUEST
+
+
+def test_finnish_dates_ac4_a_range_over_the_year_change(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    add_receipt(db, "2026-12-28", [("Ruisleipä", 100, "Leivät")])
+    add_receipt(db, "2027-01-03", [("Ruisleipä", 200, "Leivät")])
+    year_change = "unit=range&from=2026-12-28&to=2027-01-03"
+
+    weeks = totals_file(api, year_change, "week")
+    lines = lines_file(api, year_change)
+
+    assert rows(weeks) == [
+        ["2026-W53", "28.12.2026", "03.01.2027", "ei", "Ruoka", "Leivät", "3,00"]
+    ]
+    assert [row[0] for row in rows(lines)] == ["28.12.2026", "03.01.2027"]
+    assert weeks.headers["Content-Disposition"] == (
+        'attachment; filename="summat_viikot_2026-12-28_2027-01-03.csv"'
+    )
+    assert lines.headers["Content-Disposition"] == (
+        'attachment; filename="kuittirivit_2026-12-28_2027-01-03.csv"'
+    )

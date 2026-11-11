@@ -307,7 +307,7 @@ test("date range AC14, AC20: totals and export of a date range", async ({ page }
   const weeks = await download(page, "Vie viikkosummat (CSV)");
   expect(weeks.name).toBe("summat_viikot_2026-10-03_2026-10-07.csv");
   expect(weeks.text.startsWith(TOTALS_HEADER)).toBe(true);
-  expect(weeks.text).toContain("2026-W41;2026-10-05;2026-10-07;kyllä;");
+  expect(weeks.text).toContain("2026-W41;05.10.2026;07.10.2026;kyllä;");
 });
 
 test("export AC1, AC2, AC16, AC13: download the CSV files of a month", async ({ page }) => {
@@ -331,10 +331,10 @@ test("export AC1, AC2, AC16, AC13: download the CSV files of a month", async ({ 
   expect(months.name).toBe("summat_kuukaudet_2026-10_2026-10.csv");
   expect(lines.name).toBe("kuittirivit_2026-10_2026-10.csv");
   expect(weeks.text.startsWith(TOTALS_HEADER)).toBe(true);
-  expect(weeks.text).toContain("\r\n2026-W41;2026-10-05;2026-10-11;ei;");
+  expect(weeks.text).toContain("\r\n2026-W41;05.10.2026;11.10.2026;ei;");
   expect(weeks.text).not.toContain("\r\n2026-10;");
   expect(months.text.startsWith(TOTALS_HEADER)).toBe(true);
-  expect(months.text).toContain("\r\n2026-10;2026-10-01;2026-10-31;ei;");
+  expect(months.text).toContain("\r\n2026-10;01.10.2026;31.10.2026;ei;");
   expect(months.text).not.toContain("2026-W");
   expect(lines.text).toContain(";Maito;1,25;");
   expect(lines.text).toContain(";Limu;2,24;");
