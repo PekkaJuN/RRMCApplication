@@ -378,3 +378,69 @@ it("PDF export AC21: opening the week table does not change the link", async () 
 
   expect(pdfLink()?.getAttribute("href")).toBe(before);
 });
+
+// Comparison CSV export (comparison CSV export spec PC9).
+
+const csvLink = () => screen.queryByRole("link", { name: "Vie vertailu (CSV)" });
+const weeksBox = () => screen.getByRole("checkbox", { name: "Viikot mukaan" });
+
+it("comparison CSV AC13: the link and the unchecked box of the shown period", async () => {
+  window.history.replaceState(null, "", "/vertailu?month=2026-10&period=mid");
+  answerComparison();
+  render(<ComparisonPage />);
+
+  await screen.findByRole("table", { name: "Kuukausi" });
+  const link = csvLink();
+  expect(link).toHaveAttribute("href", "/api/export/comparison?month=2026-10&period=mid");
+  expect(link).toHaveAttribute("download", "");
+  expect(weeksBox()).not.toBeChecked();
+  expect(pdfLink()).toHaveAttribute("href", "/api/export/comparison/pdf?month=2026-10&period=mid");
+});
+
+it("comparison CSV AC14: the box adds and removes the weeks", async () => {
+  window.history.replaceState(null, "", "/vertailu?month=2026-10&period=mid");
+  answerComparison();
+  const user = userEvent.setup();
+  render(<ComparisonPage />);
+  await screen.findByRole("table", { name: "Kuukausi" });
+
+  await user.click(weeksBox());
+
+  expect(weeksBox()).toBeChecked();
+  expect(csvLink()).toHaveAttribute(
+    "href",
+    "/api/export/comparison?month=2026-10&period=mid&weeks=true",
+  );
+
+  await user.click(weeksBox());
+
+  expect(csvLink()).toHaveAttribute("href", "/api/export/comparison?month=2026-10&period=mid");
+});
+
+it("comparison CSV AC15: the link keeps the shown period until the new answer", async () => {
+  window.history.replaceState(null, "", "/vertailu?month=2026-10");
+  answerComparison();
+  render(<ComparisonPage />);
+  await screen.findByRole("table", { name: "Kuukausi" });
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  server.use(
+    http.get("/api/budget/comparison", async () => {
+      await gate;
+      return HttpResponse.json({ ...OCTOBER_COMPARISON, month: "2026-11" });
+    }),
+  );
+
+  changeMonth("2026-11");
+
+  expect(csvLink()).toHaveAttribute("href", "/api/export/comparison?month=2026-10&period=calendar");
+  release();
+  await vi.waitFor(() =>
+    expect(csvLink()).toHaveAttribute(
+      "href",
+      "/api/export/comparison?month=2026-11&period=calendar",
+    ),
+  );
+});

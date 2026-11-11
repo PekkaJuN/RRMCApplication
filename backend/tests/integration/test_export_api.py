@@ -12,6 +12,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
+from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
 from app.calculation.period_totals import PeriodTotals
 from app.categorization.names import normalize_key
@@ -321,6 +322,9 @@ class FixedExporter:
     totals: list[tuple[PeriodTotals, Unit]] = field(
         default_factory=lambda: list[tuple[PeriodTotals, Unit]]()
     )
+    comparisons: list[tuple[Comparison, str, bool]] = field(
+        default_factory=lambda: list[tuple[Comparison, str, bool]]()
+    )
 
     def lines_file(self, period: Period, lines: Sequence[ExportLine]) -> ExportFile:
         self.lines.extend(lines)
@@ -329,6 +333,11 @@ class FixedExporter:
     def totals_file(self, totals: PeriodTotals, by: Unit) -> ExportFile:
         self.totals.append((totals, by))
         return ExportFile("summat.test", "application/x-test", b"totals")
+
+    # The comparison CSV export spec, P4.
+    def comparison_file(self, comparison: Comparison, kind: str, *, weeks: bool) -> ExportFile:
+        self.comparisons.append((comparison, kind, weeks))
+        return ExportFile("vertailu.test", "application/x-test", b"comparison")
 
 
 def test_ac12_exporter_interface(settings: Settings) -> None:

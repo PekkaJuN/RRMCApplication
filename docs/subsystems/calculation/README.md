@@ -82,6 +82,7 @@ by [budget](../budget/README.md).
 | `budget_rows(catalog, budgets)` | `list[BudgetRow(kind, id, name, amount_cents)]` | nothing |
 | `weekly_budget(amount_cents, period, weeks)` | `list[int]`, one amount per week | nothing |
 | `budget_comparison(period, lines, catalog, budgets)` | `Comparison(period, weeks, rows, total)` | nothing |
+| `WeekFigures.remaining_cents` | a week's budget minus its spending, as a row's `remaining_cents`; a property, so the API answer of a week keeps its two fields | nothing |
 
 - A **comparison period** is named by a month. With `kind` `None` or `calendar` it is that
   calendar month. With `mid` it runs from the 15th of that month to the 14th of the next, so

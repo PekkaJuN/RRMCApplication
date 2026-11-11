@@ -83,6 +83,17 @@ def create_export_router(
     ) -> Response:
         return _download(service.comparison_pdf(month, period))
 
+    # As the PDF route; a bad `weeks` is invalid_request after the period (comparison CSV
+    # export spec PC8).
+    @router.get("/comparison")
+    def get_comparison(
+        service: Annotated[ExportService, Depends(export_service)],
+        month: str | None = None,
+        period: str | None = None,
+        weeks: str | None = None,
+    ) -> Response:
+        return _download(service.comparison_file(month, period, weeks))
+
     return router
 
 

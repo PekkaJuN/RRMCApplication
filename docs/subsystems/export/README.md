@@ -8,17 +8,19 @@ Export serves the downloads of the Yhteenveto and Vertailu pages:
 
 - **CSV** (PRD FR-26, FR-27): the **lines file** of a period, and the **totals file** of a
   period by week or by month.
+- **Comparison CSV** (PRD FR-52): the budget comparison of the Vertailu page, for the whole
+  period and optionally its weeks.
 - **PDF** (PRD FR-48): the **weekly totals PDF** (A4 landscape), the **monthly totals PDF**
   (A4 portrait, stacked month blocks) and the **comparison PDF** (A4 portrait, the Vertailu
   month table).
 
 The CSV files are built through the `Exporter` interface and the PDF files through the
-`ReportExporter` interface, so a Google Sheets exporter (FR-28) or a CSV file of the
-comparison can be added later without changing the endpoints. Two small interfaces instead
+`ReportExporter` interface, so a Google Sheets exporter (FR-28) can be added later without
+changing the endpoints. Two small interfaces instead
 of one: a report file has no lines file, and the CSV totals file needs no counts.
 
 Export computes no sum itself. The totals files use the same `TotalsService` as
-`GET /api/totals`, and the comparison PDF the same `BudgetService.comparison` as
+`GET /api/totals`, and the comparison files the same `BudgetService.comparison` as
 `GET /api/budget/comparison`, so a file and its page always agree (PRD risk table). The
 lines file reads the period's lines with their store, review state, category and group
 names from storage.
@@ -26,8 +28,8 @@ names from storage.
 ## Key Files and Entry Points
 
 - @backend/app/export/routes.py — `create_export_router(settings, exporter,
-  report_exporter, clock)`: `GET /api/export/lines`, `/totals`, `/totals/pdf` and
-  `/comparison/pdf`, one connection per request; the answer is a download
+  report_exporter, clock)`: `GET /api/export/lines`, `/totals`, `/totals/pdf`,
+  `/comparison` and `/comparison/pdf`, one connection per request; the answer is a download
   (`Content-Disposition: attachment`, `Cache-Control: no-store`)
 - @backend/app/export/service.py — `ExportService`: checks the period, then `by`, then a
   PDF's length, reads in one transaction and calls the exporter
@@ -35,6 +37,8 @@ names from storage.
   `ExportFile`, `ExportLine`, `TotalsReport`, `ComparisonReport`
 - @backend/app/export/csv_exporter.py — `CsvExporter`: the CSV format of FR-26
 - @backend/app/export/rows.py — `long_rows(totals, by)`: the CSV totals file's rows
+- @backend/app/export/comparison_rows.py — `comparison_rows(comparison, weeks=...)`: the
+  comparison CSV file's rows
 - @backend/app/export/pdf_exporter.py — `PdfExporter`: the PDF files, with reportlab
   ([ADR 0005](../../adr/0005-pdf-library.md))
 - @backend/app/export/report.py — the PDF rows: every group expanded, the period block
@@ -53,8 +57,10 @@ The endpoints, their files and error codes are in the
 | `ExportService.totals_file(unit, first, last, by)` | Parses the period, checks that `by` is `week` or `month`, reads the totals and returns the exporter's totals file | `InvalidPeriodError`, then `AppError` `invalid_request` |
 | `ExportService.totals_pdf(unit, first, last, by)` | As `totals_file`, then checks the length; reads the totals and both counts as `TotalsService.totals` does | `InvalidPeriodError`, `invalid_request`, then `PeriodTooLongError` |
 | `ExportService.comparison_pdf(month, period)` | Reads `BudgetService.comparison` | `InvalidPeriodError` |
+| `ExportService.comparison_file(month, period, weeks)` | Reads `BudgetService.comparison`, then checks that `weeks` is missing, `false` or `true` | `InvalidPeriodError`, then `AppError` `invalid_request` |
 | `Exporter.lines_file(period, lines)` | Builds the lines file from `ExportLine` items | nothing |
 | `Exporter.totals_file(totals, by)` | Builds the totals file of the week columns (`by` `week`) or the month columns (`month`) | nothing |
+| `Exporter.comparison_file(comparison, kind, weeks=...)` | Builds the comparison CSV file of a `calendar` or `mid` period, with or without the weeks | nothing |
 | `ReportExporter.totals_report(report, by)` | Builds the weekly or monthly totals PDF | nothing |
 | `ReportExporter.comparison_report(report)` | Builds the comparison PDF | nothing |
 
@@ -78,7 +84,12 @@ clock.
    and columns without lines and group sums are not.
 4. `CsvExporter` writes the rows (format below) and names the file after the period's
    bounds.
-5. The request log holds method, path, status and duration only; the query string and the
+5. The comparison CSV file reads `BudgetService.comparison`, so it counts reviewed receipts
+   only, as the Vertailu page. `comparison_rows` lists the `Koko jakso` block, then with
+   `weeks` one block per week column in date order; each block has the budget rows in the
+   page's order and `Ei kategoriaa` when such lines exist. The total is not a row. A week's
+   `Jäljellä` is `WeekFigures.remaining_cents` from calculation.
+6. The request log holds method, path, status and duration only; the query string and the
    file name are never logged (@backend/app/logging_setup.py).
 
 ### CSV format
@@ -96,6 +107,18 @@ clock.
   `summat_kuukaudet_<from>_<to>.csv`. A date range gives
   `kuittirivit_2026-10-15_2026-11-14.csv`. `parse_period` has checked the bounds, so they
   hold only digits, `-` and `W`.
+
+### Comparison CSV file
+
+- Columns `Jakso;Alkaa;Päättyy;Osittainen;Tyyppi;Nimi;Budjetti;Toteutunut;Jäljellä`.
+  `Jakso` is `Koko jakso` or the week key (`2026-W40`); `Tyyppi` is `ryhmä`, or `kategoria`
+  for a category without a group and for `Ei kategoriaa`.
+- Dates are `dd.mm.yyyy` with leading zeros (`01.10.2026`), which Finnish Excel reads as a
+  date. Only this file: the lines and totals files keep `YYYY-MM-DD` (FR-26).
+- The other rules of the CSV format above apply: separator, BOM, amounts, quoting and the
+  formula guard on `Nimi`.
+- File names: `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, and with the weeks
+  `vertailu_viikot_<month>.csv`, `vertailu_viikot_15-14_<month>.csv`.
 
 ### PDF layout
 
@@ -129,7 +152,7 @@ clock.
   [calculation](../calculation/README.md) (the period, totals and comparison types),
   [storage](../storage/README.md) (`export_lines`); reportlab for the PDF files.
 - Used by: the [UI](../ui/README.md) Yhteenveto page's download links and the Vertailu
-  page's PDF link.
+  page's PDF and CSV links.
 
 ## Modules
 
@@ -152,5 +175,6 @@ None yet.
 
 - [CSV export spec](../../../specs/features/csv-export.md)
 - [PDF export spec](../../../specs/features/pdf-export.md)
+- [Comparison CSV export spec](../../../specs/features/comparison-csv-export.md)
 - [ADR 0005: PDF library](../../adr/0005-pdf-library.md)
 - [Architecture](../../architecture.md#component-map)

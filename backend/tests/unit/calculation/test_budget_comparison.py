@@ -207,3 +207,15 @@ def test_ac8_the_total_of_a_week_sums_budget_and_actual() -> None:
     assert total.weeks[0] == WeekFigures(5161 + 645, 5200)
     assert total.actual_cents == 5200
     assert total.remaining_cents == 39800
+
+
+# Week remaining (comparison CSV export spec P1, AC3, AC4)
+
+
+@pytest.mark.parametrize(
+    ("budget", "actual", "remaining"), [(5161, 12500, -7339), (645, 0, 645), (0, 199, -199)]
+)
+def test_comparison_csv_ac3_week_remaining_is_budget_minus_actual(
+    budget: int, actual: int, remaining: int
+) -> None:
+    assert WeekFigures(budget, actual).remaining_cents == remaining

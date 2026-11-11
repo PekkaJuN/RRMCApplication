@@ -55,6 +55,7 @@ gives the Finnish word the user sees.
 | Totals PDF | viikkosummat, kuukausisummat | The PDF export of a period's category totals: the weekly PDF is one landscape table, the monthly PDF stacks month blocks ([export](subsystems/export/README.md#pdf-layout)) |
 | Month block | — | One month's two-column table (`Kategoria`, `Summa`) in the monthly PDF; kept whole on one page unless it is taller than a page, then it continues with `(jatkuu)` |
 | Period block | Koko jakso | The last block of a monthly PDF: each row's sum over the whole period; only for a period over 31 days |
+| Comparison CSV file | vertailu (CSV) | The CSV export of the Vertailu page's comparison for one comparison period: the whole period (`Koko jakso`) and optionally one block per week, dates as `dd.mm.yyyy` (FR-52) |
 | Comparison PDF | budjettivertailu | The PDF export of the Vertailu page's month table for one comparison period |
 | Long format | pitkä muoto | One row per column and category, with the period column's key in a cell, instead of one column per week or month; suited to a pivot table |
 | Budget row | budjettirivi | A group or a category without a group; a category inside a group is not one ([budget](subsystems/budget/README.md)) |

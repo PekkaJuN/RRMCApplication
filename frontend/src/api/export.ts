@@ -31,6 +31,16 @@ export function comparisonPdfUrl(period: ComparisonPeriod): string {
   return `/api/export/comparison/pdf?${query.toString()}`;
 }
 
+/** The download URL of the comparison CSV file, with the weeks when `weeks` (comparison CSV
+ * export spec PC9). */
+export function comparisonCsvUrl(period: ComparisonPeriod, weeks: boolean): string {
+  const query = new URLSearchParams({ month: period.month, period: period.kind });
+  if (weeks) {
+    query.set("weeks", "true");
+  }
+  return `/api/export/comparison?${query.toString()}`;
+}
+
 // The backend's limits (PDF export spec PC8); the page only decides what to show.
 const WEEKLY_PDF_DAYS = 31;
 const MONTHLY_PDF_DAYS = 366;

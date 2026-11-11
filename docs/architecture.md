@@ -146,7 +146,7 @@ flowchart LR
 | **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, line and receipt edits, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
 | **budget** | `/api/budget`: reads and saves the monthly budgets, reads the reviewed lines, the counts and the category order, and returns the comparison from calculation | Calculate sums itself or store figures | FR-50 (backend) |
-| **export** | `GET /api/export/lines`, `/totals`, `/totals/pdf` and `/comparison/pdf`: reads a period's lines, totals or budget comparison and builds the files through the exporter interfaces; the CSV and PDF exporters, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28, FR-48 |
+| **export** | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison` and `/comparison/pdf`: reads a period's lines, totals or budget comparison and builds the files through the exporter interfaces; the CSV and PDF exporters, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28, FR-48, FR-52 |
 | **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, budget and comparison, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, FR-50, NFR-15 |
 
 Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
@@ -253,9 +253,9 @@ Yhteenveto page asks `GET /api/totals` for a period; totals reads the lines date
 calculation sums them per category, group, ISO week and month (FR-22–FR-25). The page's
 download links ask `GET /api/export/totals` (by week or by month) and
 `GET /api/export/lines` for the same period, and the PDF links ask
-`GET /api/export/totals/pdf`. The Vertailu page's PDF link asks
-`GET /api/export/comparison/pdf`. The files use the same totals and comparison services,
-so an export always matches its page (FR-26, FR-48, PRD risk table).
+`GET /api/export/totals/pdf`. The Vertailu page's PDF and CSV links ask
+`GET /api/export/comparison/pdf` and `GET /api/export/comparison`. The files use the same
+totals and comparison services, so an export always matches its page (FR-26, FR-48, FR-52, PRD risk table).
 
 ### Budget
 
@@ -273,7 +273,7 @@ computes the budget, spending and remaining per row and ISO week (FR-50).
 | `ReceiptReader` | receipt-reading | `OcrReceiptReader` (Tesseract, then the text model) | Image in, read receipt out (store, date, total, lines, OCR text); the one interface import calls, so a vision reader can be added later |
 | `OcrEngine` | receipt-reading | Tesseract | `orient()` turns the image upright, `read()` returns its text; `check()` tells whether Tesseract with `fin` and `eng` can run |
 | `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization suggests categories for unknown names ([ADR 0004](adr/0004-line-categorization.md)). Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
-| `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)` and `totals_file(totals, by)` return a file (name, media type, bytes) (FR-27) |
+| `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)`, `totals_file(totals, by)` and `comparison_file(comparison, kind, weeks=...)` return a file (name, media type, bytes) (FR-27, FR-52) |
 | `ReportExporter` | export | `PdfExporter` | `totals_report(report, by)` and `comparison_report(report)` return a file of a whole report with its counts and creation day (FR-27, FR-48) |
 
 `OcrEngine` and `ReceiptModel` live in the shared `engines` package (see
@@ -371,6 +371,7 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [Line editing spec](../specs/features/line-editing.md)
 - [CSV export spec](../specs/features/csv-export.md)
 - [PDF export spec](../specs/features/pdf-export.md)
+- [Comparison CSV export spec](../specs/features/comparison-csv-export.md)
 - [Visual style and accessibility spec](../specs/features/styling.md)
 - [Receipt deletion and manual receipts spec](../specs/features/receipt-management.md)
 - [datamodel.md](datamodel.md), [api-reference.md](api-reference.md),

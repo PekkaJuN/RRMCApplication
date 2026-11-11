@@ -68,8 +68,8 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
   types
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
-- @frontend/src/api/export.ts — `exportUrl(kind, period)` and `comparisonPdfUrl(period)`:
-  the download URLs of the [export](../export/README.md); `pdfLimits(start, end)`: whether
+- @frontend/src/api/export.ts — `exportUrl(kind, period)`, `comparisonPdfUrl(period)` and
+  `comparisonCsvUrl(period, weeks)`: the download URLs of the [export](../export/README.md); `pdfLimits(start, end)`: whether
   each totals PDF of a period is within its limit
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
@@ -194,10 +194,13 @@ holds today by the browser's local date, so `15.–14.` on 2026-11-06 selects `2
 month input then chooses another period of the same kind. Each change pushes a history
 entry, and the `Vertailu` link does nothing while the page is open. The week table is plain
 state: it survives changes of period and sends no request, and a reload hides it.
-Under the covered dates, the link `Vie vertailu (PDF)` (`download`, `button` class) points
-at the comparison PDF of the period of the shown answer, not of the controls; it is hidden
-while the period is refused or cannot be loaded. The week table's state does not change
-the file.
+Under the covered dates, the links `Vie vertailu (PDF)` and `Vie vertailu (CSV)`
+(`download`, `button` class) point at the comparison files of the period of the shown
+answer, not of the controls; they are hidden while the period is refused or cannot be
+loaded. The checkbox `Viikot mukaan` beside them adds the weeks to the CSV file
+(`weeks=true`); it is unchecked when the page opens, keeps its state when the period
+changes, and is apart from the week table: the week table's state does not change either
+file.
 
 The Yhteenveto page takes its period from the address (`/yhteenveto?unit=week&from=2026-W40&to=2026-W41`
 or `/yhteenveto?unit=range&from=2026-10-15&to=2026-11-14`),

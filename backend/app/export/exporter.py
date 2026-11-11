@@ -38,6 +38,11 @@ class Exporter(Protocol):
         """The totals of the week columns (`by` `week`) or the month columns (`month`)."""
         ...
 
+    def comparison_file(self, comparison: Comparison, kind: str, *, weeks: bool) -> ExportFile:
+        """The budget comparison of a `calendar` or `mid` period, with or without its weeks
+        (comparison CSV export spec P4)."""
+        ...
+
 
 @dataclass(frozen=True)
 class TotalsReport:

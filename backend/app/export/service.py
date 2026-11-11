@@ -95,6 +95,22 @@ class ExportService:
         )
         return self._report_exporter.comparison_report(report)
 
+    def comparison_file(self, month: str | None, kind: str | None, weeks: str | None) -> ExportFile:
+        """Raises: InvalidPeriodError, then AppError `invalid_request` for a bad `weeks`
+        (comparison CSV export spec PC8)."""
+        view = self._budget.comparison(month, kind)
+        with_weeks = parse_weeks(weeks)
+        return self._exporter.comparison_file(view.comparison, view.kind, weeks=with_weeks)
+
+
+def parse_weeks(weeks: str | None) -> bool:
+    """Missing or `false` is the file without weeks; only `true` adds them (PC2)."""
+    if weeks is None or weeks == "false":
+        return False
+    if weeks == "true":
+        return True
+    raise AppError("invalid_request", texts.INVALID_REQUEST, 422)
+
 
 def _by(by: str | None) -> Unit:
     if by == "week" or by == "month":
