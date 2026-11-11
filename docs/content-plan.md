@@ -12,7 +12,7 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-11-09
+Last reviewed: 2026-11-11
 
 ## Summary
 
@@ -58,7 +58,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Done |
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | Done |
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | Done |
-| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf` and `/comparison/pdf`: CSV and PDF files of a period behind the exporter interfaces; Google Sheets later | 4, 13, 18 | Done |
+| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison` and `/comparison/pdf`: CSV and PDF files of a period behind the exporter interfaces; Google Sheets later | 4, 13, 18 | Done |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | Done |
@@ -128,6 +128,10 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   Code and Codex, the autonomy rule and ADR 0006. The Codex check (AC24) is deferred until
   Codex is taken into use. AGENTS.md, the spec, tdd and review-audit skills,
   security.md and development.md describe it.
+- The budget comparison CSV export spec is Done (audited 2026-11-11): `GET /api/export/comparison`,
+  the comparison CSV file with optional weeks and Finnish dates, and its link and checkbox on
+  the Vertailu page. The export, budget, calculation, UI, API, architecture and glossary docs
+  describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

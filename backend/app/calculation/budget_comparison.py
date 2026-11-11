@@ -28,6 +28,12 @@ class WeekFigures:
     budget_cents: int
     actual_cents: int
 
+    @property
+    def remaining_cents(self) -> int:
+        """The rule of `ComparisonRow.remaining_cents`, for the CSV file's weeks (comparison
+        CSV export spec P1). A property, so the API answer keeps its fields."""
+        return self.budget_cents - self.actual_cents
+
 
 @dataclass(frozen=True)
 class ComparisonRow:

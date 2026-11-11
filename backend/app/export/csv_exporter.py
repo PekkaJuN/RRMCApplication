@@ -3,8 +3,11 @@
 from collections.abc import Sequence
 from datetime import date
 
+from app import texts
+from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
-from app.calculation.period_totals import PeriodTotals
+from app.calculation.period_totals import PeriodTotals, RowKind
+from app.export.comparison_rows import comparison_rows
 from app.export.exporter import ExportFile, ExportLine
 from app.export.rows import long_rows
 
@@ -27,6 +30,19 @@ TOTALS_HEADER = ("Jakso", "Alkaa", "Päättyy", "Osittainen", "Ryhmä", "Kategor
 YES, NO = "kyllä", "ei"
 UNREVIEWED, CONFIRMED = "Tarkistamaton", "Vahvistettu"
 TOTALS_NAMES: dict[Unit, str] = {"week": "summat_viikot", "month": "summat_kuukaudet"}
+COMPARISON_HEADER = (
+    "Jakso",
+    "Alkaa",
+    "Päättyy",
+    "Osittainen",
+    "Tyyppi",
+    "Nimi",
+    "Budjetti",
+    "Toteutunut",
+    "Jäljellä",
+)
+# The row of lines without a category is a category row too (comparison CSV spec PC3).
+ROW_KINDS: dict[RowKind, str] = {"group": "ryhmä", "category": "kategoria", "none": "kategoria"}
 
 
 class CsvExporter:
@@ -67,6 +83,29 @@ class CsvExporter:
             )
         return _file(f"{TOTALS_NAMES[by]}_{_bounds(totals.period)}.csv", rows)
 
+    def comparison_file(self, comparison: Comparison, kind: str, *, weeks: bool) -> ExportFile:
+        """Comparison CSV export spec PC3–PC6, P3."""
+        rows = [[_cell(name) for name in COMPARISON_HEADER]]
+        for row in comparison_rows(comparison, weeks=weeks):
+            rows.append(
+                [
+                    _cell(row.block if row.block is not None else texts.PERIOD_BLOCK),
+                    _cell(_finnish_day(row.start)),
+                    _cell(_finnish_day(row.end)),
+                    _cell(YES if row.partial else NO),
+                    _cell(ROW_KINDS[row.kind]),
+                    _text(row.name if row.name is not None else texts.NO_CATEGORY),
+                    _cell(_money(row.budget_cents)),
+                    _cell(_money(row.actual_cents)),
+                    _cell(_money(row.remaining_cents)),
+                ]
+            )
+        prefix = "vertailu_viikot" if weeks else "vertailu"
+        if kind == "mid":
+            prefix += "_15-14"
+        # comparison_period has checked the month, so it holds only digits and `-`.
+        return _file(f"{prefix}_{comparison.period.first}.csv", rows)
+
 
 def _bounds(period: Period) -> str:
     # parse_period has checked both bounds, so they hold only digits, `-` and `W`.
@@ -80,6 +119,12 @@ def _file(name: str, rows: list[list[str]]) -> ExportFile:
 
 def _day(day: date) -> str:
     return day.isoformat()
+
+
+def _finnish_day(day: date) -> str:
+    """`01.10.2026`, with the zeros Finnish Excel reads as a date (comparison CSV spec PC3).
+    The PDF's `finnish.day` leaves them out."""
+    return f"{day.day:02d}.{day.month:02d}.{day.year:04d}"
 
 
 def _cell(value: str) -> str:

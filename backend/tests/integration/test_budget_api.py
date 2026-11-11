@@ -427,3 +427,15 @@ def test_ac22_yhteenveto_still_counts_unreviewed_receipts(
     body = api.get("/api/totals?unit=month&from=2026-10&to=2026-10").json()
 
     assert body["month_totals"] == [300]
+
+
+def test_comparison_csv_p1_week_figures_keep_their_keys(
+    api: TestClient, db: sqlite3.Connection
+) -> None:
+    # The week's remaining is a property for the CSV file, not a new field of the answer.
+    fixture_budgets(api, db)
+
+    body = api.get(OCTOBER).json()
+
+    assert set(row_named(body, "Juomat")["weeks"][0]) == {"budget_cents", "actual_cents"}
+    assert set(body["total"]["weeks"][0]) == {"budget_cents", "actual_cents"}

@@ -124,6 +124,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-27 | Exporters implement one common interface, so new targets can be added without changing the rest of the app. |
 | FR-28 | *Later release:* export to a private Google Sheet with gspread and a service account. |
 | FR-48 | *Next release:* the user can export the totals summary to PDF files, for the period chosen in the totals view (FR-25, FR-49), through the exporter interfaces (FR-27): weekly totals (A4 landscape, at most 31 days) and monthly totals (A4 portrait, months stacked, at most 366 days) as separate files, every group expanded by category, no receipt lines. The budget comparison of the Vertailu page (FR-50) has its own PDF (A4 portrait, the month table). Details in the [PDF export spec](features/pdf-export.md). |
+| FR-52 | *Later release:* the user can export the budget comparison of the Vertailu page (FR-50) as a CSV file for Finnish Excel, through the exporter interface (FR-27), for the shown period. The file is in long format with the columns Jakso, Alkaa, Päättyy, Osittainen, Tyyppi, Nimi, Budjetti, Toteutunut, Jäljellä: by default one row per budget row for the whole period (`Koko jakso`), and when the user chooses, also one block per week of the period. No total row; dates are `dd.mm.yyyy`; the other CSV rules of FR-26 apply. Details in the [comparison CSV export spec](features/comparison-csv-export.md). |
 
 ### 6.7 Model and settings
 
@@ -250,8 +251,8 @@ category, category source, product). The data model is defined in `docs/datamode
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-48 PDF export of the totals summary and the budget comparison, FR-49 free date range for totals, FR-50 monthly budget, FR-51 date fields as `dd.mm.yyyy` |
-| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)) |
-| Later (candidates) | CSV export of the budget comparison (FR-50), e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
+| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison |
+| Later (candidates) | dates as `dd.mm.yyyy` in the lines and totals CSV files (FR-26), e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 
 A suggested order of feature specs for the MVP:
 

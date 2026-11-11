@@ -69,7 +69,8 @@ budget.
   [storage](../storage/README.md), [totals](../totals/README.md) (`ColumnOut`,
   `InvalidPeriodError`).
 - Used by: the [UI](../ui/README.md) Budjetti and Vertailu pages;
-  [export](../export/README.md) for the comparison PDF (`BudgetService.comparison`).
+  [export](../export/README.md) for the comparison PDF and CSV files
+  (`BudgetService.comparison`).
 
 ## Modules
 

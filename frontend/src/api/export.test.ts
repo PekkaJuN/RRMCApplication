@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { comparisonPdfUrl, exportUrl, pdfLimits } from "./export";
+import { comparisonCsvUrl, comparisonPdfUrl, exportUrl, pdfLimits } from "./export";
 
 const WEEKS = { unit: "week", from: "2026-W40", to: "2026-W41" } as const;
 const OCTOBER = { unit: "month", from: "2026-10", to: "2026-10" } as const;
@@ -72,4 +72,19 @@ it("PDF export AC20: a change to summer time does not move a day", () => {
   // Finland moves to summer time on 29 March 2026; the period is 31 days.
   expect(pdfLimits("2026-03-15", "2026-04-14").weeks).toBe(true);
   expect(pdfLimits("2026-03-15", "2026-04-15").weeks).toBe(false);
+});
+
+it("comparison CSV AC13, AC14: the URLs of the comparison CSV file", () => {
+  expect(comparisonCsvUrl({ month: "2026-10", kind: "mid" }, false)).toBe(
+    "/api/export/comparison?month=2026-10&period=mid",
+  );
+  expect(comparisonCsvUrl({ month: "2026-10", kind: "mid" }, true)).toBe(
+    "/api/export/comparison?month=2026-10&period=mid&weeks=true",
+  );
+  expect(comparisonCsvUrl({ month: "2026-10", kind: "calendar" }, false)).toBe(
+    "/api/export/comparison?month=2026-10&period=calendar",
+  );
+  expect(comparisonCsvUrl({ month: "2026-10", kind: "calendar" }, true)).toBe(
+    "/api/export/comparison?month=2026-10&period=calendar&weeks=true",
+  );
 });

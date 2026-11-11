@@ -176,5 +176,7 @@ export const fi = {
     over: "Ylitetty",
     unreviewed: (count: number) => `Tarkistamattomia kuitteja, ei mukana: ${count}`,
     exportPdf: "Vie vertailu (PDF)",
+    exportCsv: "Vie vertailu (CSV)",
+    includeWeeks: "Viikot mukaan",
   },
 } as const;

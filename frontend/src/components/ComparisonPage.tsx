@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { getComparison, type Comparison } from "../api/budget";
-import { comparisonPdfUrl } from "../api/export";
+import { comparisonCsvUrl, comparisonPdfUrl } from "../api/export";
 import {
   comparisonFromSearch,
   comparisonToSearch,
@@ -31,6 +31,8 @@ export function ComparisonPage() {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isWeeksOpen, setIsWeeksOpen] = useState(false);
+  // Whether the CSV file has the weeks; apart from the week table (comparison CSV spec PC9).
+  const [includeWeeks, setIncludeWeeks] = useState(false);
   // Only the answer to the latest request is shown, so fast changes cannot show old figures.
   const latestRequest = useRef(0);
 
@@ -118,7 +120,25 @@ export function ComparisonPage() {
               className="button"
             >
               {fi.comparison.exportPdf}
-            </a>
+            </a>{" "}
+            <a
+              href={comparisonCsvUrl(
+                { month: comparison.month, kind: comparison.period },
+                includeWeeks,
+              )}
+              download
+              className="button"
+            >
+              {fi.comparison.exportCsv}
+            </a>{" "}
+            <label>
+              <input
+                type="checkbox"
+                checked={includeWeeks}
+                onChange={(event) => setIncludeWeeks(event.target.checked)}
+              />{" "}
+              {fi.comparison.includeWeeks}
+            </label>
           </p>
           {comparison.unreviewed_receipts > 0 && (
             <p role="status">{fi.comparison.unreviewed(comparison.unreviewed_receipts)}</p>

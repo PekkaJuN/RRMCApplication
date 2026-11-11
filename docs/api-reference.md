@@ -443,12 +443,14 @@ Implemented in @backend/app/export/routes.py; the package is
 [export](subsystems/export/README.md). The CSV endpoints take the period as
 `GET /api/totals` does and answer a CSV download for Finnish Excel (PRD FR-26). The PDF
 endpoints answer a PDF download of the totals or of the budget comparison (PRD FR-48).
+`GET /api/export/comparison` answers a CSV file of the budget comparison (PRD FR-52).
 
 | Method and path | Query | Success | Errors |
 |---|---|---|---|
 | `GET /api/export/lines` | `unit`, `from`, `to` as in `GET /api/totals` | 200, the lines file `kuittirivit_<from>_<to>.csv` | 422 `invalid_period` |
 | `GET /api/export/totals` | the same, and `by` `week` or `month` | 200, the totals file `summat_viikot_<from>_<to>.csv` or `summat_kuukaudet_<from>_<to>.csv` | 422 `invalid_period`, then 422 `invalid_request` |
 | `GET /api/export/totals/pdf` | the same as `GET /api/export/totals` | 200, `summat_viikot_<from>_<to>.pdf` (A4 landscape) or `summat_kuukaudet_<from>_<to>.pdf` (A4 portrait) | 422 `invalid_period`, then `invalid_request`, then `period_too_long` |
+| `GET /api/export/comparison` | `month` and `period` as in `GET /api/budget/comparison`; `weeks` `true`, or `false` (the default) | 200, `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, or with `weeks=true` `vertailu_viikot_<month>.csv`, `vertailu_viikot_15-14_<month>.csv` | 422 `invalid_period`, then `invalid_request` |
 | `GET /api/export/comparison/pdf` | `month` and `period` as in `GET /api/budget/comparison` | 200, `vertailu_<month>.pdf` or `vertailu_15-14_<month>.pdf` (A4 portrait) | 422 `invalid_period` |
 
 Every 200 answer has `Content-Type: text/csv; charset=utf-8`, `Content-Disposition:
@@ -477,10 +479,21 @@ Jakso;Alkaa;Päättyy;Osittainen;Ryhmä;Kategoria;Summa
 2026-W41;2026-10-05;2026-10-11;ei;;Juomat;2,50
 ```
 
+The comparison file lists the budget comparison of the Vertailu page (reviewed receipts
+only) in long format: the `Koko jakso` rows, then with `weeks=true` one block per week
+column. Dates are `dd.mm.yyyy`; there is no total row:
+
+```text
+Jakso;Alkaa;Päättyy;Osittainen;Tyyppi;Nimi;Budjetti;Toteutunut;Jäljellä
+Koko jakso;01.10.2026;31.10.2026;ei;ryhmä;Ruoka;400,00;125,00;275,00
+Koko jakso;01.10.2026;31.10.2026;ei;kategoria;Ei kategoriaa;0,00;1,99;-1,99
+2026-W40;01.10.2026;04.10.2026;kyllä;ryhmä;Ruoka;51,61;125,00;-73,39
+```
+
 | Status | `error` | `message` | When |
 |---|---|---|---|
-| 422 | `invalid_period` | `Jakso on virheellinen.` | As in `GET /api/totals`; checked first |
-| 422 | `invalid_request` | `Pyyntö on virheellinen.` | `by` of the totals file is missing or not `week` or `month` |
+| 422 | `invalid_period` | `Jakso on virheellinen.` | As in `GET /api/totals`, or as in `GET /api/budget/comparison` for the comparison files; checked first |
+| 422 | `invalid_request` | `Pyyntö on virheellinen.` | `by` of the totals file is missing or not `week` or `month`; `weeks` of the comparison file is not `true` or `false` |
 | 422 | `period_too_long` | `Jakso on liian pitkä PDF-tiedostoon.` | A totals PDF over 31 days (`by` `week`) or 366 days (`by` `month`); checked last |
 
 A PDF answer has `Content-Type: application/pdf` and the same `Content-Disposition` and
