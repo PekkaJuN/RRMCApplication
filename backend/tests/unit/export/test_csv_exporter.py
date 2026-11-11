@@ -91,11 +91,11 @@ def test_ac1_lines_file() -> None:
     file = CsvExporter().lines_file(OCTOBER, FIXTURE_LINES)
     assert text(file.content) == (
         f"{LINES_HEADER}\n"
-        "2026-10-02;2026-W40;2026-10;Testikauppa;Maito;1,25;Ruoka;Maitotuotteet;ei;Tarkistamaton\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Limu;2,50;;Juomat;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Tuntematon;1,99;;;ei;Vahvistettu\n"
-        "2026-10-06;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu\n"
+        "02.10.2026;2026-W40;2026-10;Testikauppa;Maito;1,25;Ruoka;Maitotuotteet;ei;Tarkistamaton\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Ruisleipä;3,00;Ruoka;Leivät;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Limu;2,50;;Juomat;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Tuntematon;1,99;;;ei;Vahvistettu\n"
+        "06.10.2026;2026-W41;2026-10;Testikauppa;Panttipalautus;-0,40;;;kyllä;Vahvistettu\n"
     )
 
 
@@ -103,10 +103,10 @@ def test_ac2_weekly_totals_file() -> None:
     file = CsvExporter().totals_file(period_totals(OCTOBER, FIXTURE_TOTALS, CATALOG), "week")
     assert text(file.content) == (
         f"{TOTALS_HEADER}\n"
-        "2026-W40;2026-10-01;2026-10-04;kyllä;Ruoka;Maitotuotteet;1,25\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;Ruoka;Leivät;3,00\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;;Juomat;2,50\n"
-        "2026-W41;2026-10-05;2026-10-11;ei;;Ei kategoriaa;1,99\n"
+        "2026-W40;01.10.2026;04.10.2026;kyllä;Ruoka;Maitotuotteet;1,25\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;Ruoka;Leivät;3,00\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;;Juomat;2,50\n"
+        "2026-W41;05.10.2026;11.10.2026;ei;;Ei kategoriaa;1,99\n"
     )
 
 
@@ -114,10 +114,10 @@ def test_ac16_monthly_totals_file() -> None:
     file = CsvExporter().totals_file(period_totals(OCTOBER, FIXTURE_TOTALS, CATALOG), "month")
     assert text(file.content) == (
         f"{TOTALS_HEADER}\n"
-        "2026-10;2026-10-01;2026-10-31;ei;Ruoka;Leivät;3,00\n"
-        "2026-10;2026-10-01;2026-10-31;ei;Ruoka;Maitotuotteet;1,25\n"
-        "2026-10;2026-10-01;2026-10-31;ei;;Juomat;2,50\n"
-        "2026-10;2026-10-01;2026-10-31;ei;;Ei kategoriaa;1,99\n"
+        "2026-10;01.10.2026;31.10.2026;ei;Ruoka;Leivät;3,00\n"
+        "2026-10;01.10.2026;31.10.2026;ei;Ruoka;Maitotuotteet;1,25\n"
+        "2026-10;01.10.2026;31.10.2026;ei;;Juomat;2,50\n"
+        "2026-10;01.10.2026;31.10.2026;ei;;Ei kategoriaa;1,99\n"
     )
 
 
@@ -173,4 +173,45 @@ def test_money_has_a_decimal_comma(cents: int, money: str) -> None:
 def test_week_and_month_of_a_line_use_iso_weeks() -> None:
     line = export_line("x", 1, day=date(2027, 1, 2))
     [_, row] = cells(CsvExporter().lines_file(OCTOBER, [line]).content)
-    assert row[:3] == ["2027-01-02", "2026-W53", "2027-01"]
+    assert row[:3] == ["02.01.2027", "2026-W53", "2027-01"]
+
+
+# Finnish CSV dates spec (AC4, AC5)
+
+YEAR_CHANGE = parse_period("range", "2026-12-28", "2027-01-03")
+
+
+def test_finnish_dates_ac4_a_range_over_the_year_change() -> None:
+    exporter = CsvExporter()
+    totals = [
+        TotalLine(date(2026, 12, 28), 100, LEIVAT, is_deposit_refund=False),
+        TotalLine(date(2027, 1, 3), 200, LEIVAT, is_deposit_refund=False),
+    ]
+    lines = [
+        export_line("x", 100, day=date(2026, 12, 28), group="Ruoka", category="Leivät"),
+        export_line("y", 200, day=date(2027, 1, 3), group="Ruoka", category="Leivät"),
+    ]
+
+    by_week = exporter.totals_file(period_totals(YEAR_CHANGE, totals, CATALOG), "week")
+    lines_file = exporter.lines_file(YEAR_CHANGE, lines)
+
+    week_row = ["2026-W53", "28.12.2026", "03.01.2027", "ei", "Ruoka", "Leivät", "3,00"]
+    assert cells(by_week.content)[1] == week_row
+    assert [row[0] for row in cells(lines_file.content)[1:]] == ["28.12.2026", "03.01.2027"]
+    assert by_week.name == "summat_viikot_2026-12-28_2027-01-03.csv"
+    assert lines_file.name == "kuittirivit_2026-12-28_2027-01-03.csv"
+
+
+def test_finnish_dates_ac5_keys_headers_and_names_are_unchanged() -> None:
+    exporter = CsvExporter()
+    totals = period_totals(OCTOBER, FIXTURE_TOTALS, CATALOG)
+
+    lines = cells(exporter.lines_file(OCTOBER, FIXTURE_LINES).content)
+    by_week = cells(exporter.totals_file(totals, "week").content)
+    by_month = cells(exporter.totals_file(totals, "month").content)
+
+    assert ";".join(lines[0]) == LINES_HEADER
+    assert ";".join(by_week[0]) == ";".join(by_month[0]) == TOTALS_HEADER
+    assert [row[1:3] for row in lines[1:3]] == [["2026-W40", "2026-10"], ["2026-W41", "2026-10"]]
+    assert [row[0] for row in by_week[1:]] == ["2026-W40", "2026-W41", "2026-W41", "2026-W41"]
+    assert {row[0] for row in by_month[1:]} == {"2026-10"}

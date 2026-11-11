@@ -96,7 +96,9 @@ clock.
 
 - `;` between fields, UTF-8 with a byte order mark, a Finnish header row, `\r\n` after
   every row; amounts as `1,25` and `-0,40` (integer arithmetic, no euro sign or thousands
-  separator); dates as `YYYY-MM-DD`; `kyllä` and `ei`.
+  separator); dates as `dd.mm.yyyy` with leading zeros (`06.10.2026`), which Finnish Excel
+  reads as a date, while the week and month keys (`2026-W41`, `2026-10`) and the file names
+  keep their ISO form; `kyllä` and `ei`.
 - The exporter writes its own rows instead of `csv.writer`: a cell is quoted when it holds
   `;`, `"`, `\r` or `\n`, or starts or ends with a space (`QUOTE_MINIMAL` does not quote
   spaces), and `"` is doubled.
@@ -113,8 +115,8 @@ clock.
 - Columns `Jakso;Alkaa;Päättyy;Osittainen;Tyyppi;Nimi;Budjetti;Toteutunut;Jäljellä`.
   `Jakso` is `Koko jakso` or the week key (`2026-W40`); `Tyyppi` is `ryhmä`, or `kategoria`
   for a category without a group and for `Ei kategoriaa`.
-- Dates are `dd.mm.yyyy` with leading zeros (`01.10.2026`), which Finnish Excel reads as a
-  date. Only this file: the lines and totals files keep `YYYY-MM-DD` (FR-26).
+- Dates are `dd.mm.yyyy`, as in every CSV file: one function, `_finnish_day`, writes the
+  dates of all three files.
 - The other rules of the CSV format above apply: separator, BOM, amounts, quoting and the
   formula guard on `Nimi`.
 - File names: `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, and with the weeks
@@ -176,5 +178,6 @@ None yet.
 - [CSV export spec](../../../specs/features/csv-export.md)
 - [PDF export spec](../../../specs/features/pdf-export.md)
 - [Comparison CSV export spec](../../../specs/features/comparison-csv-export.md)
+- [Finnish CSV dates spec](../../../specs/features/finnish-csv-dates.md)
 - [ADR 0005: PDF library](../../adr/0005-pdf-library.md)
 - [Architecture](../../architecture.md#component-map)

@@ -53,7 +53,7 @@ class CsvExporter:
             day = line.purchase_date
             rows.append(
                 [
-                    _cell(day.isoformat()),
+                    _cell(_finnish_day(day)),
                     _cell(f"{year:04d}-W{week:02d}"),
                     _cell(f"{day.year:04d}-{day.month:02d}"),
                     _text(line.store),
@@ -73,8 +73,8 @@ class CsvExporter:
             rows.append(
                 [
                     _cell(row.column.key),
-                    _cell(_day(row.column.start)),
-                    _cell(_day(row.column.end)),
+                    _cell(_finnish_day(row.column.start)),
+                    _cell(_finnish_day(row.column.end)),
                     _cell(YES if row.column.partial else NO),
                     _text(row.group_name),
                     _text(row.category_name),
@@ -117,13 +117,9 @@ def _file(name: str, rows: list[list[str]]) -> ExportFile:
     return ExportFile(name, MEDIA_TYPE, content.encode("utf-8"))
 
 
-def _day(day: date) -> str:
-    return day.isoformat()
-
-
 def _finnish_day(day: date) -> str:
-    """`01.10.2026`, with the zeros Finnish Excel reads as a date (comparison CSV spec PC3).
-    The PDF's `finnish.day` leaves them out."""
+    """`01.10.2026`, with the zeros Finnish Excel reads as a date: the one date form of all
+    CSV files (Finnish CSV dates spec PC5). The PDF's `finnish.day` leaves the zeros out."""
     return f"{day.day:02d}.{day.month:02d}.{day.year:04d}"
 
 

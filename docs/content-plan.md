@@ -132,6 +132,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   the comparison CSV file with optional weeks and Finnish dates, and its link and checkbox on
   the Vertailu page. The export, budget, calculation, UI, API, architecture and glossary docs
   describe it.
+- The Finnish CSV dates spec is Done (audited 2026-11-11): the lines and totals CSV files
+  write their dates as `dd.mm.yyyy`, as the comparison file. The export README and the API
+  reference describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget and export terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

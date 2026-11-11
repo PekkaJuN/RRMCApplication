@@ -9,7 +9,9 @@
   Plan added. Plan approved by the user; Tasks added. User change before approval: the
   totals file holds either weeks or months, chosen with its own link (`by`); three
   links instead of two; the `Jakson tyyppi` column is dropped (Specify, Plan and Tasks
-  updated). Spec approved by the user. Implemented and audited (PASS).
+  updated). Spec approved by the user. Implemented and audited (PASS). Later change
+  (2026-11-11): the [Finnish CSV dates spec](finnish-csv-dates.md) changed the date cells of
+  both files to `dd.mm.yyyy`; the examples below keep the ISO dates of this spec's time.
 - **Depends on:** [Category totals](totals.md)
 - **Implements:** PRD FR-26, FR-27, FR-44 (exported totals); NFR-1, NFR-3, NFR-6, NFR-15 for
   the export.
