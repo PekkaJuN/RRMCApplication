@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.archive.routes import create_archive_router
+from app.archive.service import ArchiveFiles, LocalArchiveFiles
 from app.budget.routes import create_budget_router
 from app.categorization.defaults import seed_defaults
 from app.categorization.routes import create_catalog_router
@@ -43,14 +45,16 @@ def create_app(
     clock: Callable[[], datetime] | None = None,
     failed_folder: FailedFolder | None = None,
     report_exporter: ReportExporter | None = None,
+    archive_files: ArchiveFiles | None = None,
 ) -> FastAPI:
     """Build the application.
 
     `extra_routers`, `engines`, `migrations_dir`, `import_service`, `exporter`, `clock`,
-    `failed_folder` and `report_exporter` let tests add test-only endpoints, fake servers,
-    throwaway migrations, simulated file failures, a fixed exporter, a fixed time for new
-    receipts and PDF files, a failing move of a failed image and a fixed PDF exporter;
-    production passes none of them, and the engines then follow `settings.engines`.
+    `failed_folder`, `report_exporter` and `archive_files` let tests add test-only
+    endpoints, fake servers, throwaway migrations, simulated file failures, a fixed
+    exporter, a fixed time for new receipts, PDF files and archiving, a failing move of a
+    failed image, a fixed PDF exporter and a failing move of an archived image; production
+    passes none of them, and the engines then follow `settings.engines`.
     """
     settings = settings or load_settings()
     engines = engines or create_engines(settings)
@@ -80,6 +84,11 @@ def create_app(
         settings, engines=engines, reader=create_reader(settings, engines)
     )
     app.include_router(create_import_router(import_service))
+    app.include_router(
+        create_archive_router(
+            settings, import_service, clock or _utc_now, archive_files or LocalArchiveFiles()
+        )
+    )
     app.include_router(create_review_router(settings, clock, failed_folder))
     app.include_router(create_totals_router(settings))
     app.include_router(create_budget_router(settings))

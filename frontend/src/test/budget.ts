@@ -90,6 +90,7 @@ export const OCTOBER_COMPARISON: Comparison = {
   },
   unreviewed_receipts: 0,
   undated_receipts: 0,
+  archived_years: [],
 };
 
 /** Answers the comparison from its query, as the backend does for the dates; returns the

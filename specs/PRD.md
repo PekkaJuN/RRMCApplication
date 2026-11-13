@@ -169,13 +169,15 @@ with no type of their own, such as ready meals.
 
 ### 6.10 Archiving (later release)
 
-Not part of the MVP. Remaining details are open (see [Open questions](#11-open-questions)).
+Not part of the MVP. The purpose is a smaller active dataset that still allows comparing
+years. Details will be in the archiving spec (`features/archiving.md`).
 
 | ID | Requirement |
 |---|---|
-| FR-40 | When the user chooses to, they can archive the previous calendar year: all receipts whose purchase date is in that year, and their lines, move to separate archive tables. Archiving is never automatic. |
-| FR-41 | The user can permanently delete archived data, after a confirmation. |
-| FR-42 | Archived data is not included in the totals or exports of active data, and does not appear in the normal views. |
+| FR-40 | When the user chooses to, they can archive any finished calendar year (not the current year): all receipts whose purchase date is in that year, and their lines, move to separate archive tables in the same database. An archived line keeps its category and group as names (text), so later category changes (FR-36, FR-37) do not touch the archive. An unreviewed receipt in the year blocks archiving; receipts without a purchase date stay in active data. After the data is committed, the year's images move from the done folder to an archive folder (a setting, FR-32); a failed move leaves the image in the done folder and is reported. Archiving is never automatic and cannot be undone; a confirmation shows the counts and suggests a backup first. |
+| FR-41 | The user can permanently delete an archived year, after a confirmation that shows the counts and suggests a backup. The app never deletes image files; the user deletes them from the archive folder by hand. |
+| FR-42 | Archived data is not included in the totals, budget comparison or exports of active data, and does not appear in the normal views. When a chosen period touches an archived year, these views and exports warn that the archived part is not included. An archived image stays a duplicate for import until its year is permanently deleted. |
+| FR-53 | The user can view an archived year read-only on its own page: the totals of the whole year and of each month, per group, category and product. These totals can be exported. Archived receipts are not viewed one by one. Years are compared by viewing or exporting each year separately; there is no side-by-side view. |
 
 ### 6.11 Monthly budget (next release)
 
@@ -251,8 +253,8 @@ category, category source, product). The data model is defined in `docs/datamode
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-48 PDF export of the totals summary and the budget comparison, FR-49 free date range for totals, FR-50 monthly budget, FR-51 date fields as `dd.mm.yyyy` |
-| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison |
-| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
+| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 and FR-53 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison |
+| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching), a year view of active data with monthly and yearly totals per group, category and product (as the archived year page, FR-53) |
 
 A suggested order of feature specs for the MVP:
 
@@ -291,10 +293,10 @@ A suggested order of feature specs for the MVP:
 6. Resolved (2026-10-30): a receipt is categorized per line only; a receipt with one line
    gets one category through that line ([categorization spec](features/categorization.md)).
 7. Resolved (2026-11-02): CSV format details: FR-26.
-8. [NEEDS CLARIFICATION] Archiving (FR-40 to FR-42): can older years than the previous one
-   be archived too (e.g. after a long break)? Can archived data be viewed or exported
-   separately? Can archiving be undone? Does FR-36 recategorization also update archived
-   lines? Are receipt images in `import_done` archived or deleted with the data?
+8. Resolved (2026-11-13): archiving (FR-40 to FR-42, FR-53). Any finished year can be
+   archived; the archive is viewed read-only with yearly and monthly totals per group,
+   category and product, and their export, but not receipt by receipt; archiving cannot be undone; FR-36 does not update archived lines; images move to
+   an archive folder and the user deletes them by hand.
 
 Resolved:
 
@@ -319,8 +321,11 @@ Resolved:
 - Hardware and processing time: CPU only, 3 minutes per receipt: NFR-8, open question 1 (2026-10-28).
 - Single user stays: no buyer or family-member field on receipts (2026-10-21).
 - Installation and development use Docker; Ollama stays on Windows; settings are in one `.env` file; one way of running for normal use and development: FR-32, NFR-10, NFR-11 (2026-10-23).
-- Archiving is by previous calendar year, started by the user; archived data is excluded from
-  active totals and exports: FR-40, FR-42 (2026-10-20).
+- Archiving is by calendar year, started by the user; archived data is excluded from
+  active totals and exports: FR-40, FR-42 (2026-10-20). Any finished year, separate tables
+  in the same database, categories stored as names, read-only archive view with yearly and
+  monthly totals and export, no undo, images moved to an archive folder: FR-40 to FR-42,
+  FR-53, open question 8 (2026-11-13).
 
 ## 12. Risks
 

@@ -257,7 +257,7 @@ class ReviewService:
             if folder is None:
                 raise ImageNotFoundError(422)
             image = folder.take(new.image_file_name)
-            if self._receipts.get_by_hash(image.image_hash) is not None:
+            if self._receipts.image_known(image.image_hash):
                 raise DuplicateImageError()
         try:
             with self._receipts.transaction():

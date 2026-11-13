@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 
 from app.calculation.period import parse_period
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import LineCategory, ReceiptRepository
 from app.totals.errors import InvalidPeriodError
@@ -12,7 +13,7 @@ from app.totals.service import TotalsService
 
 
 def service(db: sqlite3.Connection) -> TotalsService:
-    return TotalsService(CatalogRepository(db), ReceiptRepository(db))
+    return TotalsService(CatalogRepository(db), ReceiptRepository(db), ArchiveRepository(db))
 
 
 @pytest.mark.parametrize(

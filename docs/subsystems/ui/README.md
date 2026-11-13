@@ -1,6 +1,6 @@
 # UI
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Archive](../archive/README.md) | → [Storage](../storage/README.md) | → [Receipt reading](../receipt-reading/README.md)
 
 ## Overview
 
@@ -8,21 +8,25 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and seven pages: **Tuotteet** for groups, categories and
+reports the backend's health) and nine pages: **Tuotteet** for groups, categories and
 products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, the
 **receipt page** for one receipt, **Yhteenveto** for the category totals, **Budjetti** for
-the monthly budgets and **Vertailu** for the budget against spending. The app opens on
-Tuotteet.
+the monthly budgets, **Vertailu** for the budget against spending, **Arkisto** for
+archiving finished years, and the **archived year page** for one archived year's totals.
+The app opens on Tuotteet.
 
 A few pages do not justify a router library. @frontend/src/navigation.ts maps the address to
 a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` → Kuitit,
 `/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
 `/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, `/budjetti` → Budjetti, `/vertailu` →
-Vertailu, any other path → Tuotteet. `usePage()` returns the page, `go(page,
-receiptId?)` and the open receipt's id. The navigation links are real links (`/`, `/tuonti`,
-`/kuitit`, `/yhteenveto`, `/budjetti`, `/vertailu`), and so are the date links of the list and the back link of a receipt; a plain
+Vertailu, `/arkisto` → Arkisto, `/arkisto/<year>` (four digits) → the archived year, any
+other `/arkisto/...` → Arkisto, any other path → Tuotteet. `usePage()` returns the page,
+`go(page, id?)`, the open receipt's id and the open archived year (`archiveYearFromPath`).
+The navigation links are real links (`/`, `/tuonti`, `/kuitit`, `/yhteenveto`, `/budjetti`,
+`/vertailu`, `/arkisto`), and so are the date links of the list, the back link of a receipt
+and the `Näytä` link of an archived year; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
-has `aria-current="page"` (Kuitit also on a receipt), the back button works, and a reload
+has `aria-current="page"` (Kuitit also on a receipt, Arkisto also on an archived year), the back button works, and a reload
 keeps the page because Vite answers every path with `index.html`.
 
 ## Key Files and Entry Points
@@ -68,9 +72,17 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
   types
 - @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
+- @frontend/src/api/archive.ts — `getArchive()`, `archiveYear()`, `deleteArchivedYear()`,
+  `getArchiveTotals()`, `archiveCsvUrl()` and the archive types
 - @frontend/src/api/export.ts — `exportUrl(kind, period)`, `comparisonPdfUrl(period)` and
   `comparisonCsvUrl(period, weeks)`: the download URLs of the [export](../export/README.md); `pdfLimits(start, end)`: whether
   each totals PDF of a period is within its limit
+- @frontend/src/components/ArchivePage.tsx — the Arkisto page: the years to archive and
+  the archived years, with in-place confirmations
+- @frontend/src/components/ArchiveYearPage.tsx — one archived year: `Vie CSV` and the
+  table, or `Vuotta 2023 ei ole arkistossa.`
+- @frontend/src/components/ArchiveTotalsTable.tsx — the archived year's table: groups,
+  categories and products that open and close, 12 months and `Vuosi`
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change
@@ -238,6 +250,27 @@ link is replaced by the text `Viikkosummien PDF: jakso enintään 31 päivää.`
 download. The backend checks the limits too. The texts are in the
 [PDF export spec](../../../specs/features/pdf-export.md#ui-texts).
 
+Yhteenveto and Vertailu show `Arkistoitu vuosi 2025 ei ole mukana.` (or the plural for
+several years) with `role="status"` when the answer's `archived_years` is not empty
+([archive](../archive/README.md#period-warning)).
+
+The Arkisto page loads `GET /api/archive` and lists the years to archive and the archived
+years, each with its counts. A year with unreviewed receipts shows
+`Tarkistamattomia kuitteja: N` and no button. `Arkistoi` and `Poista pysyvästi` open a
+confirmation in place with the counts and the backup advice, and `Peruuta`; while the
+request runs every button is disabled, and a second click sends nothing. After every
+answer the lists are loaded again. Success shows the counts with `role="status"`, and
+each image that was not moved as `Kuvaa ei voitu siirtää arkistokansioon: <name>`; a
+refusal shows the backend's message with `role="alert"`. `Näytä` opens the year page.
+
+The archived year page loads `GET /api/archive/{year}/totals`; a 404 shows
+`Vuotta 2023 ei ole arkistossa.` It has no input and no edit button. `Vie CSV` is a plain
+`download` link to the [export](../export/README.md#archive-csv-file). The table opens
+with the groups showing their categories and the categories hiding their products; each
+toggle is a button with `aria-expanded` and the label `Näytä kategoriat: <name>`,
+`Piilota kategoriat: <name>`, `Näytä tuotteet: <name>` or `Piilota tuotteet: <name>`. The
+texts are in the [archiving spec](../../../specs/features/archiving.md) PC14 and PC15.
+
 ### Styling
 
 One plain CSS file, @frontend/src/styles.css, imported once in `main.tsx`, styles the whole
@@ -260,14 +293,17 @@ system font, so the UI loads nothing from another host.
   |---|---|---|
   | `amount` | money cells and headings, amount inputs (`EditableField`'s `className`) | Right aligned, tabular figures |
   | `table-box` | a `div` around each table | A wide table scrolls inside it, not the page |
-  | `table-box-wide` | the Vertailu week table's box | Spans the window, not only `main`; the table is centred in it |
+  | `table-box-wide` | the Vertailu week table's box and the archived year table's box | Spans the window, not only `main`; the table is centred in it |
   | `button` | the download links | The button look |
   | `row-group`, `row-category`, `row-total` | totals table rows | Bold group and total rows; categories indented under the group name (the toggle has a fixed width) |
+  | `row-product` | archived year table rows | Products indented under their category |
+  | `archive-table`, `archive-name` | the archived year table and its name cells | The name column stays in place (sticky, with the page background) while the amounts scroll; a name wraps at 250 px (the limit is on the name's `span`, because browsers do not apply `max-width` to table cells reliably), and amounts do not wrap, so the table scrolls instead of squeezing the names |
   | `receipt-columns`, `receipt-image`, `receipt-lines` | receipt page | Side by side from 900 px, stacked below |
-  | `confirm-delete` | a line's delete confirmation | Keeps the question and its buttons on one row |
+  | `confirm-delete` | a line's delete confirmation and the Arkisto confirmations | Keeps the question and its buttons on one row |
   | `new-receipt-preview` | new receipt form | Keeps the preview small, so the form's buttons stay in sight |
 
-- `main` is at most 1200 px wide and centred (only the Vertailu week table is wider); the header wraps on a narrow window.
+- `main` is at most 1200 px wide and centred (only the Vertailu week table and the archived
+  year table are wider); the header wraps on a narrow window.
 - The input rule's `font` shorthand resets `font-variant-numeric`, so `input.amount` comes
   after it.
 
@@ -318,6 +354,7 @@ None yet.
 - [Product management spec](../../../specs/features/product-management.md) PC9
 - [Receipt import spec](../../../specs/features/receipt-import.md) PC11
 - [Receipt-reading spec](../../../specs/features/receipt-reading.md) PC9
+- [Archiving spec](../../../specs/features/archiving.md) PC10, PC14, PC15
 - [Receipt review spec](../../../specs/features/receipt-review.md) PC7–PC10
 - [Line editing spec](../../../specs/features/line-editing.md)
 - [Receipt deletion and manual receipts spec](../../../specs/features/receipt-management.md) PC11

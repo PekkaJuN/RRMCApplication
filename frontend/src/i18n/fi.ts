@@ -160,6 +160,43 @@ export const fi = {
   budget: {
     heading: "Budjetti",
   },
+  archive: {
+    heading: "Arkisto",
+    candidatesHeading: "Arkistoitavat vuodet",
+    archivedHeading: "Arkistoidut vuodet",
+    noCandidates: "Ei arkistoitavia vuosia.",
+    noArchived: "Ei arkistoituja vuosia.",
+    candidate: (receipts: number, lines: number, images: number) =>
+      `${receipts} kuittia, ${lines} riviä ja ${images} kuvaa`,
+    archivedCounts: (receipts: number, lines: number) => `${receipts} kuittia ja ${lines} riviä`,
+    unreviewed: (count: number) => `Tarkistamattomia kuitteja: ${count}`,
+    archive: "Arkistoi",
+    confirmArchive: (year: number, receipts: number, lines: number, images: number) =>
+      `Arkistoidaan vuosi ${year}: ${receipts} kuittia, ${lines} riviä ja ${images} kuvaa. ` +
+      "Arkistointia ei voi perua. Ota varmuuskopio ennen arkistointia.",
+    archived: (year: number, receipts: number, lines: number) =>
+      `Vuosi ${year} arkistoitu: ${receipts} kuittia ja ${lines} riviä.`,
+    notMoved: (name: string) => `Kuvaa ei voitu siirtää arkistokansioon: ${name}`,
+    show: "Näytä",
+    delete: "Poista pysyvästi",
+    confirmDelete: (year: number, receipts: number, lines: number) =>
+      `Poistetaan vuoden ${year} arkisto pysyvästi: ${receipts} kuittia ja ${lines} riviä. ` +
+      "Kuvat jäävät arkistokansioon. Poistoa ei voi perua. Ota varmuuskopio ennen poistoa.",
+    deleted: (year: number) => `Vuoden ${year} arkisto poistettu.`,
+    yearHeading: (year: number) => `Vuosi ${year}`,
+    name: "Nimi",
+    year: "Vuosi",
+    exportCsv: "Vie CSV",
+    notArchived: (year: number) => `Vuotta ${year} ei ole arkistossa.`,
+    showCategories: (name: string) => `Näytä kategoriat: ${name}`,
+    hideCategories: (name: string) => `Piilota kategoriat: ${name}`,
+    showProducts: (name: string) => `Näytä tuotteet: ${name}`,
+    hideProducts: (name: string) => `Piilota tuotteet: ${name}`,
+  },
+  archivedYears: (years: readonly number[]) =>
+    years.length === 1
+      ? `Arkistoitu vuosi ${years[0]} ei ole mukana.`
+      : `Arkistoidut vuodet ${years.join(", ")} eivät ole mukana.`,
   comparison: {
     heading: "Vertailu",
     period: "Jakso",

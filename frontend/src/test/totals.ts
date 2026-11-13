@@ -52,6 +52,7 @@ export const OCTOBER: Totals = {
   month_totals: [124080],
   unreviewed_receipts: 0,
   undated_receipts: 0,
+  archived_years: [],
 };
 
 /** No lines in the period. */

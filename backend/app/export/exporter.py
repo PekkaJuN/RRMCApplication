@@ -1,10 +1,11 @@
 """The exporter interface (export spec PC1, P1): the endpoints build files only through it."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Protocol
 
+from app.calculation.archive_totals import ArchiveTotals
 from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
 from app.calculation.period_totals import PeriodTotals
@@ -43,6 +44,11 @@ class Exporter(Protocol):
         (comparison CSV export spec P4)."""
         ...
 
+    def archive_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        """The month and year totals of an archived year per product (archiving spec
+        PC13)."""
+        ...
+
 
 @dataclass(frozen=True)
 class TotalsReport:
@@ -52,6 +58,8 @@ class TotalsReport:
     unreviewed_receipts: int
     undated_receipts: int
     created: date
+    # Archived years that overlap the period (archiving spec PC10).
+    archived_years: list[int] = field(default_factory=lambda: list[int]())
 
 
 @dataclass(frozen=True)
@@ -63,6 +71,8 @@ class ComparisonReport:
     unreviewed_receipts: int
     undated_receipts: int
     created: date
+    # Archived years that overlap the period (archiving spec PC10).
+    archived_years: list[int] = field(default_factory=lambda: list[int]())
 
 
 class ReportExporter(Protocol):

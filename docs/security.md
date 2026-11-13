@@ -1,7 +1,7 @@
 # Security
 
 - **Status:** Done
-- **Updated:** 2026-11-10
+- **Updated:** 2026-11-13
 
 ## Overview
 
@@ -17,8 +17,8 @@ computer. It does not protect data from someone who can already use the computer
 
 | Data | Where | Default location |
 |---|---|---|
-| Receipt images | Import, done and failed folders on this computer | `source/import`, `source/import_done`, `source/import_failed` |
-| Receipts, lines, products, raw OCR text | SQLite database | Docker volume `rrmc_rrmc-data` |
+| Receipt images | Import, done, failed and archive folders on this computer | `source/import`, `source/import_done`, `source/import_failed`, `source/archived` |
+| Receipts, lines, products, raw OCR text, archived receipts and lines | SQLite database | Docker volume `rrmc_rrmc-data` |
 | Evaluation images and results | Evaluation folder (development tool) | `source/eval` |
 | CSV and PDF exports | Wherever the browser saves them | The user's download folder |
 | Logs | Standard output of the containers | Docker's log of each container |

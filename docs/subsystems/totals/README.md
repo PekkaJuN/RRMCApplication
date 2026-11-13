@@ -23,7 +23,7 @@ computes them from the database, so they always reflect the latest edits (FR-24)
 - @backend/app/totals/routes.py — `create_totals_router(settings)`: `GET /api/totals`, one
   connection per request
 - @backend/app/totals/service.py — `TotalsService.totals(unit, first, last)` →
-  `TotalsView(totals, unreviewed_receipts, undated_receipts)`
+  `TotalsView(totals, unreviewed_receipts, undated_receipts, archived_years)`
 - @backend/app/totals/schemas.py — the API shape; `from_` is sent as `from`
 - @backend/app/totals/errors.py — `InvalidPeriodError` (422 `invalid_period`)
 
@@ -34,7 +34,7 @@ The endpoint, its shape and its error code are in the
 
 | Method | Does | Raises |
 |---|---|---|
-| `TotalsService(catalog, receipts).totals(unit, first, last)` | Parses the period, reads the lines dated in it, the unreviewed count of the period, the undated count and the category list in one transaction, and returns the period totals | `InvalidPeriodError` |
+| `TotalsService(catalog, receipts, archive).totals(unit, first, last)` | Parses the period, reads the lines dated in it, the unreviewed count of the period, the undated count, the archived years of the period and the category list in one transaction, and returns the period totals | `InvalidPeriodError` |
 | `TotalsService.period(unit, first, last)` | Parses the period | `InvalidPeriodError` |
 | `TotalsService.read(period)` | Reads the dated lines and the category list and returns `period_totals`; opens no transaction, so the caller holds one ([export](../export/README.md)) | nothing |
 
@@ -44,7 +44,10 @@ The endpoint, its shape and its error code are in the
    nothing, so every missing or malformed value reaches `parse_period` and becomes
    `invalid_period`, not the generic `invalid_request`.
 2. The service reads, in one transaction, `dated_lines(start, end)`,
-   `count_unreviewed(start, end)`, `count_undated()` and `CategoryService.list()`.
+   `count_unreviewed(start, end)`, `count_undated()`, `CategoryService.list()` and
+   `ArchiveRepository.archived_years(start year, end year)`. Archived receipts are not in
+   the active tables, so they are in no total; `archived_years` tells the page which years
+   of the period are archived ([archive](../archive/README.md#period-warning)).
 3. `period_totals(period, lines, catalog)` computes the columns, rows and column totals.
 4. The answer holds category and group names and cents only; no product name is read
    (NFR-3). The request log has no query string (@backend/app/logging_setup.py).
@@ -53,7 +56,7 @@ The endpoint, its shape and its error code are in the
 
 - Uses: [calculation](../calculation/README.md),
   [categorization](../categorization/README.md) (the category list order),
-  [storage](../storage/README.md).
+  [storage](../storage/README.md) (also `ArchiveRepository.archived_years`).
 - Used by: the [UI](../ui/README.md) Yhteenveto page; [export](../export/README.md) for
   the totals file and the totals PDF; [budget](../budget/README.md) for `ColumnOut` and `InvalidPeriodError`.
 

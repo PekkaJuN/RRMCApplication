@@ -41,6 +41,7 @@ function New-SettingsFile([string]$Name, [hashtable]$Overrides) {
         RRMC_IMPORT_DIR   = (Join-Path $WorkDir "import")
         RRMC_DONE_DIR     = (Join-Path $WorkDir "import_done")
         RRMC_FAILED_DIR   = (Join-Path $WorkDir "import_failed")
+        RRMC_ARCHIVE_DIR  = (Join-Path $WorkDir "archived")
         RRMC_ENGINES      = "real"
         # Nothing listens on this port inside the container, so Ollama is unreachable.
         RRMC_OLLAMA_URL   = "http://127.0.0.1:9"
@@ -108,10 +109,18 @@ function Wait-Health {
     return $null
 }
 
-foreach ($folder in @("import", "import_done", "import_failed")) {
+foreach ($folder in @("import", "import_done", "import_failed", "archived")) {
     New-Item -ItemType Directory -Force -Path (Join-Path $WorkDir $folder) | Out-Null
 }
 $Settings = New-SettingsFile "settings.env" @{}
+
+# Archiving AC32: the backend mounts the archive folder from RRMC_ARCHIVE_DIR at /data/archived.
+$config = Invoke-Compose $Settings @("config", "--format", "json") | ConvertFrom-Json
+$archiveMount = @($config.services.backend.volumes | Where-Object { $_.target -eq "/data/archived" })
+$expected = Join-Path $WorkDir "archived"
+Write-Result "Archiving AC32 backend mounts RRMC_ARCHIVE_DIR at /data/archived" `
+    ($archiveMount.Count -eq 1 -and "$($archiveMount[0].source)" -eq $expected) `
+    "got: $($archiveMount | ConvertTo-Json -Compress)"
 
 # AC2: every published port is bound to 127.0.0.1, and the port settings are used.
 foreach ($case in @(@{ Backend = "8000"; Ui = "5173" }, @{ Backend = "8100"; Ui = "5200" })) {

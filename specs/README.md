@@ -25,3 +25,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 18 | [Agent guardrails](features/agent-guardrails.md) | Done (AC24 deferred) | NFR-1, NFR-4, AGENTS.md Guardrails for agents |
 | 19 | [Budget comparison CSV export](features/comparison-csv-export.md) | Done | FR-52 (new), FR-27 |
 | 20 | [Finnish dates in the CSV files](features/finnish-csv-dates.md) | Done | FR-26 (changed) |
+| 21 | [Archiving](features/archiving.md) | Done | FR-40–FR-42, FR-53 (new) |

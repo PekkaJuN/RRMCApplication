@@ -87,6 +87,7 @@ class ComparisonOut(BaseModel):
     total: ComparisonTotalOut
     unreviewed_receipts: int
     undated_receipts: int
+    archived_years: list[int]
 
     @classmethod
     def from_view(cls, view: ComparisonView) -> Self:
@@ -106,4 +107,5 @@ class ComparisonOut(BaseModel):
             ),
             unreviewed_receipts=view.unreviewed_receipts,
             undated_receipts=view.undated_receipts,
+            archived_years=view.archived_years,
         )

@@ -1,9 +1,10 @@
 """CSV files for Finnish Excel (export spec PC2–PC5, P2; PRD FR-26)."""
 
-from collections.abc import Sequence
-from datetime import date
+from collections.abc import Iterator, Sequence
+from datetime import date, timedelta
 
 from app import texts
+from app.calculation.archive_totals import ArchiveRow, ArchiveTotals
 from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
 from app.calculation.period_totals import PeriodTotals, RowKind
@@ -41,6 +42,7 @@ COMPARISON_HEADER = (
     "Toteutunut",
     "Jäljellä",
 )
+ARCHIVE_HEADER = ("Jakso", "Alkaa", "Päättyy", "Ryhmä", "Kategoria", "Tuote", "Summa")
 # The row of lines without a category is a category row too (comparison CSV spec PC3).
 ROW_KINDS: dict[RowKind, str] = {"group": "ryhmä", "category": "kategoria", "none": "kategoria"}
 
@@ -105,6 +107,58 @@ class CsvExporter:
             prefix += "_15-14"
         # comparison_period has checked the month, so it holds only digits and `-`.
         return _file(f"{prefix}_{comparison.period.first}.csv", rows)
+
+    def archive_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        """Archiving spec PC13: the product rows of each month, then of the whole year."""
+        year = totals.year
+        products = list(_archive_products(totals.rows))
+        rows = [[_cell(name) for name in ARCHIVE_HEADER]]
+        for index, key in enumerate(totals.months):
+            first = date(year, index + 1, 1)
+            last = (
+                date(year, index + 2, 1) - timedelta(days=1) if index < 11 else date(year, 12, 31)
+            )
+            for group, category, product in products:
+                if product.line_counts[index]:
+                    rows.append(
+                        _archive_row(key, first, last, group, category, product.name)
+                        + [_cell(_money(product.months[index]))]
+                    )
+        for group, category, product in products:
+            rows.append(
+                _archive_row(
+                    str(year), date(year, 1, 1), date(year, 12, 31), group, category, product.name
+                )
+                + [_cell(_money(product.total))]
+            )
+        # parse_year has checked the year, so the name holds only digits.
+        return _file(f"{texts.ARCHIVE_FILE_PREFIX}_{year}.csv", rows)
+
+
+def _archive_products(rows: Sequence[ArchiveRow]) -> Iterator[tuple[str | None, str, ArchiveRow]]:
+    """(group, category, product row) in the order of the year totals (PC11)."""
+    for row in rows:
+        if row.kind == "group":
+            for category in row.children:
+                for product in category.children:
+                    yield row.name, category.name or "", product
+        else:
+            category_name = row.name if row.kind == "category" else texts.NO_CATEGORY
+            for product in row.children:
+                yield None, category_name or "", product
+
+
+def _archive_row(
+    period: str, first: date, last: date, group: str | None, category: str, product: str | None
+) -> list[str]:
+    return [
+        _cell(period),
+        _cell(_finnish_day(first)),
+        _cell(_finnish_day(last)),
+        _text(group),
+        _text(category),
+        _text(product),
+    ]
 
 
 def _bounds(period: Period) -> str:

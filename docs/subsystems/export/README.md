@@ -1,6 +1,6 @@
 # Export
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md#export) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Storage](../storage/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../../api-reference.md#export) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Archive](../archive/README.md) | → [Storage](../storage/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -10,6 +10,8 @@ Export serves the downloads of the Yhteenveto and Vertailu pages:
   period by week or by month.
 - **Comparison CSV** (PRD FR-52): the budget comparison of the Vertailu page, for the whole
   period and optionally its weeks.
+- **Archive CSV** (PRD FR-53): the product totals of an archived year per month and for
+  the whole year.
 - **PDF** (PRD FR-48): the **weekly totals PDF** (A4 landscape), the **monthly totals PDF**
   (A4 portrait, stacked month blocks) and the **comparison PDF** (A4 portrait, the Vertailu
   month table).
@@ -21,7 +23,8 @@ of one: a report file has no lines file, and the CSV totals file needs no counts
 
 Export computes no sum itself. The totals files use the same `TotalsService` as
 `GET /api/totals`, and the comparison files the same `BudgetService.comparison` as
-`GET /api/budget/comparison`, so a file and its page always agree (PRD risk table). The
+`GET /api/budget/comparison`, and the archive file the same `read_year_totals` as
+`GET /api/archive/{year}/totals`, so a file and its page always agree (PRD risk table). The
 lines file reads the period's lines with their store, review state, category and group
 names from storage.
 
@@ -29,7 +32,7 @@ names from storage.
 
 - @backend/app/export/routes.py — `create_export_router(settings, exporter,
   report_exporter, clock)`: `GET /api/export/lines`, `/totals`, `/totals/pdf`,
-  `/comparison` and `/comparison/pdf`, one connection per request; the answer is a download
+  `/comparison`, `/comparison/pdf` and `/archive/{year}`, one connection per request; the answer is a download
   (`Content-Disposition: attachment`, `Cache-Control: no-store`)
 - @backend/app/export/service.py — `ExportService`: checks the period, then `by`, then a
   PDF's length, reads in one transaction and calls the exporter
@@ -58,6 +61,8 @@ The endpoints, their files and error codes are in the
 | `ExportService.totals_pdf(unit, first, last, by)` | As `totals_file`, then checks the length; reads the totals and both counts as `TotalsService.totals` does | `InvalidPeriodError`, `invalid_request`, then `PeriodTooLongError` |
 | `ExportService.comparison_pdf(month, period)` | Reads `BudgetService.comparison` | `InvalidPeriodError` |
 | `ExportService.comparison_file(month, period, weeks)` | Reads `BudgetService.comparison`, then checks that `weeks` is missing, `false` or `true` | `InvalidPeriodError`, then `AppError` `invalid_request` |
+| `ExportService.archive_file(year_text)` | Parses the year (`parse_year`), reads the year totals (`read_year_totals`) and returns the exporter's archive file | `InvalidYearError`, `YearNotArchivedError` |
+| `Exporter.archive_totals_file(totals)` | Builds the archive CSV file of an archived year | nothing |
 | `Exporter.lines_file(period, lines)` | Builds the lines file from `ExportLine` items | nothing |
 | `Exporter.totals_file(totals, by)` | Builds the totals file of the week columns (`by` `week`) or the month columns (`month`) | nothing |
 | `Exporter.comparison_file(comparison, kind, weeks=...)` | Builds the comparison CSV file of a `calendar` or `mid` period, with or without the weeks | nothing |
@@ -122,6 +127,18 @@ clock.
 - File names: `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, and with the weeks
   `vertailu_viikot_<month>.csv`, `vertailu_viikot_15-14_<month>.csv`.
 
+### Archive CSV file
+
+- Columns `Jakso;Alkaa;Päättyy;Ryhmä;Kategoria;Tuote;Summa`. One block per month with
+  lines (`Jakso` `2025-01`, the month's first and last day), then the year block (`Jakso`
+  `2025`, 01.01.–31.12.). A product row is written in a month when it has lines there
+  (`ArchiveRow.line_counts`), so a sum of 0 with lines is listed.
+- Inside a block the products follow the year totals' order. There are no group or
+  category sum rows; Excel sums them from the product rows. `Ryhmä` is empty for a category
+  without a group; `Kategoria` is `Ei kategoriaa` for lines without one.
+- The other rules of the CSV format above apply, also the formula guard on the names.
+- File name: `arkisto_<year>.csv`.
+
 ### PDF layout
 
 - **Limits:** the weekly PDF covers at most 31 days (at most 6 week columns), the monthly
@@ -129,7 +146,8 @@ clock.
   never split over pages.
 - **Header:** the title, `Jakso: <first day>–<last day>`, for the comparison
   `Jakson tyyppi: Kalenterikuukausi` or `15.–14.`, `Luotu <day>` and the counts of the page
-  when they are not 0. The creation day is the clock's time in `Europe/Helsinki`.
+  when they are not 0, then the archived years sentence when the period overlaps an
+  archived year. The creation day is the clock's time in `Europe/Helsinki`.
 - **Rows:** the totals PDFs show every group expanded: the group row (bold), its
   categories (indented), the standalone categories, `Ei kategoriaa` and `Yhteensä` (bold).
   The comparison shows the budget rows as the Vertailu page; a negative `Jäljellä` also
@@ -152,9 +170,11 @@ clock.
 - Uses: [totals](../totals/README.md) (`TotalsService.period`, `read` and `totals`),
   [budget](../budget/README.md) (`BudgetService.comparison`),
   [calculation](../calculation/README.md) (the period, totals and comparison types),
-  [storage](../storage/README.md) (`export_lines`); reportlab for the PDF files.
-- Used by: the [UI](../ui/README.md) Yhteenveto page's download links and the Vertailu
-  page's PDF and CSV links.
+  [archive](../archive/README.md) (`parse_year`, `read_year_totals`),
+  [storage](../storage/README.md) (`export_lines`, `ArchiveRepository`); reportlab for the
+  PDF files.
+- Used by: the [UI](../ui/README.md) Yhteenveto page's download links, the Vertailu
+  page's PDF and CSV links and the archived year page's `Vie CSV`.
 
 ## Modules
 
@@ -178,6 +198,7 @@ None yet.
 - [CSV export spec](../../../specs/features/csv-export.md)
 - [PDF export spec](../../../specs/features/pdf-export.md)
 - [Comparison CSV export spec](../../../specs/features/comparison-csv-export.md)
+- [Archiving spec](../../../specs/features/archiving.md)
 - [Finnish CSV dates spec](../../../specs/features/finnish-csv-dates.md)
 - [ADR 0005: PDF library](../../adr/0005-pdf-library.md)
 - [Architecture](../../architecture.md#component-map)

@@ -1,4 +1,6 @@
 import type { MouseEvent } from "react";
+import { ArchivePage } from "./components/ArchivePage";
+import { ArchiveYearPage } from "./components/ArchiveYearPage";
 import { BudgetPage } from "./components/BudgetPage";
 import { ComparisonPage } from "./components/ComparisonPage";
 import { ImportPage } from "./components/ImportPage";
@@ -10,19 +12,20 @@ import { TotalsPage } from "./components/TotalsPage";
 import { fi } from "./i18n/fi";
 import { isPlainLeftClick, PAGE_PATHS, usePage, type Page } from "./navigation";
 
-const LINKS: { page: Exclude<Page, "receipt">; text: string }[] = [
+const LINKS: { page: Exclude<Page, "receipt" | "archiveYear">; text: string }[] = [
   { page: "products", text: fi.products.heading },
   { page: "import", text: fi.import.heading },
   { page: "receipts", text: fi.receipts.heading },
   { page: "totals", text: fi.totals.heading },
   { page: "budget", text: fi.budget.heading },
   { page: "comparison", text: fi.comparison.heading },
+  { page: "archive", text: fi.archive.heading },
 ];
 
 export function App() {
-  const [page, go, receiptId] = usePage();
-  // A receipt belongs to the Kuitit section of the navigation.
-  const section = page === "receipt" ? "receipts" : page;
+  const [page, go, receiptId, archiveYear] = usePage();
+  // A receipt belongs to the Kuitit section of the navigation, an archived year to Arkisto.
+  const section = page === "receipt" ? "receipts" : page === "archiveYear" ? "archive" : page;
 
   function open(event: MouseEvent<HTMLAnchorElement>, target: Page) {
     if (!isPlainLeftClick(event)) {
@@ -52,6 +55,11 @@ export function App() {
         return <BudgetPage />;
       case "comparison":
         return <ComparisonPage />;
+      case "archive":
+        return <ArchivePage onOpenYear={(year) => go("archiveYear", year)} />;
+      case "archiveYear":
+        // `archiveYear` is set whenever the page is `archiveYear`; the key reloads on another year.
+        return <ArchiveYearPage key={archiveYear} year={archiveYear ?? 0} />;
       default:
         return <ProductsPage />;
     }

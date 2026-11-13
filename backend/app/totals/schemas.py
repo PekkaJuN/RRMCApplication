@@ -59,6 +59,7 @@ class TotalsOut(BaseModel):
     month_totals: list[int]
     unreviewed_receipts: int
     undated_receipts: int
+    archived_years: list[int]
 
     @classmethod
     def from_view(cls, view: TotalsView) -> Self:
@@ -76,4 +77,5 @@ class TotalsOut(BaseModel):
             month_totals=totals.month_totals,
             unreviewed_receipts=view.unreviewed_receipts,
             undated_receipts=view.undated_receipts,
+            archived_years=view.archived_years,
         )

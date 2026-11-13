@@ -1,8 +1,8 @@
 # API Reference
 
-- **Status:** Done (health, catalog, import, receipt, line editing, totals, budget and
-  export endpoints)
-- **Updated:** 2026-11-06
+- **Status:** Done (health, catalog, import, receipt, line editing, totals, budget, export
+  and archive endpoints)
+- **Updated:** 2026-11-13
 
 ## Overview
 
@@ -361,7 +361,8 @@ Implemented in @backend/app/totals/routes.py. The rules are in
   "week_totals": [324],
   "month_totals": [324],
   "unreviewed_receipts": 1,
-  "undated_receipts": 0
+  "undated_receipts": 0,
+  "archived_years": []
 }
 ```
 
@@ -369,7 +370,9 @@ The example shows one week column of five. A column's dates are its days inside 
 `partial` is true when that is not the whole week or month. A row's `weeks` and `months` are
 cents in column order. `rows` is `[]` when the period has no lines. `unreviewed_receipts`
 counts the unreviewed receipts dated in the period; `undated_receipts` counts all receipts
-without a purchase date, which are in no period.
+without a purchase date, which are in no period. `archived_years` lists, ascending, the
+[archived](#archive) years that overlap the period's dates; their receipts are not in the
+totals.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|
@@ -418,7 +421,8 @@ The comparison answers:
   "total": {"budget_cents": 40000, "actual_cents": 12699, "remaining_cents": 27301,
             "weeks": [{"budget_cents": 5161, "actual_cents": 12699}]},
   "unreviewed_receipts": 1,
-  "undated_receipts": 0
+  "undated_receipts": 0,
+  "archived_years": []
 }
 ```
 
@@ -427,6 +431,7 @@ The example shows one week of five. Only reviewed receipts count as spending. Wi
 exists only when reviewed lines have no category. A row's `weeks` follow the order of
 `weeks` and add up to its budget. `unreviewed_receipts` counts the unreviewed receipts dated
 in the period; `undated_receipts` counts all receipts without a purchase date.
+`archived_years` is as in `GET /api/totals`.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|
@@ -444,6 +449,8 @@ Implemented in @backend/app/export/routes.py; the package is
 `GET /api/totals` does and answer a CSV download for Finnish Excel (PRD FR-26). The PDF
 endpoints answer a PDF download of the totals or of the budget comparison (PRD FR-48).
 `GET /api/export/comparison` answers a CSV file of the budget comparison (PRD FR-52).
+`GET /api/export/archive/{year}` answers a CSV file of an archived year's totals (PRD FR-53).
+The other files read active data only.
 
 | Method and path | Query | Success | Errors |
 |---|---|---|---|
@@ -452,6 +459,7 @@ endpoints answer a PDF download of the totals or of the budget comparison (PRD F
 | `GET /api/export/totals/pdf` | the same as `GET /api/export/totals` | 200, `summat_viikot_<from>_<to>.pdf` (A4 landscape) or `summat_kuukaudet_<from>_<to>.pdf` (A4 portrait) | 422 `invalid_period`, then `invalid_request`, then `period_too_long` |
 | `GET /api/export/comparison` | `month` and `period` as in `GET /api/budget/comparison`; `weeks` `true`, or `false` (the default) | 200, `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, or with `weeks=true` `vertailu_viikot_<month>.csv`, `vertailu_viikot_15-14_<month>.csv` | 422 `invalid_period`, then `invalid_request` |
 | `GET /api/export/comparison/pdf` | `month` and `period` as in `GET /api/budget/comparison` | 200, `vertailu_<month>.pdf` or `vertailu_15-14_<month>.pdf` (A4 portrait) | 422 `invalid_period` |
+| `GET /api/export/archive/{year}` | — | 200, `arkisto_<year>.csv` | 422 `invalid_year`, 404 `not_found` |
 
 Every 200 answer has `Content-Type: text/csv; charset=utf-8`, `Content-Disposition:
 attachment; filename="<name>"` and `Cache-Control: no-store`. The content is UTF-8 with a
@@ -490,18 +498,104 @@ Koko jakso;01.10.2026;31.10.2026;ei;kategoria;Ei kategoriaa;0,00;1,99;-1,99
 2026-W40;01.10.2026;04.10.2026;kyllä;ryhmä;Ruoka;51,61;125,00;-73,39
 ```
 
+The archive file lists the product totals of an archived year in long format: a block per
+month with lines, then the year block. Inside a block the rows follow the order of
+[the year totals](#archive); there are no group or category sum rows:
+
+```text
+Jakso;Alkaa;Päättyy;Ryhmä;Kategoria;Tuote;Summa
+2025-01;01.01.2025;31.01.2025;Maitotuotteet;Maito;Maito 1l;5,00
+2025;01.01.2025;31.12.2025;Maitotuotteet;Maito;Maito 1l;5,00
+```
+
 | Status | `error` | `message` | When |
 |---|---|---|---|
 | 422 | `invalid_period` | `Jakso on virheellinen.` | As in `GET /api/totals`, or as in `GET /api/budget/comparison` for the comparison files; checked first |
 | 422 | `invalid_request` | `Pyyntö on virheellinen.` | `by` of the totals file is missing or not `week` or `month`; `weeks` of the comparison file is not `true` or `false` |
 | 422 | `period_too_long` | `Jakso on liian pitkä PDF-tiedostoon.` | A totals PDF over 31 days (`by` `week`) or 366 days (`by` `month`); checked last |
+| 422 | `invalid_year` | `Vuosi on virheellinen.` | The archive file's year is not four digits from 2000 to 9999 |
+| 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | The archive file's year is not archived |
 
 A PDF answer has `Content-Type: application/pdf` and the same `Content-Disposition` and
 `Cache-Control` as a CSV answer. The weekly PDF is one table of the week columns; the
 monthly PDF stacks a block per month, then `Koko jakso` for a period over 31 days; the
 comparison PDF is the Vertailu month table. A period without counted lines shows
 `Ei ostoksia valitulla jaksolla.` instead of a table. The layout is in
-[export](subsystems/export/README.md#pdf-layout).
+[export](subsystems/export/README.md#pdf-layout). The totals PDF and the comparison PDF add
+the `archived_years` sentence to their notes.
+
+### Archive
+
+Implemented in @backend/app/archive/routes.py; the package is
+[archive](subsystems/archive/README.md). Archiving moves the reviewed receipts of a finished
+year out of the active data (PRD FR-40–FR-42, FR-53). `{year}` is four digits from 2000 to
+9999.
+
+| Method and path | Success | Errors |
+|---|---|---|
+| `GET /api/archive` | 200, the archived years and the years that can be archived | — |
+| `POST /api/archive/{year}` | 200, the counts and the images that were not moved | 422 `invalid_year`; 409 `year_not_finished`, `import_running`, `unreviewed_receipts`; 404 `nothing_to_archive` |
+| `DELETE /api/archive/{year}` | 200, the deleted counts | 422 `invalid_year`, 404 `not_found` |
+| `GET /api/archive/{year}/totals` | 200, the year's totals per group, category and product | 422 `invalid_year`, 404 `not_found` |
+
+`GET /api/archive` answers both lists sorted by year, newest first. A candidate is a year
+before the current one (Finnish time) with active dated receipts; `images` counts receipts
+with an image:
+
+```json
+{
+  "archived": [{"year": 2025, "receipts": 12, "lines": 140, "images": 11}],
+  "candidates": [{"year": 2024, "receipts": 3, "lines": 20, "images": 3, "unreviewed": 1}]
+}
+```
+
+`POST` checks in the order of the error table, then moves the year in one transaction and
+the images after the commit. A year already in the archive gets the new receipts added. An
+image that could not be moved stays in the done folder and is named in the answer:
+
+```json
+{"year": 2025, "receipts": 12, "lines": 140, "images_moved": 10, "images_not_moved": ["a.jpg"]}
+```
+
+`DELETE` deletes the year's archived receipts and lines and answers
+`{"year": 2025, "receipts": 12, "lines": 140}`. Image files are not touched; after the
+delete the year's images are no longer duplicates.
+
+`GET /api/archive/{year}/totals` answers a tree of rows: a group sums its categories, a
+category its products, a product the lines with its name in that category. Lines without a
+category form a `none` row (`name` `null`) with their products. At each level rows are
+sorted by name in Finnish order, `none` last; deposit refunds are left out. `months` has 12
+entries, January first, in cents. The example shortens the lists:
+
+```json
+{
+  "year": 2025,
+  "months": ["2025-01", "2025-02", "2025-12"],
+  "rows": [
+    {"kind": "group", "name": "Maitotuotteet", "months": [900, 0, 0], "total": 900,
+     "children": [
+       {"kind": "category", "name": "Maito", "months": [500, 0, 0], "total": 500,
+        "children": [{"kind": "product", "name": "Maito 1l", "months": [500, 0, 0],
+                      "total": 500, "children": []}]}
+     ]}
+  ],
+  "month_totals": [900, 0, 0],
+  "total": 900
+}
+```
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 422 | `invalid_year` | `Vuosi on virheellinen.` | The year is not four digits from 2000 to 9999 |
+| 409 | `year_not_finished` | `Vain päättyneen vuoden voi arkistoida.` | The year is the current year (Finnish time) or later |
+| 409 | `import_running` | `Tuonti on käynnissä. Arkistoi vuosi, kun tuonti on valmis.` | An import run is running |
+| 404 | `nothing_to_archive` | `Vuodelta ei ole arkistoitavia kuitteja.` | The year has no active receipts |
+| 409 | `unreviewed_receipts` | `Vuotta ei voi arkistoida: vuodella on 1 tarkistamaton kuitti.` | The year has unreviewed receipts; adds `count` |
+| 404 | `not_found` | `Pyydettyä kohdetta ei löydy.` | `DELETE` or totals of a year that is not archived |
+
+Archived receipts are not served one by one: an archived receipt's old id answers 404 in
+`/api/receipts/{id}`. An archived image is still a duplicate for the import and for
+`POST /api/receipts`.
 
 ## Subsystems
 
@@ -513,6 +607,7 @@ comparison PDF is the Vertailu month table. A period without counted lines shows
 - [totals](subsystems/totals/README.md) — the totals endpoint
 - [budget](subsystems/budget/README.md) — the budget and comparison endpoints
 - [export](subsystems/export/README.md) — the CSV and PDF export endpoints
+- [archive](subsystems/archive/README.md) — the archive endpoints
 
 ## Related Documents
 
@@ -525,4 +620,5 @@ comparison PDF is the Vertailu month table. A period without counted lines shows
 - [Receipt review spec](../specs/features/receipt-review.md): the receipt endpoints
 - [Line editing spec](../specs/features/line-editing.md): line and receipt edits
 - [Category totals spec](../specs/features/totals.md): the totals endpoint
+- [Archiving spec](../specs/features/archiving.md): the archive endpoints
 - [development.md](development.md#troubleshooting): what the health results mean for the user

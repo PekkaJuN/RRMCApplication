@@ -1,9 +1,9 @@
 # System Architecture
 
 - **Status:** Done (foundation, categorization, import with reading, receipt review with
-  the receipt check, totals, monthly budget, CSV and PDF export implemented; Google Sheets
-  export is target design)
-- **Updated:** 2026-11-09
+  the receipt check, totals, monthly budget, CSV and PDF export, archiving implemented;
+  Google Sheets export is target design)
+- **Updated:** 2026-11-13
 
 ## Overview
 
@@ -53,6 +53,7 @@ backend/                 FastAPI app and all processing
     texts.py             Finnish texts of the backend (error messages)
     image_files.py       receipt image file rules shared by import and review: signature,
                          hash, free done name, the safe move
+    local_time.py        the Finnish time zone and today's date, shared by export and archive
     logging_setup.py     logging to stdout and one log line per request
     storage/             SQLite connection, transactions, migrations/, repositories
     categorization/      catalog: names, rules, default list, routes
@@ -66,7 +67,10 @@ backend/                 FastAPI app and all processing
                          create and delete a receipt, the failed images
     totals/              GET /api/totals: category totals per week and month of a period
     budget/              /api/budget: monthly budgets and their comparison with spending
-    export/              CSV and PDF downloads of a period's lines, totals and budget comparison
+    export/              CSV and PDF downloads of a period's lines, totals and budget comparison,
+                         and of an archived year's totals
+    archive/             /api/archive: archive a finished year, delete an archived year, the
+                         year's totals
     <subsystem>/         one package per feature subsystem (see Component map)
   evaluation/            development tool, not part of the app: compares reading variants
                          on the user's receipts (python -m evaluation)
@@ -88,6 +92,7 @@ specs/                   PRD and feature specs
 source/import/           incoming receipt images        (default; gitignored, real data)
 source/import_done/      imported images               (default; gitignored, real data)
 source/import_failed/    images that failed to import   (default; gitignored, real data)
+source/archived/         images of archived years       (default; gitignored, real data)
 source/eval/             evaluation receipts, truth files, results (default; gitignored, real data)
 compose.yaml             Docker Compose: backend and frontend; profiles test, e2e and eval
 .env.example             committed example settings file; the real .env is not committed
@@ -132,6 +137,11 @@ flowchart LR
   CAT --> ST
   EXP --> TOT
   EXP --> ST
+  EXP --> ARC
+  API --> ARC[archive]
+  ARC --> CALC
+  ARC --> ST
+  ARC --> FS
   ST --> DB[(SQLite)]
   IMP --> FS[(import folders)]
 ```
@@ -146,11 +156,12 @@ flowchart LR
 | **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, line and receipt edits, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
 | **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
 | **budget** | `/api/budget`: reads and saves the monthly budgets, reads the reviewed lines, the counts and the category order, and returns the comparison from calculation | Calculate sums itself or store figures | FR-50 (backend) |
-| **export** | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison` and `/comparison/pdf`: reads a period's lines, totals or budget comparison and builds the files through the exporter interfaces; the CSV and PDF exporters, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28, FR-48, FR-52 |
-| **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, budget and comparison, import and export actions | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-46, FR-47, FR-50, NFR-15 |
+| **export** | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison`, `/comparison/pdf` and `/archive/{year}`: reads a period's lines, totals or budget comparison, or an archived year's totals, and builds the files through the exporter interfaces; the CSV and PDF exporters, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28, FR-48, FR-52, FR-53 |
+| **archive** | `/api/archive`: checks that a year can be archived, moves its receipts and lines into the archive tables in one transaction and its images into the archive folder, lists the archived and archivable years, deletes an archived year, and returns an archived year's totals from calculation | Show archived receipts one by one, or change archived data | FR-40–FR-42, FR-53 |
+| **ui** | Pages: receipts list with the new receipt form, receipt review (image beside an editable table, receipt delete), products and categories, totals, budget and comparison, import and export actions, the archive and an archived year | Hold business rules; it shows what the API returns | FR-16–FR-21, FR-25, FR-40–FR-42, FR-46, FR-47, FR-50, FR-53, NFR-15 |
 
 Cross-cutting backend modules (`main.py`, `prestart.py`, `settings.py`, `errors.py`,
-`texts.py`, `logging_setup.py`, `image_files.py`) belong to the foundation and are used by
+`texts.py`, `logging_setup.py`, `image_files.py`, `local_time.py`) belong to the foundation and are used by
 every subsystem. `image_files.py` holds the image file rules that import and review both
 need, because neither may depend on the other.
 The `health` package reports the state of the database, the image folders, OCR and the model
@@ -167,9 +178,13 @@ The `health` package reports the state of the database, the image folders, OCR a
   `export` → `totals`, `budget` (its comparison service), `calculation` (types only),
   `storage`; `totals` and `review` →
   `calculation`, `categorization`, `storage`; `budget` → `calculation`, `categorization`,
-  `totals` (its column schema and period error), `storage`.
-  `calculation` does no I/O and depends on nothing. No subsystem depends on `import`,
-  `export` or `review`.
+  `totals` (its column schema and period error), `storage`; `archive` → `calculation`,
+  `storage`, and the import run's state; `export` → `archive` (its year check and the
+  year totals reader). `totals` and `budget` read the archived years of a period through
+  storage's `ArchiveRepository`, not through `archive`.
+  `calculation` does no I/O and depends on nothing. No subsystem depends on `export` or
+  `review`. Only the archive router reads `import`: it asks the import service whether a
+  run is running, so a year is not archived while files move.
 - Only **receipt-reading** and **categorization** call Tesseract or Ollama, and only through
   the interfaces below. The exceptions are **health** and **import**, which call only the
   interfaces' availability checks (`check()`); health also calls the model's `load()`.
@@ -257,6 +272,19 @@ download links ask `GET /api/export/totals` (by week or by month) and
 `GET /api/export/comparison/pdf` and `GET /api/export/comparison`. The files use the same
 totals and comparison services, so an export always matches its page (FR-26, FR-48, FR-52, PRD risk table).
 
+### Archive
+
+Implemented: [archive](subsystems/archive/README.md).
+
+The Arkisto page lists the finished years that can be archived and the archived years. Archiving
+a year copies its reviewed receipts and lines into `archived_receipts` and `archived_lines`,
+with category and group names instead of ids, and deletes them from the active tables in one
+transaction; then the images move from the done folder to the archive folder (FR-40). The
+active pages, totals and exports no longer see the year; Yhteenveto and Vertailu name an
+archived year that overlaps their period (FR-42). An archived year's page and its CSV file
+show the totals per group, category and product by month (FR-53). Deleting an archived year
+removes its rows and leaves the images (FR-41).
+
 ### Budget
 
 Implemented: [budget](subsystems/budget/README.md).
@@ -273,7 +301,7 @@ computes the budget, spending and remaining per row and ISO week (FR-50).
 | `ReceiptReader` | receipt-reading | `OcrReceiptReader` (Tesseract, then the text model) | Image in, read receipt out (store, date, total, lines, OCR text); the one interface import calls, so a vision reader can be added later |
 | `OcrEngine` | receipt-reading | Tesseract | `orient()` turns the image upright, `read()` returns its text; `check()` tells whether Tesseract with `fin` and `eng` can run |
 | `ReceiptModel` | receipt-reading, categorization | Ollama client | `generate(prompt, schema)` returns the model's JSON answer; receipt-reading turns OCR text into a receipt, categorization suggests categories for unknown names ([ADR 0004](adr/0004-line-categorization.md)). Output is validated; invalid output is an error (FR-8). `check()` and `load()` tell whether the model is available and keep it loaded |
-| `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)`, `totals_file(totals, by)` and `comparison_file(comparison, kind, weeks=...)` return a file (name, media type, bytes) (FR-27, FR-52) |
+| `Exporter` | export | `CsvExporter`; later Google Sheets | `lines_file(period, lines)`, `totals_file(totals, by)`, `comparison_file(comparison, kind, weeks=...)` and `archive_totals_file(totals)` return a file (name, media type, bytes) (FR-27, FR-52, FR-53) |
 | `ReportExporter` | export | `PdfExporter` | `totals_report(report, by)` and `comparison_report(report)` return a file of a whole report with its counts and creation day (FR-27, FR-48) |
 
 `OcrEngine` and `ReceiptModel` live in the shared `engines` package (see
@@ -349,8 +377,10 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [budget](subsystems/budget/README.md) — the monthly budgets and their comparison
 - [export](subsystems/export/README.md) — the CSV and PDF export endpoints and the
   exporter interfaces
+- [archive](subsystems/archive/README.md) — archiving a finished year, the archived years
+  and their totals
 - [ui](subsystems/ui/README.md) — app shell, page switching, API client, status line,
-  Tuotteet, Tuonti, Kuitit, receipt, Yhteenveto, Budjetti and Vertailu pages
+  Tuotteet, Tuonti, Kuitit, receipt, Yhteenveto, Budjetti, Vertailu and Arkisto pages
 
 ## Related Documents
 
@@ -358,6 +388,7 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [Product management spec](../specs/features/product-management.md)
 - [Receipt import spec](../specs/features/receipt-import.md)
 - [ADR 0001: Technology stack](adr/0001-tech-stack.md)
+- [ADR 0007: Archive tables](adr/0007-archive-tables.md)
 - [ADR 0002: Docker](adr/0002-docker.md)
 - [ADR 0003: Receipt reading model](adr/0003-receipt-reading-model.md)
 - [ADR 0004: Line categorization](adr/0004-line-categorization.md)

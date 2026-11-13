@@ -89,7 +89,9 @@ class HealthService:
         settings = self._settings
         checks = HealthChecks(
             database="ok" if is_available(settings.db_path) else "unavailable",
-            folders=check_folders([settings.import_dir, settings.done_dir, settings.failed_dir]),
+            folders=check_folders(
+                [settings.import_dir, settings.done_dir, settings.failed_dir, settings.archive_dir]
+            ),
             ocr=self._engines.ocr.check(),
             model=self._engines.model.check(),
         )

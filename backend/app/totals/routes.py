@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.settings import Settings
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.receipt_repository import ReceiptRepository
@@ -19,7 +20,11 @@ def create_totals_router(settings: Settings) -> APIRouter:
     def totals_service() -> Generator[TotalsService]:
         connection = connect(settings.db_path)
         try:
-            yield TotalsService(CatalogRepository(connection), ReceiptRepository(connection))
+            yield TotalsService(
+                CatalogRepository(connection),
+                ReceiptRepository(connection),
+                ArchiveRepository(connection),
+            )
         finally:
             connection.close()
 

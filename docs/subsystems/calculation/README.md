@@ -1,6 +1,6 @@
 # Calculation
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Storage](../storage/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Archive](../archive/README.md) | → [Storage](../storage/README.md)
 
 ## Overview
 
@@ -10,7 +10,8 @@ It has the receipt check (FR-20) and the category subtotals of one receipt (FR-1
 used by [review](../review/README.md), and the period totals: per category and group, per
 ISO week and per month of a period (FR-22–FR-25, FR-44), used by
 [totals](../totals/README.md). It also compares the monthly budget with spending (FR-50), used
-by [budget](../budget/README.md).
+by [budget](../budget/README.md), and the totals of an archived year per group, category
+and product (FR-53), used by [archive](../archive/README.md).
 
 ## Key Files and Entry Points
 
@@ -22,6 +23,9 @@ by [budget](../budget/README.md).
 - @backend/app/calculation/budget_comparison.py — `budget_rows`, `weekly_budget`,
   `budget_comparison`
 - @backend/app/calculation/money.py — `AMOUNT_LIMIT`, the limit of a typed amount
+- @backend/app/calculation/archive_totals.py — `archive_totals`, `ArchiveLine`,
+  `ArchiveRow`, `ArchiveTotals`
+- @backend/app/calculation/names.py — `finnish_key`, the Finnish order of names
 
 ## Interfaces
 
@@ -100,6 +104,30 @@ by [budget](../budget/README.md).
   column. The caller decides which lines count: [budget](../budget/README.md) passes only
   those of reviewed receipts.
 
+### Archived year totals
+
+| Function | Returns | Raises |
+|---|---|---|
+| `archive_totals(year, lines)` | `ArchiveTotals(year, months, rows, month_totals, total)` | nothing |
+| `finnish_key(name)` | a sort key | nothing |
+
+- The archive keeps names, not ids ([ADR 0007](../../adr/0007-archive-tables.md)), so the
+  rows are built from `ArchiveLine(purchase_date, amount_cents, product_name,
+  category_name, group_name, is_deposit_refund)`.
+- `rows` is a three-level tree: a **group** sums its categories, a **category** (in a group
+  or at the top without one) sums its products, a **product** sums the lines with its name
+  in that category. The same product name in two categories gives two product rows. Lines
+  without a category form a top-level `none` row with their products.
+- Deposit refunds and lines outside the year are left out. Rows without lines are left out.
+- `months` holds 12 keys, `2025-01` to `2025-12`; a row's `months` are its cents per month
+  and `total` their sum. `month_totals` and `total` sum the top-level rows.
+- At each level rows sort by `finnish_key`: case-insensitive, with `å`, `ä` and `ö` after
+  `z`, ties broken by the exact name. A category without a group sorts among the groups;
+  `none` is last.
+- Each row also has `line_counts`, the lines per month, so the
+  [export](../export/README.md) can tell a sum of 0 with lines from no lines; they are not
+  part of a row's equality.
+
 ## Data Flow
 
 Callers pass plain values: `check_receipt` takes the amounts, `category_subtotals` takes
@@ -110,7 +138,8 @@ the line sum that storage computed in SQL as a one-item list.
 
 - Uses: nothing.
 - Used by: [review](../review/README.md), [totals](../totals/README.md),
-  [budget](../budget/README.md), [export](../export/README.md) (the period and totals types).
+  [budget](../budget/README.md), [archive](../archive/README.md),
+  [export](../export/README.md) (the period, totals and archive totals types).
 
 ## Modules
 

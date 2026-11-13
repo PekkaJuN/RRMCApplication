@@ -3,19 +3,17 @@
 from collections.abc import Callable, Generator
 from datetime import date, datetime
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.export.exporter import Exporter, ExportFile, ReportExporter
 from app.export.service import ExportService
+from app.local_time import local_today
 from app.settings import Settings
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.receipt_repository import ReceiptRepository
-
-# The user's time zone: a file made just after midnight in Finland gets that day.
-LOCAL_TIME = ZoneInfo("Europe/Helsinki")
 
 
 def create_export_router(
@@ -28,7 +26,7 @@ def create_export_router(
     router = APIRouter(prefix="/api/export")
 
     def today() -> date:
-        return clock().astimezone(LOCAL_TIME).date()
+        return local_today(clock)
 
     def export_service() -> Generator[ExportService]:
         connection = connect(settings.db_path)
@@ -39,6 +37,7 @@ def create_export_router(
                 exporter,
                 report_exporter,
                 today,
+                ArchiveRepository(connection),
             )
         finally:
             connection.close()
@@ -93,6 +92,13 @@ def create_export_router(
         weeks: str | None = None,
     ) -> Response:
         return _download(service.comparison_file(month, period, weeks))
+
+    # A plain string, so a bad year is invalid_year, as in /api/archive (archiving spec P4).
+    @router.get("/archive/{year}")
+    def get_archive(
+        service: Annotated[ExportService, Depends(export_service)], year: str
+    ) -> Response:
+        return _download(service.archive_file(year))
 
     return router
 

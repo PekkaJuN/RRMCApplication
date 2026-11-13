@@ -14,7 +14,8 @@ class SettingsError(Exception):
 class Settings(BaseSettings):
     """Backend settings.
 
-    RRMC_IMPORT_DIR, RRMC_DONE_DIR, RRMC_FAILED_DIR and RRMC_BACKEND_PORT are host-side values
+    RRMC_IMPORT_DIR, RRMC_DONE_DIR, RRMC_FAILED_DIR, RRMC_ARCHIVE_DIR and RRMC_BACKEND_PORT
+    are host-side values
     used by Compose; inside the container the folders are always under `data_dir`.
     """
 
@@ -38,6 +39,11 @@ class Settings(BaseSettings):
     @property
     def failed_dir(self) -> Path:
         return self.data_dir / "import_failed"
+
+    @property
+    def archive_dir(self) -> Path:
+        """Images of archived years (archiving spec PC5); mounted from RRMC_ARCHIVE_DIR."""
+        return self.data_dir / "archived"
 
     @property
     def db_path(self) -> Path:

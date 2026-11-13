@@ -127,7 +127,7 @@ def _import(
     if not check_format(path.name, data):
         raise _FileFailedError("unsupported_format")
     image_hash = image_identifier(data)
-    if repository.get_by_hash(image_hash) is not None:
+    if repository.image_known(image_hash):
         return FileResult(path.name, "duplicate")
     try:
         read = reader.read(data)

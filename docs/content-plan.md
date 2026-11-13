@@ -12,14 +12,14 @@ Navigation: ↓ Tier 1 [architecture](architecture.md) | ↓ Tier 2 [subsystems]
 - Link the Path column to a doc only once it exists. Until then, show the path as plain code.
 - Tier 3 rows are added only when the code they describe exists. Do not plan modules in advance.
 
-Last reviewed: 2026-11-11
+Last reviewed: 2026-11-13
 
 ## Summary
 
 | Tier | Total | Done | In Progress | Outdated | Not Started |
 |------|------:|-----:|------------:|---------:|------------:|
 | 1 Architecture | 10 | 6 | 4 | 0 | 0 |
-| 2 Subsystems | 10 | 10 | 0 | 0 | 0 |
+| 2 Subsystems | 11 | 11 | 0 | 0 | 0 |
 | 3 Modules | 0 | 0 | 0 | 0 | 0 |
 
 ## Tier 1: Architecture & High-Level (`docs/`)
@@ -32,8 +32,8 @@ Last reviewed: 2026-11-11
 | 4 | Data Model (required) | [docs/datamodel.md](datamodel.md) | Core entities, schema overview, relationships | 3 | Done |
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | Done |
-| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing and totals terms | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md); 0006: [agent guardrails](adr/0006-agent-guardrails.md) | 3 | In Progress |
+| 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing, totals and archive terms | 2 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md); 0006: [agent guardrails](adr/0006-agent-guardrails.md); 0007: [archive tables](adr/0007-archive-tables.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 | 19 | Security | [docs/security.md](security.md) | Stored data, protection and known limits | 3, 5, 6 | Done |
 
@@ -58,11 +58,12 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 11 | Receipt reading | [docs/subsystems/receipt-reading/README.md](subsystems/receipt-reading/README.md) | Image preprocessing, Tesseract OCR, parsing to line items with the local Ollama model | 4, 10 | Done |
 | 12 | Categorization | [docs/subsystems/categorization/README.md](subsystems/categorization/README.md) | The catalog (groups, categories, products, names, default list); line categories at import (remembered products first, then the model); user corrections and FR-36 | 4, 9 | Done |
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | Done |
-| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison` and `/comparison/pdf`: CSV and PDF files of a period behind the exporter interfaces; Google Sheets later | 4, 13, 18 | Done |
+| 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison`, `/comparison/pdf` and `/archive/{year}`: CSV and PDF files of a period, and the CSV file of an archived year, behind the exporter interfaces; Google Sheets later | 4, 13, 18, 21 | Done |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
 | 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts | 6, 9, 12, 13 | Done |
 | 20 | Budget | [docs/subsystems/budget/README.md](subsystems/budget/README.md) | `/api/budget`: monthly budgets and their comparison with reviewed spending of a calendar month or a 15–14 period | 6, 9, 12, 13, 18 | Done |
+| 21 | Archive | [docs/subsystems/archive/README.md](subsystems/archive/README.md) | `/api/archive`: archiving a finished year into the archive tables and folder, the archived years, permanent delete and an archived year's totals per group, category and product | 4, 6, 9, 13 | Done |
 
 ## Tier 3: Modules & Code-Level (`docs/subsystems/<name>/modules/`)
 
@@ -135,8 +136,13 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The Finnish CSV dates spec is Done (audited 2026-11-11): the lines and totals CSV files
   write their dates as `dd.mm.yyyy`, as the comparison file. The export README and the API
   reference describe it.
+- The archiving spec is Done (audited 2026-11-13): migration 0008, the
+  archive package and repository, the archive totals in calculation, the archive CSV file,
+  the period warning, and the Arkisto and archived year pages. The archive, calculation,
+  storage, import, review, totals, budget, export, UI, data model, API, architecture,
+  development, security and glossary docs and ADR 0007 describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
-  editing, totals, budget and export terms.
+  editing, totals, budget, export and archive terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.
 - Subsystem boundaries are defined in [architecture.md](architecture.md#component-map). The Google Sheets export is the only target design left there.
 - Docs scanned against the code on 2026-11-06. Two stay In Progress: `development.md` (code standards only partly checked) and `glossary.md` (period and totals terms not traced rule by rule).
@@ -144,5 +150,5 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 ## Related documents
 
 - ↓ Tier 1: [projectdescription.md](projectdescription.md), [architecture.md](architecture.md), [datamodel.md](datamodel.md), [development.md](development.md), [api-reference.md](api-reference.md), [glossary.md](glossary.md), [learnings.md](learnings.md), [security.md](security.md), [README.md](README.md)
-- ↓ Tier 2: [storage](subsystems/storage/README.md), [import](subsystems/import/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [calculation](subsystems/calculation/README.md), [review](subsystems/review/README.md), [totals](subsystems/totals/README.md), [budget](subsystems/budget/README.md), [export](subsystems/export/README.md), [ui](subsystems/ui/README.md)
+- ↓ Tier 2: [storage](subsystems/storage/README.md), [import](subsystems/import/README.md), [categorization](subsystems/categorization/README.md), [receipt-reading](subsystems/receipt-reading/README.md), [calculation](subsystems/calculation/README.md), [review](subsystems/review/README.md), [totals](subsystems/totals/README.md), [budget](subsystems/budget/README.md), [export](subsystems/export/README.md), [archive](subsystems/archive/README.md), [ui](subsystems/ui/README.md)
 - Specs: `specs/` describe intended behavior; this plan indexes docs of what exists. See [AGENTS.md](../AGENTS.md#workflows).

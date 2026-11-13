@@ -22,6 +22,8 @@ services:
       - ${RRMC_IMPORT_DIR:-./source/import}:/data/import
       - ${RRMC_DONE_DIR:-./source/import_done}:/data/import_done
       - ${RRMC_FAILED_DIR:-./source/import_failed}:/data/import_failed
+      # Images of archived years; the user deletes them here by hand (archiving spec PC5).
+      - ${RRMC_ARCHIVE_DIR:-./source/archived}:/data/archived
       # SQLite locking is unreliable on folders shared from Windows; keep it in a volume.
       - rrmc-data:/data/db
     extra_hosts:
@@ -73,7 +75,7 @@ services:
     # /data is a temporary filesystem, so the folders are created here and the database
     # starts empty on every run.
     command: >-
-      sh -c "mkdir -p /data/import /data/import_done /data/import_failed
+      sh -c "mkdir -p /data/import /data/import_done /data/import_failed /data/archived
       && python -m app.prestart
       && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --no-access-log"
     # No settings file: every setting but the engines takes its default

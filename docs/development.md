@@ -3,7 +3,7 @@
 - **Status:** In Progress (setup, commands and code standards written; the manual checks of
   the foundation spec passed on a fresh clone on 2026-10-27; the code standards are only
   partly checked against the code)
-- **Updated:** 2026-11-04
+- **Updated:** 2026-11-13
 
 ## Overview
 
@@ -120,7 +120,11 @@ reads it.
 
 - The import folders are the Windows folders in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` and
   `RRMC_FAILED_DIR`, mounted into the backend container as `/data/import`,
-  `/data/import_done` and `/data/import_failed`.
+  `/data/import_done` and `/data/import_failed`. The archive folder `RRMC_ARCHIVE_DIR`
+  (default `./source/archived`) is mounted as `/data/archived`; archiving moves the images
+  of an archived year there ([archive](subsystems/archive/README.md)).
+- Archiving a year cannot be undone. Take a backup with `scripts/backup-db.ps1` first; a
+  restore brings the rows back, and moved images are moved back by hand.
 
 ## Commands
 
@@ -304,6 +308,13 @@ Version constraints: TypeScript stays below 6.1 while `typescript-eslint` 8 requ
 ESLint stays on 9 while `eslint-plugin-jsx-a11y` does not support ESLint 10. The Playwright
 image tag in `frontend/Dockerfile` must match the `@playwright/test` version.
 
+`frontend/package.json` has an `overrides` entry that gives
+`@typescript-eslint/typescript-estree` `minimatch` 11.0.8 instead of its `^10.2.2`
+(2026-11-13). The minimatch versions 7.0.0–11.0.0 have a moderate denial-of-service
+advisory (GHSA-g3hv-75wg-m249), and no `typescript-eslint` release (up to 8.72.2) asks for
+a fixed version yet. `npm run lint` is the check that the override works. Remove it when a
+`typescript-eslint` release depends on minimatch 11.0.1 or later, then run `npm audit`.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -313,7 +324,7 @@ image tag in `frontend/Dockerfile` must match the `@playwright/test` version.
 | The backend log has `Migration NNNN_... failed` | A migration failed; the database stays at the previous version. Fix the migration file and start again. |
 | Status line: `Ollamaan ei saada yhteyttä. Käynnistä Ollama.` | Ollama is not running on Windows. Start it; the status line updates within 30 seconds. |
 | Status line: `Mallia ... ei ole ladattu.` | Run the `ollama pull` command shown in the status line. |
-| Status line: `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | A folder in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR` or `RRMC_FAILED_DIR` is missing or read-only. |
+| Status line: `Kuvakansioita ei löydy tai niihin ei voi kirjoittaa.` | A folder in `RRMC_IMPORT_DIR`, `RRMC_DONE_DIR`, `RRMC_FAILED_DIR` or `RRMC_ARCHIVE_DIR` is missing or read-only. |
 | Status line: `Taustapalveluun ei saada yhteyttä.` | The backend container is not running. Check `docker compose ps` and `docker compose logs backend`. |
 | `port is already allocated` | Another program uses the port. Set `RRMC_BACKEND_PORT` or `RRMC_UI_PORT` in `.env`. |
 | Frontend errors about missing packages after a dependency change | The `node_modules` volume is stale. Run `docker compose run --rm frontend-test npm ci`. |
