@@ -87,6 +87,8 @@ test("archiving AC33, AC39, AC40, AC43, AC22, AC38, AC42: archive, view and dele
   const archived = yearItem(page, "Arkistoidut vuodet", LAST_YEAR);
   await expect(archived).toBeVisible();
   await expect(yearItem(page, "Arkistoitavat vuodet", LAST_YEAR)).toHaveCount(0);
+  // AC42: also the archived list with the result.
+  await noViolations(page);
 
   // AC39, AC40: the year page, read-only, with products behind their category.
   await archived.getByRole("link", { name: "Näytä" }).click();
@@ -154,6 +156,8 @@ test("archiving AC33, AC39, AC40, AC43, AC22, AC38, AC42: archive, view and dele
   const item = yearItem(page, "Arkistoidut vuodet", LAST_YEAR);
   await item.getByRole("button", { name: "Poista pysyvästi" }).click();
   await expect(item).toContainText(`Poistetaan vuoden ${LAST_YEAR} arkisto pysyvästi`);
+  // AC42: also an open confirmation.
+  await noViolations(page);
   await item.getByRole("button", { name: "Poista pysyvästi" }).click();
   await expect(page.getByRole("main").getByRole("status")).toContainText(
     `Vuoden ${LAST_YEAR} arkisto poistettu.`,
@@ -164,4 +168,5 @@ test("archiving AC33, AC39, AC40, AC43, AC22, AC38, AC42: archive, view and dele
 test("archiving AC41: a year that is not archived says so", async ({ page }) => {
   await page.goto(`/arkisto/${BLOCKED_YEAR}`);
   await expect(page.getByText(`Vuotta ${BLOCKED_YEAR} ei ole arkistossa.`)).toBeVisible();
+  await noViolations(page);
 });

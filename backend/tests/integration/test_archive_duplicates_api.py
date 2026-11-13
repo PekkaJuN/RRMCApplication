@@ -111,3 +111,16 @@ def test_ac19_after_a_permanent_delete_the_image_imports_again(
 
     assert (state["imported"], state["duplicates"]) == (1, [])
     assert active_receipts(db) == 1
+
+
+def test_ac19_delete_through_the_api_frees_the_image(
+    client: TestClient, db: sqlite3.Connection, settings: Settings
+) -> None:
+    # Audit addition: the delete of AC19 through DELETE /api/archive/2025.
+    archive_image(db, jpeg("a"))
+    assert client.delete("/api/archive/2025").status_code == 200
+    (settings.import_dir / "x.jpg").write_bytes(jpeg("a"))
+
+    state = run_import(client)
+
+    assert (state["imported"], state["duplicates"]) == (1, [])

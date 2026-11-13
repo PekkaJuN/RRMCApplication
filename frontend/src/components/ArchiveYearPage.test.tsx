@@ -103,3 +103,12 @@ it("archiving AC43: the wide box, the sticky name column and wrapping names", as
     expect(header).toHaveClass("archive-name");
   }
 });
+
+it("archiving AC39: the year page has no receipt list", async () => {
+  answerArchiveTotals();
+  render(<ArchiveYearPage year={2025} />);
+  await screen.findByRole("table", { name: "Vuosi 2025" });
+
+  expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  expect(screen.queryByText(/kuitti/i)).not.toBeInTheDocument();
+});

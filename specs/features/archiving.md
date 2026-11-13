@@ -25,7 +25,13 @@
   `test_csv_archive.py` (an added PC13 test) and `test_archive_totals_api.py`; none changes
   an expectation of this spec. Audited 2026-11-13: AC1–AC43 covered, all checks green.
   After the audit the user chose the app's wording "tarkistamaton" over "tarkastamaton"
-  (PC14, AC34 and the `unreviewed_receipts` message; 2026-11-13).
+  (PC14, AC34 and the `unreviewed_receipts` message; 2026-11-13). A full audit
+  (2026-11-13) checked each AC's assertions and added tests, without changing an existing
+  expectation: AC28 and AC19 through the API, AC18 lines deleted, AC31 `not_found`, AC13
+  unreadable archive folder and failed name update, AC42 log counts on a failed move, AC36
+  delete cancel and double click, AC37 load and delete errors, AC39 no receipt list, and
+  axe on the archived list, an open confirmation and the AC41 page. Coverage: backend 99 %,
+  `app/archive/service.py` 99 %; frontend 98 %.
 - **Depends on:** [Receipt import](receipt-import.md), [Receipt review](receipt-review.md),
   [Receipt deletion and manual receipts](receipt-management.md), [Category totals](totals.md),
   [CSV export](csv-export.md), [PDF export](pdf-export.md), [Monthly budget](budget.md),

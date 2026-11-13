@@ -419,3 +419,105 @@ def test_ac42_the_log_names_no_store_product_or_file(
     assert "MAITO" not in text
     assert "salainen" not in text
     assert "year=2025" in text
+
+
+def test_ac28_product_names_through_the_api(
+    api: TestClient, db: sqlite3.Connection, seed: Seed
+) -> None:
+    # Audit addition: AC28 through POST /api/archive and the year totals, not only the
+    # repository.
+    milk = api.post("/api/categories", json={"name": "Testimaito", "kind": "category"}).json()
+    product = api.post("/api/products", json={"name": "Maito 1l", "category_id": milk["id"]}).json()
+    receipt = seed.receipt("2025-03-10")
+    with seed.receipts.transaction():
+        seed.receipts.add_line(
+            receipt,
+            1,
+            "MAITO 1L VALIO",
+            250,
+            is_deposit_refund=False,
+            category=LineCategory(milk["id"], "user", product["id"]),
+        )
+        seed.receipts.add_line(receipt, 2, "TUNTEMATON", 100, is_deposit_refund=False)
+
+    assert api.post("/api/archive/2025").status_code == 200
+
+    names = [row[0] for row in db.execute("SELECT product_name FROM archived_lines ORDER BY 1")]
+    assert names == ["Maito 1l", "TUNTEMATON"]
+    rows = api.get("/api/archive/2025/totals").json()["rows"]
+    assert [(row["name"], [child["name"] for child in row["children"]]) for row in rows] == [
+        ("Testimaito", ["Maito 1l"]),
+        (None, ["TUNTEMATON"]),
+    ]
+
+
+def test_ac18_permanent_delete_removes_the_lines_too(
+    api: TestClient, db: sqlite3.Connection, seed: Seed
+) -> None:
+    seed.receipt("2025-01-01", lines=2)
+    api.post("/api/archive/2025")
+
+    assert api.delete("/api/archive/2025").status_code == 200
+
+    assert count(db, "archived_lines") == 0
+
+
+def test_ac42_a_failed_move_logs_counts_without_names(
+    open_client: ClientFactory, seed: Seed, caplog: pytest.LogCaptureFixture
+) -> None:
+    api = open_client(archive_files=FailingMove())
+    seed.receipt("2025-01-01", image="a.jpg", lines=1, store="Salakauppa")
+    caplog.set_level(logging.DEBUG)
+
+    assert api.post("/api/archive/2025").json()["images_not_moved"] == ["a.jpg"]
+
+    text = caplog.text
+    assert "year=2025 receipts=1 lines=1 moved=0 not_moved=1" in text
+    assert "a.jpg" not in text
+    assert "Salakauppa" not in text
+    assert "MAITO" not in text
+
+
+class UnreadableArchiveFolder(LocalArchiveFiles):
+    """The archive folder cannot be listed."""
+
+    def names_in(self, folder: Path) -> set[str]:
+        raise OSError("simulated")
+
+
+def test_ac13_an_unreadable_archive_folder_moves_no_image(
+    open_client: ClientFactory, db: sqlite3.Connection, seed: Seed, folders: Settings
+) -> None:
+    api = open_client(archive_files=UnreadableArchiveFolder())
+    seed.receipt("2025-01-01", image="a.jpg", lines=1)
+    seed.receipt("2025-02-01", image="b.jpg", lines=1)
+
+    body = api.post("/api/archive/2025").json()
+
+    assert (body["receipts"], body["images_moved"]) == (2, 0)
+    assert sorted(body["images_not_moved"]) == ["a.jpg", "b.jpg"]
+    assert sorted(path.name for path in folders.done_dir.iterdir()) == ["a.jpg", "b.jpg"]
+    assert count(db, "archived_receipts") == 2
+
+
+def test_ac13_a_failed_name_update_keeps_the_answer_and_logs_only_the_type(
+    api: TestClient,
+    db: sqlite3.Connection,
+    seed: Seed,
+    folders: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def fail(self: object, names: object) -> None:
+        raise sqlite3.OperationalError("simulated")
+
+    monkeypatch.setattr("app.storage.archive_repository.ArchiveRepository.set_file_names", fail)
+    seed.receipt("2025-01-01", image="a.jpg", lines=1)
+
+    response = api.post("/api/archive/2025")
+
+    assert response.status_code == 200
+    assert response.json()["images_moved"] == 1
+    assert (folders.archive_dir / "a.jpg").exists()
+    assert "OperationalError" in caplog.text
+    assert "a.jpg" not in caplog.text

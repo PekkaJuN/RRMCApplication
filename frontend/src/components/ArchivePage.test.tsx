@@ -1,7 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
 import { answerArchive, OVERVIEW } from "../test/archive";
+import { server } from "../test/server";
 import { ArchivePage } from "./ArchivePage";
 
 // Archiving spec PC14.
@@ -176,4 +178,84 @@ it("archiving PC14: empty lists say so", async () => {
 
   expect(await screen.findByText("Ei arkistoitavia vuosia.")).toBeInTheDocument();
   expect(screen.getByText("Ei arkistoituja vuosia.")).toBeInTheDocument();
+});
+
+it("archiving AC36: Peruuta of a delete sends nothing", async () => {
+  const requests = answerArchive();
+  const user = userEvent.setup();
+  render(<ArchivePage onOpenYear={vi.fn()} />);
+
+  await user.click(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  );
+  await user.click(within(await archivedYear(2025)).getByRole("button", { name: "Peruuta" }));
+
+  expect(requests.deleted).toEqual([]);
+  expect(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  ).toBeEnabled();
+});
+
+it("archiving AC36: a second click while deleting sends nothing", async () => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requests = answerArchive({ hold });
+  const user = userEvent.setup();
+  render(<ArchivePage onOpenYear={vi.fn()} />);
+  await user.click(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  );
+
+  await user.click(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  );
+  const again = within(await archivedYear(2025)).getByRole("button", {
+    name: "Poista pysyvästi",
+  });
+  expect(again).toBeDisabled();
+  await user.click(again);
+  release();
+
+  await waitFor(() => expect(requests.overviews).toBe(2));
+  expect(requests.deleted).toEqual([2025]);
+});
+
+it("archiving AC37: a list that cannot be loaded shows the backend's message", async () => {
+  server.use(
+    http.get("/api/archive", () =>
+      HttpResponse.json(
+        { error: "internal_error", message: "Odottamaton virhe." },
+        { status: 500 },
+      ),
+    ),
+  );
+  render(<ArchivePage onOpenYear={vi.fn()} />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Odottamaton virhe.");
+});
+
+it("archiving AC37: a failed delete shows the backend's message and reloads", async () => {
+  const requests = answerArchive();
+  server.use(
+    http.delete("/api/archive/:year", () =>
+      HttpResponse.json(
+        { error: "not_found", message: "Pyydettyä kohdetta ei löydy." },
+        { status: 404 },
+      ),
+    ),
+  );
+  const user = userEvent.setup();
+  render(<ArchivePage onOpenYear={vi.fn()} />);
+
+  await user.click(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  );
+  await user.click(
+    within(await archivedYear(2025)).getByRole("button", { name: "Poista pysyvästi" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Pyydettyä kohdetta ei löydy.");
+  await waitFor(() => expect(requests.overviews).toBe(2));
 });

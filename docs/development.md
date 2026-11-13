@@ -308,6 +308,13 @@ Version constraints: TypeScript stays below 6.1 while `typescript-eslint` 8 requ
 ESLint stays on 9 while `eslint-plugin-jsx-a11y` does not support ESLint 10. The Playwright
 image tag in `frontend/Dockerfile` must match the `@playwright/test` version.
 
+`frontend/package.json` has an `overrides` entry that gives
+`@typescript-eslint/typescript-estree` `minimatch` 11.0.8 instead of its `^10.2.2`
+(2026-11-13). The minimatch versions 7.0.0–11.0.0 have a moderate denial-of-service
+advisory (GHSA-g3hv-75wg-m249), and no `typescript-eslint` release (up to 8.72.2) asks for
+a fixed version yet. `npm run lint` is the check that the override works. Remove it when a
+`typescript-eslint` release depends on minimatch 11.0.1 or later, then run `npm audit`.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |

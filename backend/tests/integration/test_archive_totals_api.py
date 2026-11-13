@@ -142,3 +142,9 @@ def test_ac31_archived_totals_csv(api: TestClient, db: sqlite3.Connection) -> No
 def test_ac31_csv_of_a_year_not_archived(api: TestClient) -> None:
     assert api.get("/api/export/archive/2023").status_code == 404
     assert api.get("/api/export/archive/abcd").json()["error"] == "invalid_year"
+
+
+def test_ac31_csv_of_a_year_not_archived_is_not_found(api: TestClient) -> None:
+    response = api.get("/api/export/archive/2023")
+
+    assert response.json()["error"] == "not_found"
