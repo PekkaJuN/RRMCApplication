@@ -71,7 +71,7 @@ Steps of one file (`process_file`):
 |---|---|---|---|
 | 1. Read the bytes | `OSError` | `read_failed` | failed folder |
 | 2. Check the format | not supported | `unsupported_format` | failed folder |
-| 3. Hash; a receipt with that hash exists | (not an error) | duplicate | import folder |
+| 3. Hash; an active or archived receipt with that hash exists (`image_known`) | (not an error) | duplicate | import folder |
 | 4. Read the image (`ReceiptReader.read`) | `ReadFailedError` | its reason: `unreadable_image`, `ocr_failed`, `no_text`, `parse_failed` | failed folder |
 | | `ModelUnavailableError` | none: the run stops | import folder |
 | 4b. Ask for category suggestions (`LineCategorizer.suggest`); at most one model call | `ModelUnavailableError` | none: the run stops | import folder |
@@ -94,6 +94,8 @@ Steps of one file (`process_file`):
 - A deleted receipt's image stays in the done folder, but its hash is gone with the row, so
   the same image is no longer a duplicate: copied back to the import folder, it is imported
   as a new receipt (FR-46).
+- An [archived](../archive/README.md) receipt's hash is still known, so its image stays a
+  duplicate (FR-42). After the archived year is deleted, it is imported as a new receipt.
 - One file's failure never stops the run. If the run itself fails (for example the database
   cannot be opened), the files not yet handled are reported as `internal_error` and are not
   moved.

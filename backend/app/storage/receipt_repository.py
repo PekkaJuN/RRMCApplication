@@ -377,6 +377,16 @@ class ReceiptRepository:
         ).fetchone()
         return _receipt(row) if row else None
 
+    def image_known(self, image_hash: str) -> bool:
+        """Tell whether an active or archived receipt has the image: the duplicate check of
+        import and of a manual receipt's image (FR-3, FR-42)."""
+        row = self._connection.execute(
+            "SELECT EXISTS (SELECT 1 FROM receipts WHERE image_hash = ?)"
+            " OR EXISTS (SELECT 1 FROM archived_receipts WHERE image_hash = ?)",
+            (image_hash, image_hash),
+        ).fetchone()
+        return bool(row[0])
+
     def lines(self, receipt_id: int) -> list[LineRow]:
         """The receipt's lines in printed order."""
         rows = self._connection.execute(

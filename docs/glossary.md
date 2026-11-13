@@ -66,12 +66,19 @@ gives the Finnish word the user sees.
 | Weekly budget | viikkobudjetti | A row's monthly budget divided by the period's days, times the week's days in the period; the weeks add up to the monthly budget |
 | Actual spending | toteutunut | The spending of reviewed receipts, by the totals' rules |
 | Remaining | jäljellä | The budget minus the actual spending; negative when the row is over budget |
-| Exporter | — | The interfaces that turn a period's lines, totals or comparison into a file: `Exporter` for CSV (Google Sheets later), `ReportExporter` for the PDF files (FR-27) |
+| Exporter | — | The interfaces that turn a period's lines, totals or comparison, or an archived year's totals, into a file: `Exporter` for CSV (Google Sheets later), `ReportExporter` for the PDF files (FR-27) |
+| Finished year | päättynyt vuosi | A calendar year before the current one in Finnish time; only a finished year can be archived |
+| Archiving | arkistointi | Moving the reviewed receipts of a finished year, with their lines, into the archive tables and their images into the archive folder; cannot be undone ([archive](subsystems/archive/README.md)) |
+| Archive | arkisto | The archived receipts and lines (`archived_receipts`, `archived_lines`) and the archive folder of their images; it keeps product, category and group names, not ids |
+| Archived year | arkistoitu vuosi | A year with receipts in the archive. Its totals per group, category and product by month can be viewed and exported; its receipts are not shown one by one |
+| Archive folder | arkistokansio | The folder of archived images, `RRMC_ARCHIVE_DIR` (default `source/archived`); the app never deletes its files |
+| Permanent delete | poisto pysyvästi | Deleting an archived year's receipts and lines; the images stay in the archive folder |
 
 ## Subsystems
 
 - [categorization](subsystems/categorization/README.md) — catalog and line categorization terms
 - [import](subsystems/import/README.md) — import terms
+- [archive](subsystems/archive/README.md) — archive terms
 
 ## Related Documents
 

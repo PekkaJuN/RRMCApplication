@@ -203,6 +203,9 @@ export function TotalsPage() {
       {totals !== null && totals.undated_receipts > 0 && (
         <p role="status">{fi.totals.undated(totals.undated_receipts)}</p>
       )}
+      {totals !== null && totals.archived_years.length > 0 && (
+        <p role="status">{fi.archivedYears(totals.archived_years)}</p>
+      )}
       {totals !== null && !hasRows && <p>{fi.totals.empty}</p>}
       {totals !== null && hasRows && (
         <>

@@ -38,9 +38,9 @@ The endpoints, their shape and error codes are in the
 
 | Method | Does | Raises |
 |---|---|---|
-| `BudgetService(catalog, receipts).rows()` | Reads the budget rows and the total budget | nothing |
+| `BudgetService(catalog, receipts, archive).rows()` | Reads the budget rows and the total budget | nothing |
 | `BudgetService.save(item_id, amount_cents)` | Checks the id, that it is a budget row and the amount from 0 to `AMOUNT_LIMIT`, in that order, then saves | `NotFoundError`, `NotABudgetRowError`, `InvalidBudgetAmountError` |
-| `BudgetService.comparison(month, kind)` | Parses the period, reads the reviewed lines, the catalog, the budgets, the unreviewed count of the period and the undated count in one transaction, and returns the comparison | `InvalidPeriodError` |
+| `BudgetService.comparison(month, kind)` | Parses the period, reads the reviewed lines, the catalog, the budgets, the unreviewed count of the period, the undated count and the archived years of the period in one transaction, and returns the comparison | `InvalidPeriodError` |
 
 ## Data Flow
 
@@ -48,7 +48,8 @@ The endpoints, their shape and error codes are in the
    validates nothing, so every missing or malformed value reaches `comparison_period` and
    becomes `invalid_period`, not the generic `invalid_request`.
 2. The service reads, in one transaction, `dated_lines(start, end, reviewed_only=True)`,
-   `CategoryService.list()`, `budgets()`, `count_unreviewed(start, end)` and `count_undated()`.
+   `CategoryService.list()`, `budgets()`, `count_unreviewed(start, end)`, `count_undated()`
+   and `ArchiveRepository.archived_years` ([archive](../archive/README.md#period-warning)).
 3. `budget_comparison(period, lines, catalog, budgets)` computes the figures.
 4. The answer holds category and group names and cents only; no product name is read
    (NFR-3). The request log has no query string (@backend/app/logging_setup.py).

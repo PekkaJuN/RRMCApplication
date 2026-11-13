@@ -146,6 +146,9 @@ export function ComparisonPage() {
           {comparison.undated_receipts > 0 && (
             <p role="status">{fi.totals.undated(comparison.undated_receipts)}</p>
           )}
+          {comparison.archived_years.length > 0 && (
+            <p role="status">{fi.archivedYears(comparison.archived_years)}</p>
+          )}
           <ComparisonMonthTable comparison={comparison} />
           <p>
             <button

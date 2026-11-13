@@ -35,7 +35,7 @@ from app.review.service import (
     SubtotalView,
 )
 from app.storage.catalog_repository import CatalogRepository
-from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository, ReceiptRow
+from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository
 from tests.receipt_import_data import jpeg, png
 
 TIME = "2026-10-28T10:00:01Z"
@@ -1043,8 +1043,8 @@ def test_ac22_hash_taken_meanwhile_is_a_duplicate(
 ) -> None:
     # Given an import that stores the same image between the check and the commit
     class RacingRepository(ReceiptRepository):
-        def get_by_hash(self, image_hash: str) -> ReceiptRow | None:
-            found = super().get_by_hash(image_hash)
+        def image_known(self, image_hash: str) -> bool:
+            found = super().image_known(image_hash)
             with self.transaction():
                 super().add(image_hash, "other.png", TIME)
             return found

@@ -1,6 +1,6 @@
 # Storage
 
-Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [UI](../ui/README.md)
+Navigation: ↑ [Architecture](../../architecture.md) | → [Data model](../../datamodel.md) | → [Categorization](../categorization/README.md) | → [Import](../import/README.md) | → [Receipt reading](../receipt-reading/README.md) | → [Review](../review/README.md) | → [Totals](../totals/README.md) | → [Budget](../budget/README.md) | → [Archive](../archive/README.md) | → [UI](../ui/README.md)
 
 ## Overview
 
@@ -8,8 +8,8 @@ Storage owns the SQLite database: opening connections, applying schema migration
 SQL. Other subsystems never run SQL; they call storage's repositories, which feature specs
 add together with their tables. Storage holds no business rules.
 
-Today storage has the connection, transactions, the migration runner, and the catalog and
-receipt repositories. The schema is described in [datamodel.md](../../datamodel.md).
+Today storage has the connection, transactions, the migration runner, and the catalog,
+receipt and archive repositories. The schema is described in [datamodel.md](../../datamodel.md).
 
 ## Key Files and Entry Points
 
@@ -23,14 +23,17 @@ receipt repositories. The schema is described in [datamodel.md](../../datamodel.
 - @backend/app/storage/receipt_repository.py — `ReceiptRepository`: all SQL for receipts and
   their lines (`add` with the read fields, `add_line` with an optional `LineCategory`,
   `lines`, `get_line`, `set_line_category`, `update_line`, `next_position`, `delete_line`,
-  `get`, `get_by_hash`, `summaries`, `set_reviewed`, `set_fields`, `delete`, `dated_lines`,
+  `get`, `get_by_hash`, `image_known`, `summaries`, `set_reviewed`, `set_fields`, `delete`, `dated_lines`,
   `export_lines`, `count_unreviewed`, `count_undated`)
+- @backend/app/storage/archive_repository.py — `ArchiveRepository`: all SQL for the
+  archive tables (`year_counts`, `archive_year`, `set_file_names`, `archived`,
+  `candidates`, `delete_year`, `has_year`, `year_lines`, `archived_years`)
 - @backend/app/storage/migrate.py — `migrate_database(db_path)` creates the database and
   applies pending migrations; `migrate()` and `current_version()` work on an open connection
 - @backend/app/storage/migrations/ — the numbered SQL migration files
   (`0001_catalog.sql`, `0002_receipts.sql`, `0003_receipt_reading.sql`,
   `0004_line_categories.sql`, `0005_receipt_review.sql`, `0006_manual_receipts.sql`,
-  `0007_budgets.sql`)
+  `0007_budgets.sql`, `0008_archive.sql`)
 
 ## Interfaces
 
@@ -55,7 +58,7 @@ line linked to the product the category and source `remembered`. The rules are i
 `ReceiptRepository(connection)` returns the frozen dataclass `ReceiptRow` (`id`,
 `image_hash`, `file_name`, `imported_at`, the read fields and `reviewed`; `image_hash` and
 `file_name` are both `None` for a receipt typed in without an image). It has `add` (raises
-`sqlite3.IntegrityError` for an existing hash; takes `None` for both hash and name), `get`, `get_by_hash`, `delete` and
+`sqlite3.IntegrityError` for an existing hash; takes `None` for both hash and name), `get`, `get_by_hash`, `image_known` (whether the hash is in `receipts` or `archived_receipts`: the duplicate lookup of import and review, FR-42), `delete` and
 `transaction()`. `summaries()` lists every receipt as `ReceiptSummaryRow` with the sum of its
 line amounts, computed in SQL, in the review list order (no date first, then newest date,
 then newest id); `set_reviewed(id, reviewed=...)` and `set_fields(id, store=...,
@@ -90,6 +93,15 @@ flag, group name, category name, review state), ordered by purchase date, receip
 position. It joins the line's category and that category's group with `LEFT JOIN`, so a
 line without a category, or a category without a group, has `None` names.
 
+`ArchiveRepository(connection)` holds the archive SQL and no rules; callers own the
+transaction ([archive](../archive/README.md#archiving-a-year)). `archive_year(year,
+archived_at)` copies the year's receipts and lines (with the product, category and group
+names) into the archive tables, deletes the active rows, and returns the counts and the
+(id, file name) pairs of the images. `year_counts`, `archived`, `candidates(before_year)`
+and `delete_year` give and remove whole years; `year_lines` reads an archived year's lines
+for the totals; `archived_years(first_year, last_year)` serves the period warning of
+totals and budget.
+
 ## Data Flow
 
 1. `python -m app.prestart` runs before Uvicorn and calls `migrate_database`. On
@@ -97,7 +109,7 @@ line without a category, or a category without a group, has `None` names.
    the container.
 2. The app's lifespan calls `migrate_database` again; with nothing pending it applies nothing.
 3. `GET /api/health` calls `is_available` on each request.
-4. Each catalog, review, totals and export request opens its own connection and closes it
+4. Each catalog, review, totals, budget, archive and export request opens its own connection and closes it
    after the response.
 5. An import run opens one connection in its background thread and closes it when the run
    ends.
@@ -108,7 +120,8 @@ line without a category, or a category without a group, has `None` names.
 - Used by: the foundation (`prestart`, `main`), [health](../../api-reference.md#get-apihealth),
   [categorization](../categorization/README.md), [import](../import/README.md),
   [review](../review/README.md), [totals](../totals/README.md),
-  [budget](../budget/README.md), [export](../export/README.md).
+  [budget](../budget/README.md), [archive](../archive/README.md),
+  [export](../export/README.md).
 
 ## Modules
 

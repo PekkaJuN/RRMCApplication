@@ -46,6 +46,8 @@ export interface Comparison {
   total: ComparisonTotal;
   unreviewed_receipts: number;
   undated_receipts: number;
+  /** Archived years that overlap the period (archiving spec PC10). */
+  archived_years: number[];
 }
 
 export function getBudget(): Promise<ApiResult<Budget>> {

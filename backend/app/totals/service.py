@@ -6,6 +6,7 @@ from datetime import date
 from app.calculation.period import Period, PeriodError, parse_period
 from app.calculation.period_totals import PeriodTotals, RowCategory, TotalLine, period_totals
 from app.categorization.service import CategoryService
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import ReceiptRepository
 from app.totals.errors import InvalidPeriodError
@@ -16,12 +17,17 @@ class TotalsView:
     totals: PeriodTotals
     unreviewed_receipts: int
     undated_receipts: int
+    # Archived years that overlap the period; their receipts are not counted (archiving PC10).
+    archived_years: list[int]
 
 
 class TotalsService:
-    def __init__(self, catalog: CatalogRepository, receipts: ReceiptRepository) -> None:
+    def __init__(
+        self, catalog: CatalogRepository, receipts: ReceiptRepository, archive: ArchiveRepository
+    ) -> None:
         self._catalog = catalog
         self._receipts = receipts
+        self._archive = archive
 
     def totals(self, unit: str | None, first: str | None, last: str | None) -> TotalsView:
         """Raises: InvalidPeriodError."""
@@ -32,7 +38,8 @@ class TotalsService:
             totals = self.read(period)
             unreviewed = self._receipts.count_unreviewed(start, end)
             undated = self._receipts.count_undated()
-        return TotalsView(totals, unreviewed, undated)
+            archived = self._archive.archived_years(period.start.year, period.end.year)
+        return TotalsView(totals, unreviewed, undated, archived)
 
     def period(self, unit: str | None, first: str | None, last: str | None) -> Period:
         """Raises: InvalidPeriodError."""

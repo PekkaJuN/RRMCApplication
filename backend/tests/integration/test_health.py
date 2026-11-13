@@ -16,13 +16,14 @@ OLLAMA_URL = "http://ollama.test:11434"
 
 
 def make_folders(settings: Settings) -> None:
-    for folder in (settings.import_dir, settings.done_dir, settings.failed_dir):
+    folders = (settings.import_dir, settings.done_dir, settings.failed_dir, settings.archive_dir)
+    for folder in folders:
         folder.mkdir(parents=True)
 
 
 @pytest.fixture
 def ready_settings(settings: Settings) -> Settings:
-    """Settings whose three folders and database exist."""
+    """Settings whose four folders (archiving spec PC5) and database exist."""
     make_folders(settings)
     migrate_database(settings.db_path)
     return settings
@@ -83,6 +84,14 @@ def test_ac16_missing_folder_is_degraded(ready_settings: Settings) -> None:
     response = TestClient(create_app(ready_settings), base_url=BASE_URL).get("/api/health")
 
     assert response.json()["status"] == "degraded"
+    assert response.json()["checks"]["folders"] == "unavailable"
+
+
+def test_archiving_pc5_missing_archive_folder_is_degraded(ready_settings: Settings) -> None:
+    ready_settings.archive_dir.rmdir()
+
+    response = TestClient(create_app(ready_settings), base_url=BASE_URL).get("/api/health")
+
     assert response.json()["checks"]["folders"] == "unavailable"
 
 

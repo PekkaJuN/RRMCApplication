@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from app.budget.schemas import BudgetOut, BudgetUpdate, ComparisonOut
 from app.budget.service import BudgetService
 from app.settings import Settings
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.receipt_repository import ReceiptRepository
@@ -19,7 +20,11 @@ def create_budget_router(settings: Settings) -> APIRouter:
     def budget_service() -> Generator[BudgetService]:
         connection = connect(settings.db_path)
         try:
-            yield BudgetService(CatalogRepository(connection), ReceiptRepository(connection))
+            yield BudgetService(
+                CatalogRepository(connection),
+                ReceiptRepository(connection),
+                ArchiveRepository(connection),
+            )
         finally:
             connection.close()
 

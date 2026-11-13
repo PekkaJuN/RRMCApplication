@@ -1,15 +1,16 @@
 # Data Model
 
 - **Status:** Done (catalog, receipts with their read data and review state, and
-  receipt lines with their categories, and budgets implemented)
-- **Updated:** 2026-11-06
+  receipt lines with their categories, budgets and the archive implemented)
+- **Updated:** 2026-11-13
 
 ## Overview
 
 The app keeps all its data in one SQLite database. This document describes the schema and
 how it changes. Today the schema holds the migration bookkeeping, the catalog (groups,
 categories and products), the imported receipts with what was read from them and their
-review state, their lines with their categories, and the monthly budgets.
+review state, their lines with their categories, the monthly budgets, and the archive of
+finished years.
 
 ## Where the database is
 
@@ -125,6 +126,46 @@ month and has no history ([budget](subsystems/budget/README.md)).
 A missing row means 0. "Only a budget row has a budget" needs another row, which `CHECK`
 cannot read, so the budget and categorization services enforce it.
 
+### archived_receipts
+
+A receipt of an archived year (FR-40, [archive](subsystems/archive/README.md)). Archiving
+copies the reviewed receipts of a finished year here and deletes them from `receipts`. No
+column refers to the active tables ([ADR 0007](adr/0007-archive-tables.md)).
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INTEGER PRIMARY KEY` | The active receipt's id, copied. Active ids are never reused, so an id is unique across both tables |
+| `year` | `INTEGER NOT NULL`, `CHECK` 2000–9999 and equal to the date's year | The archived year; indexed |
+| `purchase_date` | `TEXT NOT NULL`, `CHECK` shape `YYYY-MM-DD` | Purchase date |
+| `store` | `TEXT` | Store name |
+| `total_cents` | `INTEGER` | Receipt total in integer cents |
+| `image_hash` | `TEXT UNIQUE`, `CHECK (NULL or length = 64)` | The image identifier; an import still finds it as a duplicate (FR-42) |
+| `file_name` | `TEXT` | The image's name in the archive folder after the move; the done folder name when the move failed. `NULL` exactly when `image_hash` is `NULL` |
+| `imported_at` | `TEXT NOT NULL` | Copied from the active receipt |
+| `archived_at` | `TEXT NOT NULL` | When it was archived, UTC ISO 8601 with seconds |
+
+The OCR text and the review state are not copied: the archive is not re-read, and every
+archived receipt was reviewed.
+
+### archived_lines
+
+A line of an archived receipt, with its product, category and group as names.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INTEGER PRIMARY KEY` | The active line's id, copied |
+| `receipt_id` | `INTEGER NOT NULL`, `REFERENCES archived_receipts ON DELETE CASCADE` | The archived receipt; deleting an archived year deletes its lines |
+| `position` | `INTEGER NOT NULL`, `UNIQUE` with `receipt_id` | Printed order, as in the active line |
+| `name` | `TEXT NOT NULL` | The line's own name |
+| `product_name` | `TEXT NOT NULL` | The linked product's name, else the line's name; the year totals group lines by it |
+| `amount_cents` | `INTEGER NOT NULL` | Amount in integer cents |
+| `is_deposit_refund` | `INTEGER NOT NULL`, `0` or `1` | 1 for a deposit refund; such a line has no category (`CHECK`) |
+| `category_name` | `TEXT` | The category's name at archiving; `NULL` for a line without a category |
+| `group_name` | `TEXT` | The category's group's name; `NULL` without a group. Only with a category (`CHECK`) |
+
+Later catalog changes never touch these rows, and deleting a category or product is not
+blocked by archived lines.
+
 ### Relationships and rules
 
 ```mermaid
@@ -135,7 +176,10 @@ erDiagram
   categories ||--o{ receipt_lines : "categorizes"
   categories ||--o| budgets : "has"
   products ||--o{ receipt_lines : "is followed by"
+  archived_receipts ||--o{ archived_lines : "has"
 ```
+
+The archive tables have no relation to the other tables.
 
 - `UNIQUE`, `CHECK` and `RESTRICT` are a safety net. "A parent is a group" and "a product's
   category is not a group" need another row, which SQLite `CHECK` cannot read, so the
@@ -146,10 +190,10 @@ erDiagram
 ## Migrations
 
 - Migrations are SQL files in @backend/app/storage/migrations/ named `NNNN_name.sql`
-  (four digits, then a short name). Today there are seven, `0001_catalog.sql`,
+  (four digits, then a short name). Today there are eight, `0001_catalog.sql`,
   `0002_receipts.sql`, `0003_receipt_reading.sql`, `0004_line_categories.sql`,
-  `0005_receipt_review.sql`, `0006_manual_receipts.sql` and `0007_budgets.sql`, so the
-  schema version is 7.
+  `0005_receipt_review.sql`, `0006_manual_receipts.sql`, `0007_budgets.sql` and
+  `0008_archive.sql`, so the schema version is 8.
 - On every start, `prestart` and then the app's lifespan apply each file whose number is
   above the schema version, in number order (@backend/app/storage/migrate.py).
 - Each file runs in its own transaction together with its `schema_version` row. If it fails,
@@ -174,6 +218,8 @@ erDiagram
 - [review](subsystems/review/README.md) — reads receipts and lines for the review UI, edits,
   adds and deletes lines, and sets the store, date, total and review state
 - [receipt-reading](subsystems/receipt-reading/README.md) — produces the read data
+- [archive](subsystems/archive/README.md) — moves a finished year into the archive tables,
+  deletes an archived year and reads its totals
 
 ## Related Documents
 
@@ -183,6 +229,7 @@ erDiagram
 - [Receipt import spec](../specs/features/receipt-import.md): the `receipts` table
 - [Receipt reading spec](../specs/features/receipt-reading.md): the read columns and
   `receipt_lines`
+- [Archiving spec](../specs/features/archiving.md): the archive tables
 - [Categorization spec](../specs/features/categorization.md): the line category columns
 - [Receipt review spec](../specs/features/receipt-review.md): the `reviewed` column
 - [Line editing spec](../specs/features/line-editing.md): edited, added and deleted lines;

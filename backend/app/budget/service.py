@@ -18,6 +18,7 @@ from app.calculation.period import PeriodError, comparison_period
 from app.calculation.period_totals import RowCategory, TotalLine
 from app.categorization.errors import NotFoundError
 from app.categorization.service import CategoryService
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import ReceiptRepository
 from app.totals.errors import InvalidPeriodError
@@ -35,12 +36,17 @@ class ComparisonView:
     kind: str
     unreviewed_receipts: int
     undated_receipts: int
+    # Archived years that overlap the period (archiving spec PC10).
+    archived_years: list[int]
 
 
 class BudgetService:
-    def __init__(self, catalog: CatalogRepository, receipts: ReceiptRepository) -> None:
+    def __init__(
+        self, catalog: CatalogRepository, receipts: ReceiptRepository, archive: ArchiveRepository
+    ) -> None:
         self._catalog = catalog
         self._receipts = receipts
+        self._archive = archive
 
     def rows(self) -> BudgetView:
         with self._catalog.transaction():
@@ -83,7 +89,8 @@ class BudgetService:
             )
             unreviewed = self._receipts.count_unreviewed(start, end)
             undated = self._receipts.count_undated()
-        return ComparisonView(comparison, kind or "calendar", unreviewed, undated)
+            archived = self._archive.archived_years(period.start.year, period.end.year)
+        return ComparisonView(comparison, kind or "calendar", unreviewed, undated, archived)
 
     def _catalog_rows(self) -> list[RowCategory]:
         return [

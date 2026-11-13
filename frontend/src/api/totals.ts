@@ -34,6 +34,8 @@ export interface Totals {
   month_totals: number[];
   unreviewed_receipts: number;
   undated_receipts: number;
+  /** Archived years that overlap the period; their receipts are left out (archiving PC10). */
+  archived_years: number[];
 }
 
 export function getTotals(period: Period): Promise<ApiResult<Totals>> {

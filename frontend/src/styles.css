@@ -172,6 +172,36 @@ tbody tr {
   font-weight: 400;
 }
 
+/* An archived year's table (archiving PC15): products sit under their category, the name
+   column stays in place while the 13 amount columns scroll, and a long name wraps instead
+   of widening the table. The background hides the amounts that scroll under the names. */
+.row-product th {
+  padding-left: calc(var(--space-2) + 2 * (2.5em + var(--space-1) + var(--space-4)));
+  font-weight: 400;
+}
+
+.archive-table .archive-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg);
+}
+
+/* Browsers do not apply `max-width` to table cells reliably, so the name itself is limited.
+   `break-word`, unlike `anywhere`, keeps a long word's width as the column's minimum, so
+   the table scrolls instead of squeezing the names. */
+.archive-table .archive-name span {
+  display: inline-block;
+  max-width: 250px;
+  overflow-wrap: break-word;
+  vertical-align: middle;
+}
+
+/* An amount or a month never wraps at its space. */
+.archive-table .amount {
+  white-space: nowrap;
+}
+
 /* Buttons and inputs (PC5, PC6) */
 
 button,

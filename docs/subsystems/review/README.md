@@ -110,8 +110,8 @@ transaction; the lines go with it (`ON DELETE CASCADE`). It never touches the im
 
 `create_receipt` checks the store, date and total first, so a bad field never moves a file.
 With an image it then follows the import's order: `FailedFolder.take` finds and reads the
-file, checks its signature, hashes it and chooses the done name; a hash already stored is
-`duplicate_image`. The row is committed (a `UNIQUE` failure, from an import that stored the
+file, checks its signature, hashes it and chooses the done name; a hash already stored,
+also in the [archive](../archive/README.md) (`image_known`), is `duplicate_image`. The row is committed (a `UNIQUE` failure, from an import that stored the
 same image meanwhile, is also `duplicate_image`), then the file moves. If the move fails,
 the row is deleted again and the answer is `image_move_failed`; the file is still in the
 failed folder. If that delete fails too, only the error type is logged. The answer is also

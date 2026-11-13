@@ -100,5 +100,25 @@ def page_number(number: int, total: int) -> str:
     return f"Sivu {number}/{total}"
 
 
+# Archiving (archiving spec)
+INVALID_YEAR = "Vuosi on virheellinen."
+YEAR_NOT_FINISHED = "Vain päättyneen vuoden voi arkistoida."
+ARCHIVE_IMPORT_RUNNING = "Tuonti on käynnissä. Arkistoi vuosi, kun tuonti on valmis."
+NOTHING_TO_ARCHIVE = "Vuodelta ei ole arkistoitavia kuitteja."
+ARCHIVE_FILE_PREFIX = "arkisto"
+
+
+def unreviewed_block_archiving(count: int) -> str:
+    receipts = "tarkistamaton kuitti" if count == 1 else "tarkistamatonta kuittia"
+    return f"Vuotta ei voi arkistoida: vuodella on {count} {receipts}."
+
+
+def archived_years_note(years: list[int]) -> str:
+    """The period warning of the totals and the budget comparison (archiving spec PC10)."""
+    if len(years) == 1:
+        return f"Arkistoitu vuosi {years[0]} ei ole mukana."
+    return f"Arkistoidut vuodet {', '.join(str(year) for year in years)} eivät ole mukana."
+
+
 # Monthly budget (budget spec)
 NOT_A_BUDGET_ROW = "Budjetin voi asettaa vain ryhmälle tai ryhmättömälle kategorialle."

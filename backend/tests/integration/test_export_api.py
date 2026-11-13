@@ -12,6 +12,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
+from app.calculation.archive_totals import ArchiveTotals
 from app.calculation.budget_comparison import Comparison
 from app.calculation.period import Period, Unit
 from app.calculation.period_totals import PeriodTotals
@@ -338,6 +339,10 @@ class FixedExporter:
     def comparison_file(self, comparison: Comparison, kind: str, *, weeks: bool) -> ExportFile:
         self.comparisons.append((comparison, kind, weeks))
         return ExportFile("vertailu.test", "application/x-test", b"comparison")
+
+    # The archiving spec, PC13.
+    def archive_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        return ExportFile("arkisto.test", "application/x-test", b"archive")
 
 
 def test_ac12_exporter_interface(settings: Settings) -> None:

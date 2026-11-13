@@ -6,6 +6,7 @@ import indexHtml from "../index.html?raw";
 import type { Health } from "./api/health";
 import { App } from "./App";
 import { fi } from "./i18n/fi";
+import { answerArchive, answerArchiveTotals } from "./test/archive";
 import { answerBudget, answerComparison } from "./test/budget";
 import { defaultItems, fakeCatalog } from "./test/catalog";
 import { IDLE } from "./test/imports";
@@ -78,6 +79,7 @@ it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
     "Yhteenveto",
     "Budjetti",
     "Vertailu",
+    "Arkisto",
   ]);
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
@@ -104,6 +106,25 @@ it("AC26: the Tuonti link opens the Tuonti page", async () => {
   );
   expect(window.location.pathname).toBe("/tuonti");
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
+});
+
+it("archiving PC14, AC39: Arkisto opens the archive, and Näytä a year inside its section", async () => {
+  answerArchive();
+  answerArchiveTotals();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Arkisto" }));
+  expect(window.location.pathname).toBe("/arkisto");
+  await user.click(await screen.findByRole("link", { name: "Näytä" }));
+
+  expect(window.location.pathname).toBe("/arkisto/2025");
+  expect(await screen.findByRole("table", { name: "Vuosi 2025" })).toBeInTheDocument();
+  expect(within(navigation).getByRole("link", { name: "Arkisto" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });
 
 it("AC25, AC30: shows no English text", async () => {

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from datetime import date
 
 from app import texts
+from app.archive.service import parse_year, read_year_totals
 from app.budget.service import BudgetService
 from app.calculation.period import Unit
 from app.errors import AppError
@@ -16,6 +17,7 @@ from app.export.exporter import (
     TotalsReport,
 )
 from app.export.limits import check_pdf_length
+from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import ReceiptRepository
 from app.totals.service import TotalsService
@@ -29,10 +31,12 @@ class ExportService:
         exporter: Exporter,
         report_exporter: ReportExporter,
         today: Callable[[], date],
+        archive: ArchiveRepository,
     ) -> None:
         self._receipts = receipts
-        self._totals = TotalsService(catalog, receipts)
-        self._budget = BudgetService(catalog, receipts)
+        self._archive = archive
+        self._totals = TotalsService(catalog, receipts, archive)
+        self._budget = BudgetService(catalog, receipts, archive)
         self._exporter = exporter
         self._report_exporter = report_exporter
         self._today = today
@@ -79,9 +83,18 @@ class ExportService:
         # The same view as the Yhteenveto page: totals and both counts in one transaction.
         view = self._totals.totals(unit, first, last)
         report = TotalsReport(
-            view.totals, view.unreviewed_receipts, view.undated_receipts, self._today()
+            view.totals,
+            view.unreviewed_receipts,
+            view.undated_receipts,
+            self._today(),
+            view.archived_years,
         )
         return self._report_exporter.totals_report(report, by_unit)
+
+    def archive_file(self, year_text: str) -> ExportFile:
+        """Raises: InvalidYearError, YearNotArchivedError (archiving spec PC13)."""
+        totals = read_year_totals(self._archive, parse_year(year_text))
+        return self._exporter.archive_totals_file(totals)
 
     def comparison_pdf(self, month: str | None, kind: str | None) -> ExportFile:
         """Raises: InvalidPeriodError."""
@@ -92,6 +105,7 @@ class ExportService:
             view.unreviewed_receipts,
             view.undated_receipts,
             self._today(),
+            view.archived_years,
         )
         return self._report_exporter.comparison_report(report)
 

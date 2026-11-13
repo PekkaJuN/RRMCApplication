@@ -86,6 +86,7 @@ class PdfExporter:
                     report.unreviewed_receipts,
                 ),
                 (texts.undated_left_out(report.undated_receipts), report.undated_receipts),
+                _archived(report.archived_years),
             )
             if not has_lines(totals):
                 story.append(Paragraph(texts.NO_PURCHASES, _LINE))
@@ -134,6 +135,7 @@ class PdfExporter:
                     report.unreviewed_receipts,
                 ),
                 (texts.undated_left_out(report.undated_receipts), report.undated_receipts),
+                _archived(report.archived_years),
             )
             story.append(
                 _amount_table(texts.COMPARISON_COLUMNS, rows, A4, name_share=COMPARISON_NAME_SHARE)
@@ -151,6 +153,11 @@ def _header(title: str, period: Period, created: date) -> list[Flowable]:
         Paragraph(escape(f"{texts.PERIOD_LABEL} {day(period.start)}–{day(period.end)}"), _LINE),
         Paragraph(escape(f"{texts.CREATED} {day(created)}"), _LINE),
     ]
+
+
+def _archived(years: list[int]) -> tuple[str, int]:
+    """The archived years note as a count line: shown only when a year is archived (PC10)."""
+    return (texts.archived_years_note(years) if years else "", len(years))
 
 
 def _counts(*counts: tuple[str, int]) -> list[Flowable]:

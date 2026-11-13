@@ -30,6 +30,9 @@ To see the status of every doc and what is missing, read the
   - [0002: Docker](adr/0002-docker.md)
   - [0003: Receipt reading model](adr/0003-receipt-reading-model.md)
   - [0004: Line categorization](adr/0004-line-categorization.md)
+  - [0005: PDF library](adr/0005-pdf-library.md)
+  - [0006: Agent guardrails](adr/0006-agent-guardrails.md)
+  - [0007: Archive tables](adr/0007-archive-tables.md)
 - [Learnings](learnings.md): fixed errors and their solutions, newest first
 
 ## Subsystems
@@ -45,6 +48,7 @@ To see the status of every doc and what is missing, read the
 - [Totals](subsystems/totals/README.md): the totals endpoint
 - [Budget](subsystems/budget/README.md): monthly budgets and their comparison
 - [Export](subsystems/export/README.md): CSV export and the exporter interface
+- [Archive](subsystems/archive/README.md): archiving finished years and their totals
 - [UI](subsystems/ui/README.md): the React UI, stylesheet and accessibility check
 
 ## Requirements and specs
