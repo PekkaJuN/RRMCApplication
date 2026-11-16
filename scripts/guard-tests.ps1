@@ -271,6 +271,21 @@ foreach ($c in @("& docker compose run --rm backend-test pytest", 'bash -c "ls d
     Assert-Shell $c ""
 }
 
+# A separator inside quotes is text, not a command boundary (docs/learnings.md, 2026-11-16).
+foreach ($c in @('grep -rn "a\|b" docs', "grep -rn 'a|b' docs specs", 'grep -rn "x;y" docs',
+        'grep -rn "research\|\.agents/skills" AGENTS.md docs .agents .codex',
+        'Select-String -Path docs/*.md -Pattern "a|b"', 'echo "a && b"', 'echo a\|b')) {
+    Assert-Shell $c ""
+}
+# A separator outside quotes, a command run inside double quotes, an escaped quote and
+# quotes that do not close still split.
+foreach ($c in @('grep -rn "a" docs | cat .env', 'grep "a|b" docs; cat .env', 'echo "$(cat .env)"',
+        'echo "`cat .env`"', 'echo \" ; cat .env \"', 'echo "x | cat .env', 'eval "cat .env | head"')) {
+    Assert-Shell $c "G1"
+}
+Assert-Shell 'eval "git push"' "G3"
+Assert-Shell 'grep -rn "a|b" docs && git push' "G3"
+
 # --- G5 and G6 counters (AC11-AC14)------------------------------------------------------
 $BackendTests = "docker compose run --rm backend-test pytest"
 $Now = [datetime]::new(2026, 11, 10, 12, 0, 0, [DateTimeKind]::Utc)

@@ -65,13 +65,69 @@ function Test-ProtectedPath([string]$Path) {
 
 # --- Shell text -------------------------------------------------------------------------
 
+$script:ShellSeparator = '&&|\|\||;|\||\r?\n|\$\(|\(|\)|`|(?<![>&\d])&(?![&>\d])'
+
+# The command with each quoted text and each escaped character replaced by `_` (same length),
+# so that separators there do not split: `grep "a\|b" docs` is one command. $Escape is `\`
+# for Bash and a backtick for PowerShell. Returns $null when the quotes do not close, or when
+# a double-quoted text runs a command (`$(...)`, or a backtick in Bash), because the shell
+# runs that command; the caller then splits on every separator.
+function Get-QuoteMask([string]$Command, [char]$Escape) {
+    $chars = $Command.ToCharArray()
+    $quote = [char]0
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+        $c = $chars[$i]
+        if ($quote -eq [char]"'") {
+            if ($c -eq [char]"'") { $quote = [char]0 } else { $chars[$i] = [char]'_' }
+            continue
+        }
+        if ($c -eq $Escape -and $i + 1 -lt $chars.Length) {
+            $chars[$i] = [char]'_'; $chars[$i + 1] = [char]'_'; $i++
+            continue
+        }
+        if ($quote -eq [char]'"') {
+            if ($c -eq [char]'"') { $quote = [char]0; continue }
+            if ($c -eq [char]'`' -or ($c -eq [char]'$' -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq [char]'(')) {
+                return $null
+            }
+            $chars[$i] = [char]'_'
+            continue
+        }
+        if ($c -eq [char]'"' -or $c -eq [char]"'") { $quote = $c }
+    }
+    if ($quote -ne [char]0) { return $null }
+    return -join $chars
+}
+
+# Cuts $Command where $Masked has a separator. Both strings have the same length.
+function Split-AtSeparators([string]$Command, [string]$Masked) {
+    $pieces = New-Object System.Collections.Generic.List[string]
+    $start = 0
+    foreach ($match in [regex]::Matches($Masked, $script:ShellSeparator)) {
+        $pieces.Add($Command.Substring($start, $match.Index - $start))
+        $start = $match.Index + $match.Length
+    }
+    $pieces.Add($Command.Substring($start))
+    return @($pieces | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+}
+
 # Splits a shell command into its simple commands, so that each part is checked on its own:
 # on &&, ||, ;, |, newlines, the brackets of ( ), $( ) and backticks, and a single `&`
 # (background in Bash, the call operator in PowerShell) that is not part of a redirection
-# such as `2>&1` or `&>`.
+# such as `2>&1` or `&>`. Separators inside quotes or after an escape character are text and
+# do not split. Bash and PowerShell escape differently, so the command is read both ways and
+# the parts of both readings are checked; a reading that Get-QuoteMask rejects splits on
+# every separator.
 function Split-ShellParts([string]$Command) {
-    @($Command -split '&&|\|\||;|\||\r?\n|\$\(|\(|\)|`|(?<![>&\d])&(?![&>\d])' |
-        ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    $parts = New-Object System.Collections.Generic.List[string]
+    foreach ($escape in @([char]'\', [char]'`')) {
+        $masked = Get-QuoteMask $Command $escape
+        if ($null -eq $masked) { $masked = $Command }
+        foreach ($part in @(Split-AtSeparators $Command $masked)) {
+            if (-not $parts.Contains($part)) { $parts.Add($part) }
+        }
+    }
+    return @($parts)
 }
 
 # Splits one simple command into words, keeping quoted text together and removing quotes.
@@ -129,7 +185,7 @@ function Get-WrappedCommand([string[]]$Words) {
             return (@($Words | Select-Object -Skip ($i + 1)) -join " ")
         }
     }
-    if ($command -in @("invoke-expression", "iex")) {
+    if ($command -in @("invoke-expression", "iex", "eval")) {
         return (@($Words | Select-Object -Skip 1 | Where-Object { $_ -notmatch '^(?i)-command$' }) -join " ")
     }
     return $null

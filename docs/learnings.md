@@ -2,6 +2,25 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-16: A quoted `|` in a grep pattern was blocked as G1 or G4
+
+- **Context:** A read-only search of the docs for two patterns, written as
+  `grep -rn "a\|b" docs ...`.
+- **Symptom:** The search was blocked with G1 (and with G4 when guard folders were among the
+  searched paths), although it read only docs and specs.
+- **Root cause:** `Split-ShellParts` in @.agents/guardrails/Guard.psm1 split the command on
+  every separator, also inside quotes. `grep -rn "a\` became a recursive search without a
+  root, which G1 treats as a search of the project root. The rest became an unknown command
+  naming guard paths, which G4 treats as a write.
+- **Solution:** Separators inside quotes or after an escape character no longer split. The
+  command is read both as Bash (`\` escapes) and as PowerShell (backtick escapes), and the
+  parts of both readings are checked. Quotes that do not close, and a command run inside
+  double quotes (`"$(...)"`, a Bash backtick), still split on every separator. Bash `eval` is
+  unwrapped like `Invoke-Expression`, so `eval "cat .env | head"` stays blocked. The guard
+  files are G4-protected, so the user applies the change.
+- **Prevention:** guard test rows for quoted separators, both allowed and still blocked, in
+  @scripts/guard-tests.ps1. Until the fix is in, write alternatives as `grep -e a -e b`.
+
 ## 2026-11-11: The frontend format check failed on untouched files
 
 - **Context:** The checks of the comparison CSV export on a Windows checkout.
