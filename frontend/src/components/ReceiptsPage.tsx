@@ -3,6 +3,7 @@ import { listReceipts, type ReceiptSummary } from "../api/receipts";
 import { formatCents, formatDate } from "../format";
 import { fi } from "../i18n/fi";
 import { isPlainLeftClick, receiptPath } from "../navigation";
+import { attention, finnishYear, needsAttention } from "../receiptsAttention";
 import { NewReceiptForm } from "./NewReceiptForm";
 
 interface Props {
@@ -14,6 +15,7 @@ export function ReceiptsPage({ onOpen }: Props) {
   const [receipts, setReceipts] = useState<ReceiptSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [onlyAttention, setOnlyAttention] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,9 +34,32 @@ export function ReceiptsPage({ onOpen }: Props) {
     };
   }, []);
 
+  const year = finnishYear(new Date());
+  const note = receipts ? attention(receipts, year) : null;
+
   return (
     <section aria-labelledby="receipts-heading">
       <h2 id="receipts-heading">{fi.receipts.heading}</h2>
+      {/* Unreviewed receipts without a date or from earlier years (unreviewed-receipts-note PC2, PC3). */}
+      {note && note.undated + note.earlier > 0 && (
+        <div role="status">
+          <p>
+            {[
+              note.undated > 0 ? fi.receipts.undatedUnreviewed(note.undated) : null,
+              note.earlier > 0 ? fi.receipts.earlierUnreviewed(note.earlier, note.years) : null,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </p>
+          <button
+            type="button"
+            aria-pressed={onlyAttention}
+            onClick={() => setOnlyAttention(!onlyAttention)}
+          >
+            {fi.receipts.onlyAttention}
+          </button>
+        </div>
+      )}
       {/* Closing the form unmounts it, so it opens empty again (receipt-management AC34). */}
       {isCreating ? (
         <NewReceiptForm onCreated={onOpen} onCancel={() => setIsCreating(false)} />
@@ -60,33 +85,35 @@ export function ReceiptsPage({ onOpen }: Props) {
               </tr>
             </thead>
             <tbody>
-              {receipts.map((receipt) => (
-                <tr key={receipt.id}>
-                  <td>
-                    <a
-                      href={receiptPath(receipt.id)}
-                      onClick={(event) => {
-                        if (isPlainLeftClick(event)) {
-                          event.preventDefault();
-                          onOpen(receipt.id);
-                        }
-                      }}
-                    >
-                      {receipt.purchase_date
-                        ? formatDate(receipt.purchase_date)
-                        : fi.receipts.missing}
-                    </a>
-                  </td>
-                  <td>{receipt.store || fi.receipts.missing}</td>
-                  <td className="amount">
-                    {receipt.total_cents === null
-                      ? fi.receipts.missing
-                      : formatCents(receipt.total_cents)}
-                  </td>
-                  <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
-                  <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
-                </tr>
-              ))}
+              {receipts
+                .filter((receipt) => !onlyAttention || needsAttention(receipt, year))
+                .map((receipt) => (
+                  <tr key={receipt.id}>
+                    <td>
+                      <a
+                        href={receiptPath(receipt.id)}
+                        onClick={(event) => {
+                          if (isPlainLeftClick(event)) {
+                            event.preventDefault();
+                            onOpen(receipt.id);
+                          }
+                        }}
+                      >
+                        {receipt.purchase_date
+                          ? formatDate(receipt.purchase_date)
+                          : fi.receipts.missing}
+                      </a>
+                    </td>
+                    <td>{receipt.store || fi.receipts.missing}</td>
+                    <td className="amount">
+                      {receipt.total_cents === null
+                        ? fi.receipts.missing
+                        : formatCents(receipt.total_cents)}
+                    </td>
+                    <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
+                    <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

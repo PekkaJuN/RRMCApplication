@@ -80,6 +80,10 @@ export const fi = {
     mismatch: "Summa ei täsmää",
     unreviewed: "Tarkistamaton",
     reviewed: "Vahvistettu",
+    undatedUnreviewed: (count: number) => `Tarkistamattomia kuitteja ilman päivämäärää: ${count}.`,
+    earlierUnreviewed: (count: number, years: readonly number[]) =>
+      `Tarkistamattomia kuitteja edellisiltä vuosilta: ${count} (${years.join(", ")}).`,
+    onlyAttention: "Näytä vain nämä kuitit",
   },
   dateField: {
     placeholder: "pp.kk.vvvv",

@@ -40,8 +40,11 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/navigation.ts — `usePage()`, `pageFromPath()`, `PAGE_PATHS`
 - @frontend/src/components/ImportPage.tsx — the Tuonti page: the "Tuo kuitit" button,
   progress, and the report of the latest run
-- @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the `Uusi kuitti` button and
-  form, and the receipt list
+- @frontend/src/components/ReceiptsPage.tsx — the Kuitit page: the note on old and undated
+  unreviewed receipts with its filter button, the `Uusi kuitti` button and form, and the
+  receipt list
+- @frontend/src/receiptsAttention.ts — which receipts the Kuitit note counts, and the
+  current year in Finnish time
 - @frontend/src/components/DateInput.tsx — a date as `dd.mm.yyyy` text with a calendar button;
   holds no state. A native date input shows the browser's format, so it stays only as the
   hidden calendar; only its native `change` event is a pick. With `pickerOnly` the text cannot be edited, and a click opens the calendar
@@ -155,6 +158,17 @@ backend's message, so new reasons need no UI change. The texts are in the
 
 On the Kuitit page the list is loaded when the page opens; missing date, store and total
 show `–`. A list that cannot be loaded shows the error with `role="alert"`.
+
+When unreviewed receipts have no date or are dated before this year, a note with
+`role="status"` above the list says how many, with the years of the old ones:
+`Tarkistamattomia kuitteja ilman päivämäärää: 1. Tarkistamattomia kuitteja edellisiltä
+vuosilta: 3 (2024, 2025).` Each sentence shows only when its count is not 0. Such receipts
+are in no year's totals and block archiving. The note's toggle button
+`Näytä vain nämä kuitit` (`aria-pressed`) shows only these receipts in the list's order, and
+again every receipt. @frontend/src/receiptsAttention.ts decides which receipts these are;
+the current year is the one in `Europe/Helsinki`, as on the Vuosi tuotteineen page. The
+filter is not remembered. The texts are in the
+[unreviewed receipts note spec](../../../specs/features/unreviewed-receipts-note.md).
 
 The `Uusi kuitti` button above the list opens the new receipt form (receipt-management
 PC11). The form loads the failed images when it opens, and a failed load shows its error beside

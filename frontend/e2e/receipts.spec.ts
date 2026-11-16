@@ -128,3 +128,62 @@ test("AC35: the new receipt form and a receipt without an image are accessible",
 
   expect({ form, receipt }).toEqual({ form: [], receipt: [] });
 });
+
+// Note on old and undated unreviewed receipts (specs/features/unreviewed-receipts-note.md,
+// E2E tests). The receipts are dated two years back: the archiving journey archives last
+// year, and an unreviewed receipt there would block it; two years back is its blocked year.
+const OLD_YEAR = new Date().getFullYear() - 2;
+
+/** Type in a receipt dated in OLD_YEAR with one line, and confirm it when `review` is set. */
+async function typeInOld(page: Page, store: string, review: boolean): Promise<void> {
+  await openForm(page);
+  const form = page.getByRole("form", { name: "Uusi kuitti" });
+  await form.getByLabel("Kauppa").fill(store);
+  await form.getByLabel("Päivä", { exact: true }).fill(`15.09.${OLD_YEAR}`);
+  await form.getByLabel("Loppusumma").fill("1,25");
+  await form.getByRole("button", { name: "Luo kuitti" }).click();
+  await expect(page).toHaveURL(/\/kuitit\/\d+$/);
+  if (review) {
+    const newLine = page.getByRole("form", { name: "Uusi rivi" });
+    await newLine.getByLabel("Tuote").fill("Maito");
+    await newLine.getByLabel("Summa").fill("1,25");
+    await newLine.getByRole("button", { name: "Lisää rivi" }).click();
+    await expect(page.getByRole("textbox", { name: "Tuote: Maito" })).toHaveValue("Maito");
+    await page.getByRole("button", { name: "Vahvista" }).click();
+    await expect(page.getByText("Vahvistettu")).toBeVisible();
+  }
+}
+
+test("unreviewed-note AC5, AC6, AC9: show only the old unreviewed receipts", async ({ page }) => {
+  const unreviewed = `E2E-vanha ${RUN} a`;
+  const reviewed = `E2E-vanha ${RUN} b`;
+  await typeInOld(page, unreviewed, false);
+  await typeInOld(page, reviewed, true);
+
+  await page.goto("/kuitit");
+  const table = page.getByRole("table", { name: "Kuittilista" });
+  const note = page.getByRole("main").getByRole("status");
+  await expect(note).toContainText(
+    new RegExp(
+      String.raw`Tarkistamattomia kuitteja edellisiltä vuosilta: \d+ \(.*${OLD_YEAR}.*\)\.`,
+    ),
+  );
+  await expect(table.getByText(unreviewed)).toBeVisible();
+  await expect(table.getByText(reviewed)).toBeVisible();
+  expect(await axeViolations(page)).toEqual([]);
+
+  // AC5 with the keyboard: Enter turns the filter on.
+  const button = note.getByRole("button", { name: "Näytä vain nämä kuitit" });
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await expect(table.getByText(unreviewed)).toBeVisible();
+  await expect(table.getByText(reviewed)).toHaveCount(0);
+  await expect(table.getByText("Vahvistettu")).toHaveCount(0);
+  expect(await axeViolations(page)).toEqual([]);
+
+  // AC6 with the keyboard: Space turns it off.
+  await page.keyboard.press("Space");
+  await expect(button).toHaveAttribute("aria-pressed", "false");
+  await expect(table.getByText(reviewed)).toBeVisible();
+});

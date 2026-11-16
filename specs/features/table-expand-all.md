@@ -12,7 +12,10 @@
   goes to `Leivät` of the seeded group `Ruoka`, so the table has a group. G7 record: no
   existing test changed; tests were only added to `YearPage.test.tsx`,
   `ArchiveYearPage.test.tsx` and `year.spec.ts`. Audited 2026-11-16: AC1–AC10 covered,
-  all checks green.
+  all checks green. After the merge (2026-11-16, approved by the user): the E2E receipt
+  moved from 16.03. to 16.06., because a confirmed receipt in March races the budget
+  journey's March total (see the unreviewed receipts note spec's G7 record); no
+  expectation changed; all 47 E2E tests pass.
 - **Created:** 2026-11-16
 - **Updated:** 2026-11-16: user decisions: two level buttons (one for categories, one for
   products), the table opens as now (groups open, categories closed), and both pages that

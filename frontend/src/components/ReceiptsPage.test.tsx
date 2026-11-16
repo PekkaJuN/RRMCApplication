@@ -1,9 +1,16 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import type { ReceiptSummary } from "../api/receipts";
-import { FAILED_IMAGES, SUMMARY_A, SUMMARY_B } from "../test/receipts";
+import {
+  ATTENTION_LIST,
+  attentionReceipts,
+  FAILED_IMAGES,
+  FUTURE_UNREVIEWED,
+  SUMMARY_A,
+  SUMMARY_B,
+} from "../test/receipts";
 import { server } from "../test/server";
 import { ReceiptsPage } from "./ReceiptsPage";
 
@@ -103,4 +110,120 @@ it("receipt-management AC34: the new receipt form opens empty again after cancel
   await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
   expect(screen.getByLabelText("Kauppa")).toHaveValue("");
   expect(screen.getByLabelText("Kuva")).toHaveDisplayValue("Ei kuvaa");
+});
+
+// Note on old and undated unreviewed receipts (specs/features/unreviewed-receipts-note.md).
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Fixes today; only Date is faked, so fetch and MSW keep their real timers. */
+function today(iso = "2026-06-15T09:00:00Z") {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date(iso) });
+}
+
+async function noteText(): Promise<string> {
+  return (await screen.findByRole("status")).querySelector("p")?.textContent ?? "";
+}
+
+const filterButton = () => screen.getByRole("button", { name: "Näytä vain nämä kuitit" });
+
+async function storesShown(): Promise<string[]> {
+  return (await rowTexts()).map((cells) => cells[1] ?? "");
+}
+
+const ALL_STORES = ATTENTION_LIST.map((receipt) => receipt.store);
+
+it("unreviewed-note AC1: the note names both kinds and has the filter button", async () => {
+  today();
+  listAnswers(ATTENTION_LIST);
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  expect(await noteText()).toBe(
+    "Tarkistamattomia kuitteja ilman päivämäärää: 1. " +
+      "Tarkistamattomia kuitteja edellisiltä vuosilta: 3 (2024, 2025).",
+  );
+  const note = screen.getByRole("status");
+  expect(within(note).getByRole("button", { name: "Näytä vain nämä kuitit" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  expect(
+    note.compareDocumentPosition(screen.getByRole("table", { name: "Kuittilista" })) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(await storesShown()).toEqual(ALL_STORES);
+});
+
+it("unreviewed-note AC2: only undated receipts", async () => {
+  today();
+  listAnswers(attentionReceipts(1, 2, 3));
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  expect(await noteText()).toBe("Tarkistamattomia kuitteja ilman päivämäärää: 1.");
+});
+
+it("unreviewed-note AC3: only receipts of earlier years", async () => {
+  today();
+  listAnswers(attentionReceipts(3, 4, 5, 6));
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  expect(await noteText()).toBe("Tarkistamattomia kuitteja edellisiltä vuosilta: 3 (2024, 2025).");
+});
+
+it("unreviewed-note AC4: no note without receipts that need attention", async () => {
+  today();
+  listAnswers([...attentionReceipts(2, 3, 7), FUTURE_UNREVIEWED]);
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  await screen.findByRole("table", { name: "Kuittilista" });
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Näytä vain nämä kuitit" })).not.toBeInTheDocument();
+});
+
+it("unreviewed-note AC7: the year turns at Finnish midnight", async () => {
+  today("2025-12-31T22:30:00Z");
+  listAnswers(attentionReceipts(3, 4));
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  expect(await noteText()).toBe("Tarkistamattomia kuitteja edellisiltä vuosilta: 1 (2025).");
+});
+
+it("unreviewed-note AC8: a failed list shows the alert and no note", async () => {
+  today();
+  server.use(
+    http.get("/api/receipts", () =>
+      HttpResponse.json(
+        { error: "internal_error", message: "Jokin meni pieleen." },
+        { status: 500 },
+      ),
+    ),
+  );
+  render(<ReceiptsPage onOpen={() => {}} />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jokin meni pieleen.");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+it("unreviewed-note AC5, AC6: the filter shows only these receipts, then all", async () => {
+  today();
+  listAnswers(ATTENTION_LIST);
+  const user = userEvent.setup();
+  render(<ReceiptsPage onOpen={() => {}} />);
+  await screen.findByRole("status");
+
+  await user.click(filterButton());
+
+  expect(await storesShown()).toEqual(["Kauppa 1", "Kauppa 4", "Kauppa 5", "Kauppa 6"]);
+  expect(filterButton()).toHaveAttribute("aria-pressed", "true");
+  expect(await noteText()).toBe(
+    "Tarkistamattomia kuitteja ilman päivämäärää: 1. " +
+      "Tarkistamattomia kuitteja edellisiltä vuosilta: 3 (2024, 2025).",
+  );
+
+  await user.click(filterButton());
+
+  expect(await storesShown()).toEqual(ALL_STORES);
+  expect(filterButton()).toHaveAttribute("aria-pressed", "false");
 });

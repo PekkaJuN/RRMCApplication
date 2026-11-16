@@ -296,7 +296,8 @@ input.amount {
 /* Messages (PC7). The header's status line is a div, so these rules do not reach it. */
 
 main p[role="alert"],
-main p[role="status"] {
+main p[role="status"],
+main div[role="status"] {
   padding: var(--space-2) var(--space-3);
   border-left: 4px solid;
   border-radius: var(--radius);
@@ -308,10 +309,21 @@ main p[role="alert"] {
   border-left-color: var(--color-error-border);
 }
 
-main p[role="status"] {
+main p[role="status"],
+main div[role="status"] {
   color: var(--color-notice-text);
   background: var(--color-notice-bg);
   border-left-color: var(--color-notice-border);
+}
+
+/* A note with a button (unreviewed-receipts-note PC2): a paragraph's spacing, and the text
+   above the button. */
+main div[role="status"] {
+  margin: 1em 0;
+}
+
+main div[role="status"] p {
+  margin: 0 0 var(--space-2);
 }
 
 span[role="alert"] {
