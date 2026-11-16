@@ -166,7 +166,7 @@ can start; if something is missing, stop and say what.
 
 | Workflow | When | Skill file |
 |---|---|---|
-| research | Request is unclear, or before any spec. Read-only. | (below) |
+| research | Request is unclear, or before any spec. Read-only. | `.agents/skills/research/SKILL.md` |
 | spec | New feature, API change, architectural or multi-subsystem change | `.agents/skills/spec/SKILL.md` |
 | develop + tdd | Implementing an approved spec, or fixing a bug | `.agents/skills/tdd/SKILL.md` |
 | review / audit | Feature implemented; final gate before marking Done | `.agents/skills/review-audit/SKILL.md` |
@@ -191,15 +191,6 @@ can start; if something is missing, stop and say what.
   starts with a failing test that reproduces the bug; keep it as a regression test.
 - Trivial changes (typo, formatting, comment, dependency bump without behavior change) need
   neither.
-
-### Research (read-only)
-
-1. Read `docs/content-plan.md`, then the relevant Tier 1 and Tier 2 docs and specs.
-2. Search the code for existing patterns. For libraries, use official docs and note the version.
-3. Present: request type, complexity, whether a spec is needed, affected subsystems, docs read,
-   a draft outline, and open questions. Cite web sources.
-4. Do not change code or docs (except listing gaps in `docs/content-plan.md`). Stop after
-   presenting findings.
 
 ### Fix
 
@@ -251,6 +242,7 @@ If a skill conflicts with this file, this file wins; tell the user.
 
 | Skill | Purpose | Status |
 |---|---|---|
+| `research` | Read-only research before a spec | ready |
 | `spec` | SDD: write a spec, plan and tasks | ready |
 | `tdd` | Develop an approved spec with Red → Green → Refactor | ready |
 | `review-audit` | Review an implementation against its spec; final audit gate | ready |
