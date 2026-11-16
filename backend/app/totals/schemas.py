@@ -4,9 +4,11 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
+from app.archive.schemas import ArchiveTotalsOut
 from app.calculation.period import Column
 from app.calculation.period_totals import RowKind, TotalsRow
 from app.totals.service import TotalsView
+from app.totals.year import YearTotals
 
 
 class ColumnOut(BaseModel):
@@ -79,3 +81,15 @@ class TotalsOut(BaseModel):
             undated_receipts=view.undated_receipts,
             archived_years=view.archived_years,
         )
+
+
+class YearTotalsOut(ArchiveTotalsOut):
+    """The current year's totals in the archived year's shape, plus the unreviewed count
+    (year with products spec P5)."""
+
+    unreviewed: int
+
+    @classmethod
+    def from_year(cls, year: YearTotals) -> Self:
+        base = ArchiveTotalsOut.from_totals(year.totals)
+        return cls(**base.model_dump(), unreviewed=year.unreviewed)

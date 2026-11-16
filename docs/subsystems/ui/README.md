@@ -8,9 +8,10 @@ The UI is a React + Vite + TypeScript app in Finnish (NFR-15), opened at
 <http://127.0.0.1:5173>. It shows what the API returns and holds no business rules.
 
 It has the app shell (the heading `Kuittisovellus`, the navigation and a status line that
-reports the backend's health) and nine pages: **Tuotteet** for groups, categories and
+reports the backend's health) and ten pages: **Tuotteet** for groups, categories and
 products, **Tuonti** for importing receipt images, **Kuitit** for the receipt list, the
-**receipt page** for one receipt, **Yhteenveto** for the category totals, **Budjetti** for
+**receipt page** for one receipt, **Yhteenveto** for the category totals, **Vuosi
+tuotteineen** for the current year's totals per product, **Budjetti** for
 the monthly budgets, **Vertailu** for the budget against spending, **Arkisto** for
 archiving finished years, and the **archived year page** for one archived year's totals.
 The app opens on Tuotteet.
@@ -18,12 +19,13 @@ The app opens on Tuotteet.
 A few pages do not justify a router library. @frontend/src/navigation.ts maps the address to
 a page and switches pages with the History API: `/tuonti` → Tuonti, `/kuitit` → Kuitit,
 `/kuitit/<id>` (a positive number without leading zeros) → the receipt, any other
-`/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, `/budjetti` → Budjetti, `/vertailu` →
+`/kuitit/...` → Kuitit, `/yhteenveto` → Yhteenveto, `/vuosi` → Vuosi tuotteineen,
+`/budjetti` → Budjetti, `/vertailu` →
 Vertailu, `/arkisto` → Arkisto, `/arkisto/<year>` (four digits) → the archived year, any
 other `/arkisto/...` → Arkisto, any other path → Tuotteet. `usePage()` returns the page,
 `go(page, id?)`, the open receipt's id and the open archived year (`archiveYearFromPath`).
-The navigation links are real links (`/`, `/tuonti`, `/kuitit`, `/yhteenveto`, `/budjetti`,
-`/vertailu`, `/arkisto`), and so are the date links of the list, the back link of a receipt
+The navigation links are real links (`/`, `/tuonti`, `/kuitit`, `/yhteenveto`, `/vuosi`,
+`/budjetti`, `/vertailu`, `/arkisto`), and so are the date links of the list, the back link of a receipt
 and the `Näytä` link of an archived year; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
 has `aria-current="page"` (Kuitit also on a receipt, Arkisto also on an archived year), the back button works, and a reload
@@ -71,7 +73,8 @@ keeps the page because Vite answers every path with `index.html`.
   `columnHeading`, `currentMonthRange`
 - @frontend/src/api/budget.ts — `getBudget()`, `saveBudget()`, `getComparison()` and their
   types
-- @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types
+- @frontend/src/api/totals.ts — `getTotals()` and the `Totals` types; `getYearTotals()`,
+  `yearCsvUrl()` and `YearTotals` (the archived year's shape plus `unreviewed`)
 - @frontend/src/api/archive.ts — `getArchive()`, `archiveYear()`, `deleteArchivedYear()`,
   `getArchiveTotals()`, `archiveCsvUrl()` and the archive types
 - @frontend/src/api/export.ts — `exportUrl(kind, period)`, `comparisonPdfUrl(period)` and
@@ -82,7 +85,12 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/components/ArchiveYearPage.tsx — one archived year: `Vie CSV` and the
   table, or `Vuotta 2023 ei ole arkistossa.`
 - @frontend/src/components/ArchiveTotalsTable.tsx — the archived year's table: groups,
-  categories and products that open and close, 12 months and `Vuosi`
+  categories and products that open and close, 12 months and `Vuosi`; also the table of
+  the Vuosi tuotteineen page
+- @frontend/src/components/YearPage.tsx — the Vuosi tuotteineen page: the current year's
+  table and `Vie CSV`, the note `Tarkistamattomia kuitteja: N. Ne eivät ole mukana
+  summissa.` when N > 0, or `Vuodelta 2026 ei ole vielä tarkistettuja kuitteja.` for a year
+  without reviewed lines
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
 - @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
   product table; loads the lists and reloads them after every successful change

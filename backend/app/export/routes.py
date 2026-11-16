@@ -100,6 +100,10 @@ def create_export_router(
     ) -> Response:
         return _download(service.archive_file(year))
 
+    @router.get("/year")
+    def get_year(service: Annotated[ExportService, Depends(export_service)]) -> Response:
+        return _download(service.year_file())
+
     return router
 
 

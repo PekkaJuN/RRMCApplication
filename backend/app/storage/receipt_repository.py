@@ -92,6 +92,19 @@ class DatedLineRow:
 
 
 @dataclass(frozen=True)
+class YearLineRow:
+    """A reviewed line with the current catalog names, for the year totals (year with
+    products spec P3). The product name is the linked product's name, else the line's."""
+
+    purchase_date: str
+    amount_cents: int
+    product_name: str
+    category_name: str | None
+    group_name: str | None
+    is_deposit_refund: bool
+
+
+@dataclass(frozen=True)
 class ExportLineRow:
     """A line with the names the lines file shows (export spec P4)."""
 
@@ -322,6 +335,33 @@ class ReceiptRepository:
                 purchase_date=row["purchase_date"],
                 amount_cents=row["amount_cents"],
                 category_id=row["category_id"],
+                is_deposit_refund=bool(row["is_deposit_refund"]),
+            )
+            for row in rows
+        ]
+
+    def year_lines(self, start: str, end: str) -> list[YearLineRow]:
+        """The lines of the reviewed receipts dated from `start` to `end` (inclusive), with
+        the current product, category and group names (year with products spec P3)."""
+        rows = self._connection.execute(
+            "SELECT r.purchase_date, l.amount_cents, coalesce(p.name, l.name) AS product_name,"
+            " c.name AS category_name, g.name AS group_name, l.is_deposit_refund"
+            " FROM receipt_lines AS l"
+            " JOIN receipts AS r ON r.id = l.receipt_id"
+            " LEFT JOIN products AS p ON p.id = l.product_id"
+            " LEFT JOIN categories AS c ON c.id = l.category_id"
+            " LEFT JOIN categories AS g ON g.id = c.parent_id"
+            " WHERE r.reviewed = 1 AND r.purchase_date BETWEEN ? AND ?"
+            " ORDER BY r.purchase_date, r.id, l.position",
+            (start, end),
+        )
+        return [
+            YearLineRow(
+                purchase_date=row["purchase_date"],
+                amount_cents=row["amount_cents"],
+                product_name=row["product_name"],
+                category_name=row["category_name"],
+                group_name=row["group_name"],
                 is_deposit_refund=bool(row["is_deposit_refund"]),
             )
             for row in rows

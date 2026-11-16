@@ -9,6 +9,7 @@ import { ReceiptPage } from "./components/ReceiptPage";
 import { ReceiptsPage } from "./components/ReceiptsPage";
 import { StatusLine } from "./components/StatusLine";
 import { TotalsPage } from "./components/TotalsPage";
+import { YearPage } from "./components/YearPage";
 import { fi } from "./i18n/fi";
 import { isPlainLeftClick, PAGE_PATHS, usePage, type Page } from "./navigation";
 
@@ -17,6 +18,7 @@ const LINKS: { page: Exclude<Page, "receipt" | "archiveYear">; text: string }[] 
   { page: "import", text: fi.import.heading },
   { page: "receipts", text: fi.receipts.heading },
   { page: "totals", text: fi.totals.heading },
+  { page: "year", text: fi.year.heading },
   { page: "budget", text: fi.budget.heading },
   { page: "comparison", text: fi.comparison.heading },
   { page: "archive", text: fi.archive.heading },
@@ -51,6 +53,8 @@ export function App() {
         return <ReceiptPage key={receiptId} id={receiptId ?? 0} onBack={() => go("receipts")} />;
       case "totals":
         return <TotalsPage />;
+      case "year":
+        return <YearPage />;
       case "budget":
         return <BudgetPage />;
       case "comparison":

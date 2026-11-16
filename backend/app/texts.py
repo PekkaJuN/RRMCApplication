@@ -106,6 +106,7 @@ YEAR_NOT_FINISHED = "Vain päättyneen vuoden voi arkistoida."
 ARCHIVE_IMPORT_RUNNING = "Tuonti on käynnissä. Arkistoi vuosi, kun tuonti on valmis."
 NOTHING_TO_ARCHIVE = "Vuodelta ei ole arkistoitavia kuitteja."
 ARCHIVE_FILE_PREFIX = "arkisto"
+YEAR_FILE_PREFIX = "vuosi"
 
 
 def unreviewed_block_archiving(count: int) -> str:
