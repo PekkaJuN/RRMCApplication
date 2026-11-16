@@ -108,3 +108,45 @@ it("year AC17: the wide box, the sticky name column and wrapping names", async (
   expect(table().parentElement).toHaveClass("table-box", "table-box-wide");
   expect(table()).toHaveClass("archive-table");
 });
+
+const LEVEL_BUTTONS = [
+  "Näytä kategoriat",
+  "Piilota kategoriat",
+  "Näytä tuotteet",
+  "Piilota tuotteet",
+];
+
+it("table-expand-all AC1: the level buttons stand above the year table on /vuosi", async () => {
+  answerYearTotals();
+  render(<YearPage />);
+  await screen.findByRole("table", { name: "Vuosi 2026" });
+
+  for (const name of ["Piilota kategoriat", "Näytä tuotteet"]) {
+    const button = screen.getByRole("button", { name });
+    expect(table().contains(button)).toBe(false);
+    expect(button.compareDocumentPosition(table()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+});
+
+it("table-expand-all AC9: no level buttons for an empty year", async () => {
+  answerYearTotals(EMPTY_YEAR);
+  render(<YearPage />);
+  await screen.findByText("Vuodelta 2026 ei ole vielä tarkistettuja kuitteja.");
+
+  for (const name of LEVEL_BUTTONS) {
+    expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+  }
+});
+
+it("table-expand-all AC9: no level buttons after a failed request", async () => {
+  answerYearTotals(YEAR_TOTALS, {
+    status: 500,
+    body: { error: "internal_error", message: "Jokin meni pieleen." },
+  });
+  render(<YearPage />);
+  await screen.findByRole("alert");
+
+  for (const name of LEVEL_BUTTONS) {
+    expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+  }
+});
