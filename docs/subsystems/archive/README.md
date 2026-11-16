@@ -102,8 +102,9 @@ change.
   [import](../import/README.md) service's state.
 - Used by: the [UI](../ui/README.md) Arkisto and archived year pages;
   [export](../export/README.md) for the archive CSV file (`parse_year`,
-  `read_year_totals`). This is the one dependency on archive: the CSV file must be built
-  from the same reader as the page.
+  `read_year_totals`), so the CSV file is built from the same reader as the page;
+  [totals](../totals/README.md#current-year-totals) for `ArchiveTotalsOut`, the shape of
+  the current year's totals.
 
 ## Modules
 

@@ -4,7 +4,8 @@ Navigation: ↑ [Architecture](../../architecture.md) | → [API reference](../.
 
 ## Overview
 
-Export serves the downloads of the Yhteenveto and Vertailu pages:
+Export serves the downloads of the Yhteenveto, Vertailu, archived year and Vuosi
+tuotteineen pages:
 
 - **CSV** (PRD FR-26, FR-27): the **lines file** of a period, and the **totals file** of a
   period by week or by month.
@@ -12,6 +13,7 @@ Export serves the downloads of the Yhteenveto and Vertailu pages:
   period and optionally its weeks.
 - **Archive CSV** (PRD FR-53): the product totals of an archived year per month and for
   the whole year.
+- **Year CSV** (PRD FR-54): the same file for the current year, from reviewed receipts.
 - **PDF** (PRD FR-48): the **weekly totals PDF** (A4 landscape), the **monthly totals PDF**
   (A4 portrait, stacked month blocks) and the **comparison PDF** (A4 portrait, the Vertailu
   month table).
@@ -24,7 +26,9 @@ of one: a report file has no lines file, and the CSV totals file needs no counts
 Export computes no sum itself. The totals files use the same `TotalsService` as
 `GET /api/totals`, and the comparison files the same `BudgetService.comparison` as
 `GET /api/budget/comparison`, and the archive file the same `read_year_totals` as
-`GET /api/archive/{year}/totals`, so a file and its page always agree (PRD risk table). The
+`GET /api/archive/{year}/totals`, and the year file the same `read_year_totals` of
+[totals](../totals/README.md#current-year-totals) as `GET /api/year/totals`, so a file and
+its page always agree (PRD risk table). The
 lines file reads the period's lines with their store, review state, category and group
 names from storage.
 
@@ -62,7 +66,9 @@ The endpoints, their files and error codes are in the
 | `ExportService.comparison_pdf(month, period)` | Reads `BudgetService.comparison` | `InvalidPeriodError` |
 | `ExportService.comparison_file(month, period, weeks)` | Reads `BudgetService.comparison`, then checks that `weeks` is missing, `false` or `true` | `InvalidPeriodError`, then `AppError` `invalid_request` |
 | `ExportService.archive_file(year_text)` | Parses the year (`parse_year`), reads the year totals (`read_year_totals`) and returns the exporter's archive file | `InvalidYearError`, `YearNotArchivedError` |
+| `ExportService.year_file()` | Reads the current year's totals (`app.totals.year.read_year_totals`) for the year of `today()`, in Finnish time, and returns the exporter's year file | nothing |
 | `Exporter.archive_totals_file(totals)` | Builds the archive CSV file of an archived year | nothing |
+| `Exporter.year_totals_file(totals)` | Builds the year CSV file of the current year; `CsvExporter` shares the archive file's builder | nothing |
 | `Exporter.lines_file(period, lines)` | Builds the lines file from `ExportLine` items | nothing |
 | `Exporter.totals_file(totals, by)` | Builds the totals file of the week columns (`by` `week`) or the month columns (`month`) | nothing |
 | `Exporter.comparison_file(comparison, kind, weeks=...)` | Builds the comparison CSV file of a `calendar` or `mid` period, with or without the weeks | nothing |
@@ -138,6 +144,9 @@ clock.
   without a group; `Kategoria` is `Ei kategoriaa` for lines without one.
 - The other rules of the CSV format above apply, also the formula guard on the names.
 - File name: `arkisto_<year>.csv`.
+- The year CSV file of the current year (`GET /api/export/year`) is built by the same code
+  (`_year_products_file`), with the name `vuosi_<year>.csv`. A year without reviewed lines
+  gives the header row only.
 
 ### PDF layout
 
@@ -170,11 +179,13 @@ clock.
 - Uses: [totals](../totals/README.md) (`TotalsService.period`, `read` and `totals`),
   [budget](../budget/README.md) (`BudgetService.comparison`),
   [calculation](../calculation/README.md) (the period, totals and comparison types),
-  [archive](../archive/README.md) (`parse_year`, `read_year_totals`),
+  [archive](../archive/README.md) (`parse_year`, `read_year_totals`), totals'
+  `app.totals.year.read_year_totals` for the year file,
   [storage](../storage/README.md) (`export_lines`, `ArchiveRepository`); reportlab for the
   PDF files.
 - Used by: the [UI](../ui/README.md) Yhteenveto page's download links, the Vertailu
-  page's PDF and CSV links and the archived year page's `Vie CSV`.
+  page's PDF and CSV links, and the `Vie CSV` links of the archived year page and the Vuosi
+  tuotteineen page.
 
 ## Modules
 

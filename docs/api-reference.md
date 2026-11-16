@@ -378,6 +378,34 @@ totals.
 |---|---|---|---|
 | 422 | `invalid_period` | `Jakso on virheellinen.` | A missing or malformed `unit`, `from` or `to`; a week or a day that does not exist; `from` after `to`; a longer period |
 
+#### Current year totals
+
+| Method and path | Query | Success | Errors |
+|---|---|---|---|
+| `GET /api/year/totals` | — | 200, the current year's totals per group, category and product (PRD FR-54) | none of its own |
+
+The year is the current year in Finnish time. The answer has the shape of
+[an archived year's totals](#archive) plus `unreviewed`: only reviewed receipts dated in the
+year are counted, and `unreviewed` is the number of unreviewed receipts dated in it. Names are
+the current catalog names; a linked line has its product's name. `rows` is `[]` when the year
+has no reviewed lines.
+
+```json
+{
+  "year": 2026,
+  "months": ["2026-01", "2026-02", "...", "2026-12"],
+  "rows": [
+    {"kind": "category", "name": "Kahvi", "months": [0, 0, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0], "total": 500,
+     "children": [
+       {"kind": "product", "name": "Kahvi 500g", "months": [0, 0, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0], "total": 500, "children": []}
+     ]}
+  ],
+  "month_totals": [0, 0, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "total": 500,
+  "unreviewed": 2
+}
+```
+
 ### Budget
 
 Implemented in @backend/app/budget/routes.py. The rules are in
@@ -460,6 +488,7 @@ The other files read active data only.
 | `GET /api/export/comparison` | `month` and `period` as in `GET /api/budget/comparison`; `weeks` `true`, or `false` (the default) | 200, `vertailu_<month>.csv`, `vertailu_15-14_<month>.csv`, or with `weeks=true` `vertailu_viikot_<month>.csv`, `vertailu_viikot_15-14_<month>.csv` | 422 `invalid_period`, then `invalid_request` |
 | `GET /api/export/comparison/pdf` | `month` and `period` as in `GET /api/budget/comparison` | 200, `vertailu_<month>.pdf` or `vertailu_15-14_<month>.pdf` (A4 portrait) | 422 `invalid_period` |
 | `GET /api/export/archive/{year}` | — | 200, `arkisto_<year>.csv` | 422 `invalid_year`, 404 `not_found` |
+| `GET /api/export/year` | — | 200, `vuosi_<year>.csv`: the current year's product totals in the archive file's format (PRD FR-54) | none of its own |
 
 Every 200 answer has `Content-Type: text/csv; charset=utf-8`, `Content-Disposition:
 attachment; filename="<name>"` and `Cache-Control: no-store`. The content is UTF-8 with a
@@ -507,6 +536,10 @@ Jakso;Alkaa;Päättyy;Ryhmä;Kategoria;Tuote;Summa
 2025-01;01.01.2025;31.01.2025;Maitotuotteet;Maito;Maito 1l;5,00
 2025;01.01.2025;31.12.2025;Maitotuotteet;Maito;Maito 1l;5,00
 ```
+
+The year file `vuosi_<year>.csv` has the same columns, blocks and order, for
+[the current year totals](#current-year-totals). A year without reviewed lines gives the
+header row only.
 
 | Status | `error` | `message` | When |
 |---|---|---|---|

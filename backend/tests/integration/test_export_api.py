@@ -344,6 +344,9 @@ class FixedExporter:
     def archive_totals_file(self, totals: ArchiveTotals) -> ExportFile:
         return ExportFile("arkisto.test", "application/x-test", b"archive")
 
+    def year_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        return ExportFile("vuosi.test", "application/x-test", b"year")
+
 
 def test_ac12_exporter_interface(settings: Settings) -> None:
     exporter = FixedExporter()

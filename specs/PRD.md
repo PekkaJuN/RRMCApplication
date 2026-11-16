@@ -114,6 +114,7 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-24 | Totals update when a receipt is edited. |
 | FR-25 | The user chooses the period shown: one calendar month, a range of months, one ISO week or a range of ISO weeks. The default is the current calendar month. Only receipts whose purchase date falls inside the period are counted. An ISO week that crosses the period's start or end counts only its days inside the period, so it shows a partial total (e.g. ISO week 1 of 2026, Mon 29 Dec 2025 – Sun 4 Jan 2026, shown for January 2026 counts only 1–4 January). |
 | FR-49 | *Next release:* the user can also choose the period as a free date range, from a start date to an end date, in addition to the options in FR-25. The same rules apply: only receipts whose purchase date falls inside the range are counted, and weeks and months at the range's edges count only their days inside it. The CSV export (FR-26) uses the same date range, so it can also cover a period such as the 15th to the 14th. |
+| FR-54 | The user can view the current calendar year (in Finnish time) on its own page, `Vuosi tuotteineen`: the totals of the whole year and of each month, per group, category and product, counted from reviewed receipts only, sorted by name as on the archived year page (FR-53); the number of unreviewed receipts of the year is shown. These totals can be exported as CSV in the archive file's format. Details in the [year with products spec](features/year-products.md). |
 | FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
@@ -253,8 +254,8 @@ category, category source, product). The data model is defined in `docs/datamode
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-48 PDF export of the totals summary and the budget comparison, FR-49 free date range for totals, FR-50 monthly budget, FR-51 date fields as `dd.mm.yyyy` |
-| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 and FR-53 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison |
-| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching), a year view of active data with monthly and yearly totals per group, category and product (as the archived year page, FR-53) |
+| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 and FR-53 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison, FR-54 the current year with products |
+| Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 
 A suggested order of feature specs for the MVP:
 

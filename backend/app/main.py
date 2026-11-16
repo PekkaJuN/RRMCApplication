@@ -90,7 +90,7 @@ def create_app(
         )
     )
     app.include_router(create_review_router(settings, clock, failed_folder))
-    app.include_router(create_totals_router(settings))
+    app.include_router(create_totals_router(settings, clock or _utc_now))
     app.include_router(create_budget_router(settings))
     app.include_router(
         create_export_router(

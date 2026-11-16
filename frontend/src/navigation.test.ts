@@ -97,3 +97,15 @@ it("totals AC14: go pushes /yhteenveto", () => {
   expect(result.current[0]).toBe("totals");
   expect(window.location.pathname).toBe("/yhteenveto");
 });
+
+// Year with products spec: the Vuosi tuotteineen page.
+
+it("year AC11: /vuosi is the Vuosi tuotteineen page and go opens it", () => {
+  expect(pageFromPath("/vuosi")).toBe("year");
+  const { result } = renderHook(() => usePage());
+
+  act(() => result.current[1]("year"));
+
+  expect(result.current[0]).toBe("year");
+  expect(window.location.pathname).toBe("/vuosi");
+});

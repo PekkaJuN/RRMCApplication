@@ -7,6 +7,7 @@ export type Page =
   | "receipts"
   | "receipt"
   | "totals"
+  | "year"
   | "budget"
   | "comparison"
   | "archive"
@@ -21,6 +22,7 @@ export const PAGE_PATHS: Record<Exclude<Page, PageWithId>, string> = {
   import: "/tuonti",
   receipts: "/kuitit",
   totals: "/yhteenveto",
+  year: "/vuosi",
   budget: "/budjetti",
   comparison: "/vertailu",
   archive: "/arkisto",
@@ -61,6 +63,9 @@ export function pageFromPath(pathname: string): Page {
   }
   if (pathname === PAGE_PATHS.totals) {
     return "totals";
+  }
+  if (pathname === PAGE_PATHS.year) {
+    return "year";
   }
   if (pathname === PAGE_PATHS.budget) {
     return "budget";

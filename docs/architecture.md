@@ -65,10 +65,11 @@ backend/                 FastAPI app and all processing
     review/              receipt endpoints: list, receipt view, image, category choice, line and
                          receipt edits, review state,
                          create and delete a receipt, the failed images
-    totals/              GET /api/totals: category totals per week and month of a period
+    totals/              GET /api/totals: category totals per week and month of a period;
+                         GET /api/year/totals: the current year per group, category, product
     budget/              /api/budget: monthly budgets and their comparison with spending
     export/              CSV and PDF downloads of a period's lines, totals and budget comparison,
-                         and of an archived year's totals
+                         and of an archived or the current year's totals
     archive/             /api/archive: archive a finished year, delete an archived year, the
                          year's totals
     <subsystem>/         one package per feature subsystem (see Component map)
@@ -154,7 +155,7 @@ flowchart LR
 | **categorization** | The catalog (groups, categories, products, name normalization, default list) and the assignment of a category to each line: remembered product first, then the model; record the category source; learn from user corrections | Calculate totals | FR-11–FR-15, FR-33–FR-39, FR-43 |
 | **calculation** | Category and group totals per ISO week and per month by purchase date; receipt subtotals; line-sum vs receipt-total check; deposit refund handling | Change data | FR-19–FR-20, FR-22–FR-25, FR-44 |
 | **review** | The receipt endpoints of the review UI: list with warnings, one receipt with its lines, category names, sums and subtotals, the image from the done folder, a line's category choice, line and receipt edits, the review state, deleting a receipt, creating one by hand with an image from the failed folder | Calculate sums or remember categories itself | FR-16–FR-21, FR-46, FR-47 (backend) |
-| **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend) |
+| **totals** | `GET /api/totals`: reads the lines dated in a period, the unreviewed and undated counts and the category order, and returns the period totals from calculation. `GET /api/year/totals`: reads the current year's reviewed lines with their names and returns the year tree from calculation | Calculate sums itself or store totals | FR-22–FR-25 (backend), FR-54 |
 | **budget** | `/api/budget`: reads and saves the monthly budgets, reads the reviewed lines, the counts and the category order, and returns the comparison from calculation | Calculate sums itself or store figures | FR-50 (backend) |
 | **export** | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison`, `/comparison/pdf` and `/archive/{year}`: reads a period's lines, totals or budget comparison, or an archived year's totals, and builds the files through the exporter interfaces; the CSV and PDF exporters, later the Google Sheets exporter | Compute totals itself | FR-26–FR-28, FR-48, FR-52, FR-53 |
 | **archive** | `/api/archive`: checks that a year can be archived, moves its receipts and lines into the archive tables in one transaction and its images into the archive folder, lists the archived and archivable years, deletes an archived year, and returns an archived year's totals from calculation | Show archived receipts one by one, or change archived data | FR-40–FR-42, FR-53 |
@@ -271,6 +272,10 @@ download links ask `GET /api/export/totals` (by week or by month) and
 `GET /api/export/totals/pdf`. The Vertailu page's PDF and CSV links ask
 `GET /api/export/comparison/pdf` and `GET /api/export/comparison`. The files use the same
 totals and comparison services, so an export always matches its page (FR-26, FR-48, FR-52, PRD risk table).
+
+The Vuosi tuotteineen page asks `GET /api/year/totals`: the current year's reviewed lines,
+by month, per group, category and product, in the archived year's tree (FR-54). Its
+`Vie CSV` link asks `GET /api/export/year`, built from the same reader.
 
 ### Archive
 

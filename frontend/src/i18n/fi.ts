@@ -160,6 +160,13 @@ export const fi = {
   budget: {
     heading: "Budjetti",
   },
+  year: {
+    heading: "Vuosi tuotteineen",
+    title: (year: number) => `Vuosi tuotteineen ${year}`,
+    unreviewed: (count: number) =>
+      `Tarkistamattomia kuitteja: ${count}. Ne eivät ole mukana summissa.`,
+    empty: (year: number) => `Vuodelta ${year} ei ole vielä tarkistettuja kuitteja.`,
+  },
   archive: {
     heading: "Arkisto",
     candidatesHeading: "Arkistoitavat vuodet",

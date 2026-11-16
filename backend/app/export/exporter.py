@@ -49,6 +49,11 @@ class Exporter(Protocol):
         PC13)."""
         ...
 
+    def year_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        """The month and year totals of the current year per product, in the archive file's
+        format (year with products spec PC5)."""
+        ...
+
 
 @dataclass(frozen=True)
 class TotalsReport:

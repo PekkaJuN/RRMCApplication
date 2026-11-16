@@ -13,6 +13,7 @@ import { IDLE } from "./test/imports";
 import { RECEIPT_A, RECEIPT_MANUAL, SUMMARY_A, SUMMARY_B } from "./test/receipts";
 import { server } from "./test/server";
 import { answerTotals } from "./test/totals";
+import { answerYearTotals } from "./test/year";
 
 const HEALTHY: Health = {
   status: "ok",
@@ -66,7 +67,7 @@ it("AC25: shows the heading, the navigation and the status line", async () => {
 
 // The product management spec's AC31 had one link; receipt-import AC26 adds "Tuonti",
 // receipt-review PC7 "Kuitit", the totals spec PC4 "Yhteenveto" and the budget spec PC3 and
-// PC6 "Budjetti" and "Vertailu".
+// PC6 "Budjetti" and "Vertailu"; the year with products spec AC11 "Vuosi tuotteineen".
 it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   render(<App />);
 
@@ -77,6 +78,7 @@ it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
     "Tuonti",
     "Kuitit",
     "Yhteenveto",
+    "Vuosi tuotteineen",
     "Budjetti",
     "Vertailu",
     "Arkisto",
@@ -363,4 +365,36 @@ it("totals PC5: the Yhteenveto link on the Yhteenveto page keeps the chosen peri
   expect(window.location.search).toBe("?unit=week&from=2026-W40&to=2026-W41");
   expect(window.history.length).toBe(entries);
   expect(screen.getByLabelText("Alkaen")).toHaveValue("2026-W40");
+});
+
+// Year with products spec: the Vuosi tuotteineen page.
+
+it("year AC11: the Vuosi tuotteineen link opens /vuosi and is the current page", async () => {
+  answerYearTotals();
+  const user = userEvent.setup();
+  render(<App />);
+  const navigation = screen.getByRole("navigation", { name: "Päävalikko" });
+
+  await user.click(within(navigation).getByRole("link", { name: "Vuosi tuotteineen" }));
+
+  expect(window.location.pathname).toBe("/vuosi");
+  expect(within(navigation).getByRole("link", { name: "Vuosi tuotteineen" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const main = screen.getByRole("main");
+  expect(
+    await within(main).findByRole("heading", { name: "Vuosi tuotteineen 2026" }),
+  ).toBeInTheDocument();
+});
+
+it("year AC11: opening /vuosi directly shows the page", async () => {
+  answerYearTotals();
+  window.history.replaceState(null, "", "/vuosi");
+  render(<App />);
+
+  const main = screen.getByRole("main");
+  expect(
+    await within(main).findByRole("heading", { name: "Vuosi tuotteineen 2026" }),
+  ).toBeInTheDocument();
 });

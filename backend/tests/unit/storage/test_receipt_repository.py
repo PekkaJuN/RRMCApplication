@@ -12,6 +12,7 @@ from app.storage.receipt_repository import (
     ReceiptRow,
     ReceiptSummaryRow,
     StoredLine,
+    YearLineRow,
 )
 
 HASH = "b" * 64
@@ -518,3 +519,91 @@ def test_ac7_receipt_without_an_image(db: sqlite3.Connection) -> None:
     assert stored.image_hash is None
     assert stored.file_name is None
     assert stored.ocr_text is None
+
+
+# Year with products spec T1: the reviewed lines of a year with their names.
+
+
+def reviewed_receipt(repository: ReceiptRepository, number: int, purchase_date: str | None) -> int:
+    receipt_id = add_dated(repository, number, purchase_date)
+    repository.set_reviewed(receipt_id, reviewed=True)
+    return receipt_id
+
+
+def test_year_ac2_year_lines_of_reviewed_receipts_only(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    reviewed = reviewed_receipt(repository, 1, "2026-01-10")
+    unreviewed = add_dated(repository, 2, "2026-02-01")
+    repository.add_line(reviewed, 1, "Maito", 250, is_deposit_refund=False)
+    repository.add_line(unreviewed, 1, "Maito", 300, is_deposit_refund=False)
+
+    lines = repository.year_lines("2026-01-01", "2026-12-31")
+
+    assert lines == [YearLineRow("2026-01-10", 250, "Maito", None, None, is_deposit_refund=False)]
+
+
+def test_year_ac3_year_lines_inside_the_range_only(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    for number, day in enumerate(
+        ["2025-12-31", "2026-01-01", "2026-12-31", "2027-01-01", None], start=1
+    ):
+        receipt_id = reviewed_receipt(repository, number, day)
+        repository.add_line(receipt_id, 1, "Kahvi", number * 100, is_deposit_refund=False)
+
+    lines = repository.year_lines("2026-01-01", "2026-12-31")
+
+    assert [(line.purchase_date, line.amount_cents) for line in lines] == [
+        ("2026-01-01", 200),
+        ("2026-12-31", 300),
+    ]
+
+
+def test_year_ac5_year_lines_use_the_current_names(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    catalog = CatalogRepository(db)
+    group_id = catalog.add_category("Maitotuotteet", "maitotuotteet", "group", None)
+    category_id = catalog.add_category("Maito", "maito", "category", group_id)
+    product_id = catalog.add_product("Maito 1l", "maito 1l", category_id)
+    receipt_id = reviewed_receipt(repository, 1, "2026-03-01")
+    repository.add_line(
+        receipt_id,
+        1,
+        "MAITO 1L VALIO",
+        100,
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "user", product_id),
+    )
+    catalog.update_product(product_id, "Maito 1 l", "maito 1 l", category_id)
+    catalog.update_category(category_id, "Maidot", "maidot", "category", group_id)
+
+    lines = repository.year_lines("2026-01-01", "2026-12-31")
+
+    assert lines == [
+        YearLineRow(
+            "2026-03-01", 100, "Maito 1 l", "Maidot", "Maitotuotteet", is_deposit_refund=False
+        )
+    ]
+
+
+def test_year_lines_without_a_product_group_or_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    category_id, _ = category_and_product(db)
+    receipt_id = reviewed_receipt(repository, 1, "2026-03-05")
+    repository.add_line(
+        receipt_id,
+        1,
+        "Kauraleipä",
+        300,
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "user", None),
+    )
+    repository.add_line(receipt_id, 2, "TUNTEMATON", 100, is_deposit_refund=False)
+    repository.add_line(receipt_id, 3, "Panttipalautus", -40, is_deposit_refund=True)
+
+    lines = repository.year_lines("2026-01-01", "2026-12-31")
+
+    assert lines == [
+        YearLineRow("2026-03-05", 300, "Kauraleipä", "Leivät", None, is_deposit_refund=False),
+        YearLineRow("2026-03-05", 100, "TUNTEMATON", None, None, is_deposit_refund=False),
+        YearLineRow("2026-03-05", -40, "Panttipalautus", None, None, is_deposit_refund=True),
+    ]

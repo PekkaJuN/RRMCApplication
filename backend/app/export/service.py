@@ -21,6 +21,7 @@ from app.storage.archive_repository import ArchiveRepository
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import ReceiptRepository
 from app.totals.service import TotalsService
+from app.totals.year import read_year_totals as read_current_year_totals
 
 
 class ExportService:
@@ -95,6 +96,12 @@ class ExportService:
         """Raises: InvalidYearError, YearNotArchivedError (archiving spec PC13)."""
         totals = read_year_totals(self._archive, parse_year(year_text))
         return self._exporter.archive_totals_file(totals)
+
+    def year_file(self) -> ExportFile:
+        """The CSV file of the current year (year with products spec PC5); `today` is in
+        Finnish time, so the year is the one the page shows."""
+        year = read_current_year_totals(self._receipts, self._today().year)
+        return self._exporter.year_totals_file(year.totals)
 
     def comparison_pdf(self, month: str | None, kind: str | None) -> ExportFile:
         """Raises: InvalidPeriodError."""

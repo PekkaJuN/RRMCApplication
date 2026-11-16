@@ -110,29 +110,36 @@ class CsvExporter:
 
     def archive_totals_file(self, totals: ArchiveTotals) -> ExportFile:
         """Archiving spec PC13: the product rows of each month, then of the whole year."""
-        year = totals.year
-        products = list(_archive_products(totals.rows))
-        rows = [[_cell(name) for name in ARCHIVE_HEADER]]
-        for index, key in enumerate(totals.months):
-            first = date(year, index + 1, 1)
-            last = (
-                date(year, index + 2, 1) - timedelta(days=1) if index < 11 else date(year, 12, 31)
-            )
-            for group, category, product in products:
-                if product.line_counts[index]:
-                    rows.append(
-                        _archive_row(key, first, last, group, category, product.name)
-                        + [_cell(_money(product.months[index]))]
-                    )
+        return _year_products_file(texts.ARCHIVE_FILE_PREFIX, totals)
+
+    def year_totals_file(self, totals: ArchiveTotals) -> ExportFile:
+        """Year with products spec PC5: the archive file's rows for the current year."""
+        return _year_products_file(texts.YEAR_FILE_PREFIX, totals)
+
+
+def _year_products_file(prefix: str, totals: ArchiveTotals) -> ExportFile:
+    """The product rows of each month, then of the whole year, in the order of the tree."""
+    year = totals.year
+    products = list(_archive_products(totals.rows))
+    rows = [[_cell(name) for name in ARCHIVE_HEADER]]
+    for index, key in enumerate(totals.months):
+        first = date(year, index + 1, 1)
+        last = date(year, index + 2, 1) - timedelta(days=1) if index < 11 else date(year, 12, 31)
         for group, category, product in products:
-            rows.append(
-                _archive_row(
-                    str(year), date(year, 1, 1), date(year, 12, 31), group, category, product.name
+            if product.line_counts[index]:
+                rows.append(
+                    _archive_row(key, first, last, group, category, product.name)
+                    + [_cell(_money(product.months[index]))]
                 )
-                + [_cell(_money(product.total))]
+    for group, category, product in products:
+        rows.append(
+            _archive_row(
+                str(year), date(year, 1, 1), date(year, 12, 31), group, category, product.name
             )
-        # parse_year has checked the year, so the name holds only digits.
-        return _file(f"{texts.ARCHIVE_FILE_PREFIX}_{year}.csv", rows)
+            + [_cell(_money(product.total))]
+        )
+    # The year is an int, so the name holds only digits after the prefix.
+    return _file(f"{prefix}_{year}.csv", rows)
 
 
 def _archive_products(rows: Sequence[ArchiveRow]) -> Iterator[tuple[str | None, str, ArchiveRow]]:

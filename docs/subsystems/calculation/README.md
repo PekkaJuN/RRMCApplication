@@ -114,6 +114,10 @@ and product (FR-53), used by [archive](../archive/README.md).
 - The archive keeps names, not ids ([ADR 0007](../../adr/0007-archive-tables.md)), so the
   rows are built from `ArchiveLine(purchase_date, amount_cents, product_name,
   category_name, group_name, is_deposit_refund)`.
+- The same tree serves the current year of the Vuosi tuotteineen page (PRD FR-54):
+  [totals](../totals/README.md#current-year-totals) turns the current year's reviewed lines,
+  with their current catalog names, into `ArchiveLine`s. A change here changes both pages
+  and both CSV files.
 - `rows` is a three-level tree: a **group** sums its categories, a **category** (in a group
   or at the top without one) sums its products, a **product** sums the lines with its name
   in that category. The same product name in two categories gives two product rows. Lines

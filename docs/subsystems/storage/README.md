@@ -87,6 +87,13 @@ receipts dated from `start` to `end` (`YYYY-MM-DD`, inclusive) as `DatedLineRow`
 `count_undated()` the receipts without a purchase date. The date `CHECK` keeps every
 `purchase_date` as `YYYY-MM-DD`, so `BETWEEN` on the text compares dates.
 
+For the [current year totals](../totals/README.md#current-year-totals),
+`year_lines(start, end)` returns the lines of the **reviewed** receipts dated in the range as
+`YearLineRow` (purchase date, amount, product name, category name, group name, refund flag),
+ordered by purchase date, receipt id and position. The product name is the linked product's
+current name, else the line's own name; the category and group names are the current
+catalog names, `NULL` for a line without a category or a category without a group.
+
 For the [export](../export/README.md), `export_lines(start, end)` returns the lines of the
 receipts dated in the range as `ExportLineRow` (purchase date, store, name, amount, refund
 flag, group name, category name, review state), ordered by purchase date, receipt id and

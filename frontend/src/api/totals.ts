@@ -1,4 +1,5 @@
 import type { Period } from "../period";
+import type { ArchiveTotals } from "./archive";
 import { apiGet, type ApiResult } from "./client";
 
 /** A week or month column, clipped to the period; `partial` when it was clipped. */
@@ -41,4 +42,19 @@ export interface Totals {
 export function getTotals(period: Period): Promise<ApiResult<Totals>> {
   const query = new URLSearchParams({ unit: period.unit, from: period.from, to: period.to });
   return apiGet<Totals>(`/api/totals?${query.toString()}`);
+}
+
+/** The current year's totals per group, category and product, in the archived year's shape,
+ * with the unreviewed receipts of the year that are not in them (year with products spec). */
+export interface YearTotals extends ArchiveTotals {
+  unreviewed: number;
+}
+
+export function getYearTotals(): Promise<ApiResult<YearTotals>> {
+  return apiGet<YearTotals>("/api/year/totals");
+}
+
+/** The download URL of the current year's CSV file (year with products spec PC5). */
+export function yearCsvUrl(): string {
+  return "/api/export/year";
 }
