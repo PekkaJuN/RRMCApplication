@@ -136,7 +136,7 @@ async function typeInGroupedReceipt(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Uusi kuitti" }).click();
   const form = page.getByRole("form", { name: "Uusi kuitti" });
   await form.getByLabel("Kauppa").fill(`E2E-taso ${RUN}`);
-  await form.getByLabel("Päivä", { exact: true }).fill(`16.03.${THIS_YEAR}`);
+  await form.getByLabel("Päivä", { exact: true }).fill(`16.06.${THIS_YEAR}`);
   await form.getByLabel("Loppusumma").fill("2,40");
   await form.getByRole("button", { name: "Luo kuitti" }).click();
   await expect(page).toHaveURL(/\/kuitit\/\d+$/);
