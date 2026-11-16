@@ -125,3 +125,64 @@ test("year AC11, AC12, AC13, AC17, AC18: the Vuosi tuotteineen page", async ({ p
   expect(wide.boxClient).toBeGreaterThan(wide.main);
   expect(wide.page).toBeLessThanOrEqual(wide.window);
 });
+
+// Expand and collapse a whole level (specs/features/table-expand-all.md, E2E tests). The
+// line goes to `Leivät` of the seeded group `Ruoka`, so the table has a group.
+const LEVEL_PRODUCT = `E2E-taso ${RUN}`;
+
+async function typeInGroupedReceipt(page: Page): Promise<void> {
+  await page.goto("/kuitit");
+  await page.getByRole("button", { name: "Uusi kuitti" }).click();
+  const form = page.getByRole("form", { name: "Uusi kuitti" });
+  await form.getByLabel("Kauppa").fill(`E2E-taso ${RUN}`);
+  await form.getByLabel("Päivä", { exact: true }).fill(`16.03.${THIS_YEAR}`);
+  await form.getByLabel("Loppusumma").fill("2,40");
+  await form.getByRole("button", { name: "Luo kuitti" }).click();
+  await expect(page).toHaveURL(/\/kuitit\/\d+$/);
+  const newLine = page.getByRole("form", { name: "Uusi rivi" });
+  await newLine.getByLabel("Tuote").fill(LEVEL_PRODUCT);
+  await newLine.getByLabel("Summa").fill("2,40");
+  await newLine.getByRole("button", { name: "Lisää rivi" }).click();
+  const category = page.getByRole("combobox", { name: `Kategoria: ${LEVEL_PRODUCT}` });
+  await expect(category).toBeEnabled();
+  await category.selectOption({ label: "Leivät" });
+  await expect(category.locator("option:checked")).toHaveText("Leivät");
+  await page.getByRole("button", { name: "Vahvista" }).click();
+  await expect(page.getByText("Vahvistettu")).toBeVisible();
+}
+
+test("table-expand-all AC2, AC3, AC10: level buttons on /vuosi", async ({ page }) => {
+  await typeInGroupedReceipt(page);
+  await page.goto("/vuosi");
+  const table = page.getByRole("table", { name: `Vuosi ${THIS_YEAR}` });
+  const level = (name: string) => page.getByRole("button", { name, exact: true });
+  await expect(level("Piilota kategoriat")).toHaveAttribute("aria-expanded", "true");
+  await expect(level("Näytä tuotteet")).toHaveAttribute("aria-expanded", "false");
+  await expect(table.getByText("Leivät", { exact: true })).toBeVisible();
+  await expect(table.getByText(LEVEL_PRODUCT)).toHaveCount(0);
+  await noViolations(page);
+
+  // AC10: Tab goes from Vie CSV to the two level buttons, then into the table.
+  await page.getByRole("link", { name: "Vie CSV" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(level("Piilota kategoriat")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(level("Näytä tuotteet")).toBeFocused();
+  await page.keyboard.press("Tab");
+  expect(await table.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+
+  // AC2: every product shows.
+  await level("Näytä tuotteet").click();
+  await expect(table.getByText(LEVEL_PRODUCT)).toBeVisible();
+  await expect(level("Piilota tuotteet")).toHaveAttribute("aria-expanded", "true");
+  await noViolations(page);
+
+  // AC3: only the top level shows.
+  await level("Piilota kategoriat").click();
+  await expect(table.getByText(LEVEL_PRODUCT)).toHaveCount(0);
+  await expect(table.getByText("Leivät", { exact: true })).toHaveCount(0);
+  await expect(table.getByText("Ruoka", { exact: true })).toBeVisible();
+  await expect(level("Näytä kategoriat")).toHaveAttribute("aria-expanded", "false");
+  await expect(level("Näytä tuotteet")).toHaveAttribute("aria-expanded", "false");
+  await noViolations(page);
+});

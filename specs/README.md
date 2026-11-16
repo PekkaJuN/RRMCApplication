@@ -27,3 +27,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 20 | [Finnish dates in the CSV files](features/finnish-csv-dates.md) | Done | FR-26 (changed) |
 | 21 | [Archiving](features/archiving.md) | Done | FR-40–FR-42, FR-53 (new) |
 | 22 | [Year with products](features/year-products.md) | Done | FR-54 (new) |
+| 23 | [Expand and collapse a whole level](features/table-expand-all.md) | Done | FR-53, FR-54 (year table) |
