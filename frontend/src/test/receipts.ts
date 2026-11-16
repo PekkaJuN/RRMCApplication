@@ -175,3 +175,26 @@ export const RECEIPT_MANUAL: Receipt = receipt(7, {
 
 /** The failed images of folder F (receipt-management AC16, AC30). */
 export const FAILED_IMAGES = ["b.png", "fake.jpg", "IMG_2.jpg"];
+
+function summary(id: number, purchase_date: string | null, reviewed: boolean): ReceiptSummary {
+  return { id, purchase_date, store: `Kauppa ${id}`, total_cents: 100, warning: false, reviewed };
+}
+
+/** The example list of the unreviewed receipts note spec, in the API's order. */
+export const ATTENTION_LIST: ReceiptSummary[] = [
+  summary(1, null, false),
+  summary(2, null, true),
+  summary(3, "2026-03-01", false),
+  summary(4, "2025-12-31", false),
+  summary(5, "2025-05-01", false),
+  summary(6, "2024-02-10", false),
+  summary(7, "2024-01-05", true),
+];
+
+/** An unreviewed receipt dated after the current year (unreviewed receipts note AC4). */
+export const FUTURE_UNREVIEWED: ReceiptSummary = summary(8, "2027-01-10", false);
+
+/** The receipts of ATTENTION_LIST with these ids, in the list's order. */
+export function attentionReceipts(...ids: number[]): ReceiptSummary[] {
+  return ATTENTION_LIST.filter((receipt) => ids.includes(receipt.id));
+}

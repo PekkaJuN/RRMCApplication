@@ -27,3 +27,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 20 | [Finnish dates in the CSV files](features/finnish-csv-dates.md) | Done | FR-26 (changed) |
 | 21 | [Archiving](features/archiving.md) | Done | FR-40–FR-42, FR-53 (new) |
 | 22 | [Year with products](features/year-products.md) | Done | FR-54 (new) |
+| 24 | [Note on old and undated unreviewed receipts](features/unreviewed-receipts-note.md) | Done | FR-55 (new), FR-21 |

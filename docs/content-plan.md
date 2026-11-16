@@ -144,6 +144,8 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The year with products spec is Done (audited 2026-11-16): `GET /api/year/totals`,
   `GET /api/export/year` and the Vuosi tuotteineen page. The totals, calculation, storage,
   export, UI, API, architecture and glossary docs describe it.
+- The unreviewed receipts note spec is Done (audited 2026-11-16): the note and filter on the
+  Kuitit page, frontend only. The UI doc describes it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget, export and archive terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.
