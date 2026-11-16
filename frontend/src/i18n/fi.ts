@@ -181,6 +181,10 @@ export const fi = {
       `${receipts} kuittia, ${lines} riviä ja ${images} kuvaa`,
     archivedCounts: (receipts: number, lines: number) => `${receipts} kuittia ja ${lines} riviä`,
     unreviewed: (count: number) => `Tarkistamattomia kuitteja: ${count}`,
+    showAllCategories: "Näytä kategoriat",
+    hideAllCategories: "Piilota kategoriat",
+    showAllProducts: "Näytä tuotteet",
+    hideAllProducts: "Piilota tuotteet",
     archive: "Arkistoi",
     confirmArchive: (year: number, receipts: number, lines: number, images: number) =>
       `Arkistoidaan vuosi ${year}: ${receipts} kuittia, ${lines} riviä ja ${images} kuvaa. ` +

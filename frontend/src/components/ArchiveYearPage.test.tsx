@@ -112,3 +112,15 @@ it("archiving AC39: the year page has no receipt list", async () => {
   expect(screen.queryByRole("list")).not.toBeInTheDocument();
   expect(screen.queryByText(/kuitti/i)).not.toBeInTheDocument();
 });
+
+it("table-expand-all AC1: the level buttons stand above the archived year's table", async () => {
+  answerArchiveTotals();
+  render(<ArchiveYearPage year={2025} />);
+  await screen.findByRole("table", { name: "Vuosi 2025" });
+
+  for (const name of ["Piilota kategoriat", "Näytä tuotteet"]) {
+    const button = screen.getByRole("button", { name });
+    expect(table().contains(button)).toBe(false);
+    expect(button.compareDocumentPosition(table()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+});

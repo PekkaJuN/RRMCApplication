@@ -88,8 +88,8 @@ keeps the page because Vite answers every path with `index.html`.
 - @frontend/src/components/ArchiveYearPage.tsx — one archived year: `Vie CSV` and the
   table, or `Vuotta 2023 ei ole arkistossa.`
 - @frontend/src/components/ArchiveTotalsTable.tsx — the archived year's table: groups,
-  categories and products that open and close, 12 months and `Vuosi`; also the table of
-  the Vuosi tuotteineen page
+  categories and products that open and close, 12 months and `Vuosi`, with the level
+  buttons above it; also the table of the Vuosi tuotteineen page
 - @frontend/src/components/YearPage.tsx — the Vuosi tuotteineen page: the current year's
   table and `Vie CSV`, the note `Tarkistamattomia kuitteja: N. Ne eivät ole mukana
   summissa.` when N > 0, or `Vuodelta 2026 ei ole vielä tarkistettuja kuitteja.` for a year
@@ -292,6 +292,17 @@ with the groups showing their categories and the categories hiding their product
 toggle is a button with `aria-expanded` and the label `Näytä kategoriat: <name>`,
 `Piilota kategoriat: <name>`, `Näytä tuotteet: <name>` or `Piilota tuotteet: <name>`. The
 texts are in the [archiving spec](../../../specs/features/archiving.md) PC14 and PC15.
+
+Above the table two level buttons open or close a whole level at once
+([table-expand-all spec](../../../specs/features/table-expand-all.md)), on this page and on
+the Vuosi tuotteineen page. `Näytä kategoriat` opens every group; `Piilota kategoriat`
+closes every group and category, so only the top-level rows show. `Näytä tuotteet` opens
+every group and category; `Piilota tuotteet` closes the categories. Each button reads
+`Piilota …` with `aria-expanded="true"` when its level and the levels above it are open,
+and it follows the row toggles too; `aria-controls` points at the table. The state is
+derived from the open rows, not stored, so it is never out of step. The categories button
+shows only when the table has a group, the products button only when a category has
+products.
 
 ### Styling
 
