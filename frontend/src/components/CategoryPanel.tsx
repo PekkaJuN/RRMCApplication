@@ -1,190 +1,199 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import {
-  createCategory,
-  deleteCategory,
-  updateCategory,
-  type CatalogItem,
-  type Kind,
-} from "../api/catalog";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { createCategory, type CatalogItem } from "../api/catalog";
 import type { ApiResult } from "../api/client";
 import { fi } from "../i18n/fi";
-import { ConfirmDelete } from "./ConfirmDelete";
 
 interface Props {
   items: CatalogItem[];
+  /** The selected group or category; null is "Kaikki tuotteet". */
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
   /** Called after a successful change, so the page reloads the lists and counts. */
   onChanged: () => void;
 }
 
-type Run = (key: string, action: () => Promise<ApiResult<unknown>>) => Promise<boolean>;
+type FormKind = "group" | "category";
 
-/** Groups with their categories, then the categories without a group (PC9). */
-export function CategoryPanel({ items, onChanged }: Props) {
-  // Errors are shown next to the item or form whose action caused them (AC27).
-  const [errors, setErrors] = useState<Record<string, string>>({});
+/**
+ * The category column (products two columns PC2, PC3, PC7): a tree of "Kaikki tuotteet",
+ * the groups with their categories and the categories without a group, then the buttons
+ * that open the new group and new category forms.
+ */
+export function CategoryPanel({ items, selectedId, onSelect, onChanged }: Props) {
+  // Closed groups are stored, not open ones, so every group starts open, also a new one.
+  const [closedGroups, setClosedGroups] = useState<ReadonlySet<number>>(new Set());
+  const [openForm, setOpenForm] = useState<FormKind | null>(null);
+  const baseId = useId();
   const groups = items.filter((item) => item.kind === "group");
   const ungrouped = items.filter((item) => item.kind === "category" && item.parent_id === null);
+  const selected = items.find((item) => item.id === selectedId);
+  const suggestedGroupId = selected?.kind === "group" ? selected.id : (selected?.parent_id ?? null);
+  const formId = (kind: FormKind) => `${baseId}-${kind}-form`;
 
-  const run: Run = async (key, action) => {
-    const result = await action();
-    setErrors((current) => {
-      const next = { ...current };
-      if (result.ok) {
-        delete next[key];
-      } else {
-        next[key] = result.error.message;
+  const toggleGroup = (id: number) =>
+    setClosedGroups((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) {
+        next.add(id);
       }
       return next;
     });
-    if (result.ok) {
-      onChanged();
-    }
-    return result.ok;
+
+  const selectButton = (id: number | null, name: string) => (
+    <button
+      type="button"
+      className="tree-item"
+      aria-pressed={id === selectedId}
+      onClick={() => onSelect(id)}
+    >
+      {name}
+    </button>
+  );
+
+  const category = (item: CatalogItem) => (
+    <li key={item.id}>
+      {selectButton(item.id, item.name)}{" "}
+      <span data-count>{fi.categories.productCount(item.product_count ?? 0)}</span>
+    </li>
+  );
+
+  const group = (item: CatalogItem) => {
+    const children = items.filter((child) => child.parent_id === item.id);
+    const isOpen = !closedGroups.has(item.id);
+    const listId = `${baseId}-group-${item.id}`;
+    return (
+      <li key={item.id}>
+        {children.length > 0 ? (
+          <button
+            type="button"
+            className="tree-toggle"
+            aria-expanded={isOpen}
+            aria-controls={listId}
+            aria-label={
+              isOpen
+                ? fi.categories.hideCategories(item.name)
+                : fi.categories.showCategories(item.name)
+            }
+            onClick={() => toggleGroup(item.id)}
+          >
+            {isOpen ? "−" : "+"}
+          </button>
+        ) : (
+          <span className="tree-toggle-space" />
+        )}
+        {selectButton(item.id, item.name)}{" "}
+        <span data-count>{fi.categories.categoryCount(item.category_count ?? 0)}</span>
+        {children.length > 0 && isOpen && <ul id={listId}>{children.map(category)}</ul>}
+      </li>
+    );
   };
 
-  const entry = (item: CatalogItem) => (
-    <Entry key={item.id} item={item} groups={groups} error={errors[`item-${item.id}`]} run={run}>
-      {item.kind === "group" && (
-        <ul>{items.filter((child) => child.parent_id === item.id).map((child) => entry(child))}</ul>
-      )}
-    </Entry>
+  const formButton = (kind: FormKind, label: string) => (
+    <button
+      type="button"
+      className="button"
+      aria-expanded={openForm === kind}
+      aria-controls={formId(kind)}
+      onClick={() => setOpenForm((current) => (current === kind ? null : kind))}
+    >
+      {label}
+    </button>
   );
 
   return (
-    <section aria-labelledby="categories-heading">
-      <h2 id="categories-heading">{fi.categories.heading}</h2>
-      <ul>
-        {groups.map(entry)}
-        {ungrouped.map(entry)}
+    <section className="category-column" aria-labelledby="categories-heading">
+      <h3 id="categories-heading">{fi.categories.heading}</h3>
+      <ul className="category-tree">
+        <li>{selectButton(null, fi.products.allProducts)}</li>
+        {groups.map(group)}
+        {ungrouped.map(category)}
       </ul>
-      <AddForm
-        label={fi.categories.newGroup}
-        nameLabel={fi.categories.groupName}
-        error={errors.newGroup}
-        onAdd={(name) => run("newGroup", () => createCategory({ name, kind: "group" }))}
-      />
-      <AddForm
-        label={fi.categories.newCategory}
-        nameLabel={fi.categories.categoryName}
-        groups={groups}
-        error={errors.newCategory}
-        onAdd={(name, parentId) =>
-          run("newCategory", () =>
-            createCategory({ name, kind: "category", parent_id: parentId ?? null }),
-          )
-        }
-      />
+      <p>
+        {formButton("group", fi.categories.newGroup)}
+        {formButton("category", fi.categories.newCategory)}
+      </p>
+      {openForm === "group" && (
+        <AddForm
+          id={formId("group")}
+          label={fi.categories.newGroup}
+          nameLabel={fi.categories.groupName}
+          onCancel={() => setOpenForm(null)}
+          onAdd={(name) => createCategory({ name, kind: "group" })}
+          onAdded={onChanged}
+        />
+      )}
+      {openForm === "category" && (
+        <AddForm
+          id={formId("category")}
+          label={fi.categories.newCategory}
+          nameLabel={fi.categories.categoryName}
+          groups={groups}
+          initialParentId={suggestedGroupId}
+          onCancel={() => setOpenForm(null)}
+          onAdd={(name, parentId) =>
+            createCategory({ name, kind: "category", parent_id: parentId ?? null })
+          }
+          onAdded={onChanged}
+        />
+      )}
     </section>
   );
 }
 
-interface EntryProps {
-  item: CatalogItem;
-  groups: CatalogItem[];
-  error: string | undefined;
-  run: Run;
-  children: ReactNode;
-}
-
-function Entry({ item, groups, error, run, children }: EntryProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const key = `item-${item.id}`;
-  const isGroup = item.kind === "group";
-  const nameLabel = isGroup ? fi.categories.groupName : fi.categories.categoryName;
-  const convertTo: Kind = isGroup ? "category" : "group";
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    if (draft !== null && (await run(key, () => updateCategory(item.id, { name: draft })))) {
-      setDraft(null);
-    }
-  };
-
-  return (
-    <li>
-      {draft === null ? (
-        <>
-          <span data-name>{item.name}</span>{" "}
-          <span>
-            {isGroup
-              ? fi.categories.categoryCount(item.category_count ?? 0)
-              : fi.categories.productCount(item.product_count ?? 0)}
-          </span>{" "}
-          <button type="button" onClick={() => setDraft(item.name)}>
-            {fi.actions.rename}
-          </button>
-        </>
-      ) : (
-        <form onSubmit={(event) => void save(event)}>
-          <input
-            aria-label={nameLabel}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <button type="submit">{fi.actions.save}</button>
-          <button type="button" onClick={() => setDraft(null)}>
-            {fi.actions.cancel}
-          </button>
-        </form>
-      )}{" "}
-      {!isGroup && (
-        <select
-          aria-label={fi.categories.move(item.name)}
-          value={item.parent_id ?? ""}
-          onChange={(event) => {
-            const parentId = event.target.value === "" ? null : Number(event.target.value);
-            void run(key, () => updateCategory(item.id, { parent_id: parentId }));
-          }}
-        >
-          <option value="">{fi.categories.noGroup}</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.name}
-            </option>
-          ))}
-        </select>
-      )}{" "}
-      <button
-        type="button"
-        onClick={() => void run(key, () => updateCategory(item.id, { kind: convertTo }))}
-      >
-        {isGroup ? fi.categories.toCategory : fi.categories.toGroup}
-      </button>{" "}
-      <ConfirmDelete onConfirm={() => void run(key, () => deleteCategory(item.id))} />
-      {error && <p role="alert">{error}</p>}
-      {children}
-    </li>
-  );
-}
-
 interface AddFormProps {
+  id: string;
   label: string;
   nameLabel: string;
   /** When given, the form also asks for the group of the new category. */
   groups?: CatalogItem[];
-  error: string | undefined;
-  onAdd: (name: string, parentId: number | null) => Promise<boolean>;
+  /** The group the dropdown starts at; read once, when the form opens. */
+  initialParentId?: number | null;
+  onCancel: () => void;
+  onAdd: (name: string, parentId: number | null) => Promise<ApiResult<unknown>>;
+  onAdded: () => void;
 }
 
-function AddForm({ label, nameLabel, groups, error, onAdd }: AddFormProps) {
+function AddForm({
+  id,
+  label,
+  nameLabel,
+  groups,
+  initialParentId = null,
+  onCancel,
+  onAdd,
+  onAdded,
+}: AddFormProps) {
   const [name, setName] = useState("");
-  const [parentId, setParentId] = useState<number | null>(null);
+  const [parentId, setParentId] = useState<number | null>(initialParentId);
+  // Errors are shown next to the form whose action caused them (product management AC27).
+  const [error, setError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  // The form opens from a button, so the focus moves to its first field (AC15).
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (await onAdd(name, parentId)) {
+    const result = await onAdd(name, parentId);
+    if (result.ok) {
+      setError(null);
       setName("");
+      onAdded();
+    } else {
+      setError(result.error.message);
     }
   };
 
   return (
-    <form aria-label={label} onSubmit={(event) => void submit(event)}>
-      <h3>{label}</h3>
+    <form id={id} aria-label={label} onSubmit={(event) => void submit(event)}>
       <input
+        ref={nameRef}
         aria-label={nameLabel}
         value={name}
         onChange={(event) => setName(event.target.value)}
-      />
+      />{" "}
       {groups && (
         <select
           aria-label={fi.categories.group}
@@ -200,8 +209,11 @@ function AddForm({ label, nameLabel, groups, error, onAdd }: AddFormProps) {
             </option>
           ))}
         </select>
-      )}
-      <button type="submit">{fi.actions.add}</button>
+      )}{" "}
+      <button type="submit">{fi.actions.add}</button>{" "}
+      <button type="button" onClick={onCancel}>
+        {fi.actions.cancel}
+      </button>
       {error && <p role="alert">{error}</p>}
     </form>
   );

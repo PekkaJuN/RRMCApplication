@@ -11,6 +11,10 @@
   2026-10-27: implemented and audited (PASS), see Audit;
   2026-10-28: AC31 (one navigation link) superseded by AC26 of the
   [receipt import spec](receipt-import.md), which adds the Tuonti link
+- **Superseded in part (2026-11-17):** the page layout of PC9 (the category panel above the
+  product table, with controls on every row) and the filter dropdown of AC24 are replaced by
+  the [Tuotteet page in two columns](products-two-columns.md) spec; the behavior of the other
+  ACs stays.
 - **Depends on:** [Project foundation](foundation.md)
 - **Implements:** PRD FR-11, FR-33, FR-34, FR-35, FR-37, FR-38, FR-39, the default list in
   PRD 6.9, NFR-15 for this page, and the basic part of FR-14 (name normalization without OCR

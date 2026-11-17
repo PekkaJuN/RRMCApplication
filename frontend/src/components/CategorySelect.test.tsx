@@ -42,18 +42,4 @@ describe("CategorySelect", () => {
 
     expect(onChange).toHaveBeenCalledWith(itemNamed(items, "Juomat").id);
   });
-
-  it("AC24: the filter variant offers all products and whole groups", async () => {
-    const onChange = vi.fn();
-    render(
-      <CategorySelect label="Suodata" items={items} value={null} onChange={onChange} isFilter />,
-    );
-    const select = screen.getByRole("combobox", { name: "Suodata" });
-
-    expect(within(select).getByRole("option", { name: "Kaikki" })).toBeInTheDocument();
-    await userEvent.selectOptions(select, "Ruoka (koko ryhmä)");
-    expect(onChange).toHaveBeenLastCalledWith(itemNamed(items, "Ruoka").id);
-    await userEvent.selectOptions(select, "Kaikki");
-    expect(onChange).toHaveBeenLastCalledWith(null);
-  });
 });

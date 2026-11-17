@@ -51,8 +51,12 @@ function allowedTexts(): Set<string> {
   return new Set([
     ...fixedTexts(fi),
     ...names,
-    ...names.map(fi.products.wholeGroup),
+    ...names.map(fi.categories.showCategories),
+    ...names.map(fi.categories.hideCategories),
     ...names.map(fi.categories.move),
+    // The visible text of a group toggle in the category tree, a sign, not a word.
+    "−",
+    "+",
     ...counts,
   ]);
 }
@@ -86,7 +90,7 @@ it("AC31, AC26: the navigation opens the Tuotteet page", async () => {
   expect(links[0]).toHaveAttribute("aria-current", "page");
   const main = screen.getByRole("main");
   expect(within(main).getByRole("heading", { name: "Tuotteet" })).toBeInTheDocument();
-  expect(await within(main).findByText("Juomat", { selector: "[data-name]" })).toBeInTheDocument();
+  expect(await within(main).findByRole("button", { name: "Juomat" })).toBeInTheDocument();
   expect(await screen.findByText("Kaikki palvelut toiminnassa")).toBeInTheDocument();
 });
 

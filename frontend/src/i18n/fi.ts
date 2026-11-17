@@ -26,9 +26,6 @@ export const fi = {
   products: {
     heading: "Tuotteet",
     search: "Hae",
-    filter: "Näytä",
-    all: "Kaikki",
-    wholeGroup: (group: string) => `${group} (koko ryhmä)`,
     chooseCategory: "Valitse kategoria",
     name: "Nimi",
     category: "Kategoria",
@@ -38,6 +35,7 @@ export const fi = {
     noProducts: "Ei tuotteita.",
     noMatches: "Ehdoilla ei löytynyt tuotteita.",
     categoryNeeded: "Lisää ensin kategoria.",
+    allProducts: "Kaikki tuotteet",
   },
   categories: {
     heading: "Kategoriat",
@@ -52,6 +50,8 @@ export const fi = {
     toCategory: "Muuta kategoriaksi",
     productCount: (count: number) => (count === 1 ? "1 tuote" : `${count} tuotetta`),
     categoryCount: (count: number) => (count === 1 ? "1 kategoria" : `${count} kategoriaa`),
+    showCategories: (name: string) => `Näytä kategoriat: ${name}`,
+    hideCategories: (name: string) => `Piilota kategoriat: ${name}`,
   },
   import: {
     heading: "Tuonti",
