@@ -12,17 +12,22 @@ import type { ApiResult } from "../api/client";
 import { fi } from "../i18n/fi";
 import { CategoryPanel } from "./CategoryPanel";
 import { CategorySelect } from "./CategorySelect";
+import { CategoryTools } from "./CategoryTools";
 import { ConfirmDelete } from "./ConfirmDelete";
 
 type Run = (key: string, action: () => Promise<ApiResult<unknown>>) => Promise<boolean>;
 
-/** The Tuotteet page: the category panel and the product table (PC9). */
+/**
+ * The Tuotteet page in two columns (products two columns PC1): the category tree, and the
+ * products of the selected group or category with that item's tools.
+ */
 export function ProductsPage() {
   // null until the categories have loaded once.
   const [loadedItems, setItems] = useState<CatalogItem[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
   const [query, setQuery] = useState("");
-  const [filterId, setFilterId] = useState<number | null>(null);
+  // null is "Kaikki tuotteet".
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -30,8 +35,10 @@ export function ProductsPage() {
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((current) => current + 1), []);
   const items = loadedItems ?? [];
-  // A filter on an item that was deleted meanwhile falls back to all products.
-  const activeFilterId = items.some((item) => item.id === filterId) ? filterId : null;
+  // A selection whose item was deleted meanwhile falls back to all products (PC6, PC10).
+  const selected = items.find((item) => item.id === selectedId) ?? null;
+  const activeSelectedId = selected?.id ?? null;
+  const groups = items.filter((item) => item.kind === "group");
 
   useEffect(() => {
     let isCurrent = true;
@@ -53,7 +60,7 @@ export function ProductsPage() {
 
   useEffect(() => {
     let isCurrent = true;
-    void listProducts({ q: query, categoryId: activeFilterId ?? undefined }).then((result) => {
+    void listProducts({ q: query, categoryId: activeSelectedId ?? undefined }).then((result) => {
       if (!isCurrent) {
         return;
       }
@@ -67,7 +74,7 @@ export function ProductsPage() {
     return () => {
       isCurrent = false;
     };
-  }, [query, activeFilterId, version]);
+  }, [query, activeSelectedId, version]);
 
   const run: Run = async (key, action) => {
     const result = await action();
@@ -86,66 +93,86 @@ export function ProductsPage() {
     return result.ok;
   };
 
-  const isFiltered = query !== "" || activeFilterId !== null;
+  const isFiltered = query !== "" || activeSelectedId !== null;
   const loadErrors = [...new Set([categoriesError, productsError])].filter((error) => error);
 
   return (
-    <section aria-labelledby="products-heading">
+    <section className="products-page" aria-labelledby="products-heading">
       <h2 id="products-heading">{fi.products.heading}</h2>
       {loadErrors.map((error) => (
         <p key={error} role="alert">
           {error}
         </p>
       ))}
-      <CategoryPanel items={items} onChanged={reload} />
-      <div>
-        <input
-          type="search"
-          aria-label={fi.products.search}
-          placeholder={fi.products.search}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />{" "}
-        <CategorySelect
-          label={fi.products.filter}
+      <div className="products-columns">
+        <CategoryPanel
           items={items}
-          value={activeFilterId}
-          onChange={setFilterId}
-          isFilter
+          selectedId={activeSelectedId}
+          onSelect={setSelectedId}
+          onChanged={reload}
         />
+        <section className="product-column" aria-labelledby="product-column-heading">
+          <h3 id="product-column-heading">{selected?.name ?? fi.products.allProducts}</h3>
+          {selected && (
+            <CategoryTools key={selected.id} item={selected} groups={groups} onChanged={reload} />
+          )}
+          <div>
+            <input
+              type="search"
+              aria-label={fi.products.search}
+              placeholder={fi.products.search}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <AddProductForm
+            items={items}
+            isLoaded={loadedItems !== null}
+            suggestedId={selected?.kind === "category" ? selected.id : null}
+            error={errors.newProduct}
+            run={run}
+          />
+          <ProductTable products={products} items={items} errors={errors} run={run} />
+          {products?.length === 0 && (
+            <p>{isFiltered ? fi.products.noMatches : fi.products.noProducts}</p>
+          )}
+        </section>
       </div>
-      <AddProductForm
-        items={items}
-        isLoaded={loadedItems !== null}
-        error={errors.newProduct}
-        run={run}
-      />
-      <div className="table-box">
-        <table aria-label={fi.products.table}>
-          <thead>
-            <tr>
-              <th scope="col">{fi.products.name}</th>
-              <th scope="col">{fi.products.category}</th>
-              <th scope="col" />
-            </tr>
-          </thead>
-          <tbody>
-            {products?.map((item) => (
-              <ProductRow
-                key={item.id}
-                product={item}
-                items={items}
-                error={errors[`product-${item.id}`]}
-                run={run}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {products?.length === 0 && (
-        <p>{isFiltered ? fi.products.noMatches : fi.products.noProducts}</p>
-      )}
     </section>
+  );
+}
+
+interface ProductTableProps {
+  products: Product[] | null;
+  items: CatalogItem[];
+  errors: Record<string, string>;
+  run: Run;
+}
+
+function ProductTable({ products, items, errors, run }: ProductTableProps) {
+  return (
+    <div className="table-box">
+      <table aria-label={fi.products.table}>
+        <thead>
+          <tr>
+            <th scope="col">{fi.products.name}</th>
+            <th scope="col">{fi.products.category}</th>
+            <th scope="col" />
+          </tr>
+        </thead>
+        <tbody>
+          {products?.map((item) => (
+            <ProductRow
+              key={item.id}
+              product={item}
+              items={items}
+              error={errors[`product-${item.id}`]}
+              run={run}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -153,13 +180,21 @@ interface AddProductFormProps {
   items: CatalogItem[];
   /** False until the categories have loaded, so "no categories" is not claimed early. */
   isLoaded: boolean;
+  /** The selected category, which the dropdown starts at (PC8); null for none. */
+  suggestedId: number | null;
   error: string | undefined;
   run: Run;
 }
 
-function AddProductForm({ items, isLoaded, error, run }: AddProductFormProps) {
+function AddProductForm({ items, isLoaded, suggestedId, error, run }: AddProductFormProps) {
   const [name, setName] = useState("");
-  const [chosenId, setChosenId] = useState<number | null>(null);
+  // The user's choice holds while the suggestion it was made under is current; a new
+  // selection shows its own suggestion (P2). No effect sets state.
+  const [chosen, setChosen] = useState<{ suggestedId: number | null; id: number | null }>({
+    suggestedId,
+    id: suggestedId,
+  });
+  const chosenId = chosen.suggestedId === suggestedId ? chosen.id : suggestedId;
   const [hint, setHint] = useState<string | null>(null);
   const hasCategories = items.some((item) => item.kind === "category");
   // A choice that was deleted or turned into a group meanwhile is no choice.
@@ -181,7 +216,7 @@ function AddProductForm({ items, isLoaded, error, run }: AddProductFormProps) {
 
   return (
     <form aria-label={fi.products.newProduct} onSubmit={(event) => void submit(event)}>
-      <h3>{fi.products.newProduct}</h3>
+      <h4>{fi.products.newProduct}</h4>
       <input
         aria-label={fi.products.newProductName}
         value={name}
@@ -191,7 +226,7 @@ function AddProductForm({ items, isLoaded, error, run }: AddProductFormProps) {
         label={fi.products.category}
         items={items}
         value={categoryId}
-        onChange={setChosenId}
+        onChange={(id) => setChosen({ suggestedId, id })}
       />{" "}
       <button type="submit">{fi.actions.add}</button>
       {isLoaded && !hasCategories && <p>{fi.products.categoryNeeded}</p>}

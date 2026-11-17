@@ -89,6 +89,26 @@ test("archiving AC33, AC39, AC40, AC43, AC22, AC38, AC42: archive, view and dele
   await expect(yearItem(page, "Arkistoitavat vuodet", LAST_YEAR)).toHaveCount(0);
   // AC42: also the archived list with the result.
   await noViolations(page);
+  // The link and the delete button are apart, so a click does not hit the wrong one.
+  const show = await archived.getByRole("link", { name: "Näytä" }).boundingBox();
+  const remove = await archived.getByRole("button", { name: "Poista pysyvästi" }).boundingBox();
+  expect(show).not.toBeNull();
+  expect(remove).not.toBeNull();
+  if (show && remove) {
+    expect(remove.x - (show.x + show.width)).toBeGreaterThanOrEqual(24);
+  }
+  // The year's counts and the link are apart too.
+  const textGap = await archived.getByRole("link", { name: "Näytä" }).evaluate((link) => {
+    // Before the link: the space, then the counts text.
+    const counts = link.previousSibling?.previousSibling;
+    if (!counts || counts.nodeType !== Node.TEXT_NODE) {
+      return -1;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(counts);
+    return link.getBoundingClientRect().left - range.getBoundingClientRect().right;
+  });
+  expect(textGap).toBeGreaterThanOrEqual(24);
 
   // AC39, AC40: the year page, read-only, with products behind their category.
   await archived.getByRole("link", { name: "Näytä" }).click();

@@ -336,6 +336,12 @@ span[role="alert"] {
   white-space: nowrap;
 }
 
+/* Arkisto: an archived year's Näytä link stands apart from the year's counts and from its
+   delete button, so a click does not hit the wrong one. */
+ul[aria-labelledby="archive-archived"] a {
+  margin: 0 var(--space-4);
+}
+
 /* New receipt form (receipt-management PC11): the preview stays small enough to keep the
    form's buttons in sight on a narrow window. */
 .new-receipt-preview {
@@ -375,5 +381,101 @@ span[role="alert"] {
 
   .receipt-image {
     margin-bottom: 0;
+  }
+}
+
+/* Tuotteet page (products two columns PC1, PC9): the category tree and the products,
+   stacked, side by side on a wide window. */
+
+.category-tree,
+.category-tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row holds the toggle, the item and its count; a group's categories wrap below it. */
+.category-tree li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.category-tree li > ul {
+  flex-basis: 100%;
+  padding-left: calc(2.5em + var(--space-1));
+}
+
+.tree-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px var(--space-2);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+}
+
+/* The selection shows by weight and a border, not by colour alone (AC23). */
+.tree-item[aria-pressed="true"] {
+  font-weight: 700;
+  background: var(--color-surface);
+  border-left-color: var(--color-accent);
+}
+
+/* The toggle has a fixed width, so the group names line up, also without a toggle. */
+.tree-toggle,
+.tree-toggle-space {
+  flex: none;
+  width: 2.5em;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.tree-toggle-space {
+  display: inline-block;
+}
+
+.category-tree [data-count] {
+  color: var(--color-muted);
+}
+
+.category-tools {
+  margin-bottom: var(--space-3);
+}
+
+.product-column h3,
+.category-column h3 {
+  margin-top: 0;
+}
+
+@media (min-width: 900px) {
+  /* The page spans the window, not only `main`, as `.table-box-wide` does (PC11). */
+  .products-page {
+    width: calc(100vw - 2 * var(--space-4));
+    margin-left: calc(50% - 50vw + var(--space-4));
+  }
+
+  .products-columns {
+    display: grid;
+    /* The product column keeps about its width inside `main`; the tree gets the rest. */
+    grid-template-columns: minmax(22rem, 1fr) minmax(0, 48rem);
+    gap: var(--space-3);
+    align-items: start;
+  }
+
+  .product-column table {
+    width: 100%;
+  }
+
+  /* The padding sits inside the scroll bar, so the counts keep their distance from it. */
+  .category-column {
+    position: sticky;
+    top: var(--space-3);
+    max-height: calc(100vh - 2 * var(--space-3));
+    padding-right: var(--space-3);
+    overflow-y: auto;
   }
 }

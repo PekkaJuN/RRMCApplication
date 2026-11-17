@@ -7,6 +7,8 @@
   properties, no CSS framework or UI library; automated accessibility checks with axe in
   the E2E tests; no dark mode. Specify approved by the user; Plan added. Plan approved
   by the user; Tasks added. Spec approved by the user. Implemented and audited (PASS).
+  2026-11-17: the Tuotteet page is a second exception to the 1200 px limit of PC2: from
+  900 px it spans the window ([Tuotteet page in two columns](products-two-columns.md) PC11).
 - **Implements:** PRD NFR-16 (new); NFR-1 for the UI's resources.
 - **Affected subsystems:** [ui](../../docs/subsystems/ui/README.md)
 

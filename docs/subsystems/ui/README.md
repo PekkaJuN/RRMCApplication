@@ -84,7 +84,9 @@ keeps the page because Vite answers every path with `index.html`.
   `comparisonCsvUrl(period, weeks)`: the download URLs of the [export](../export/README.md); `pdfLimits(start, end)`: whether
   each totals PDF of a period is within its limit
 - @frontend/src/components/ArchivePage.tsx — the Arkisto page: the years to archive and
-  the archived years, with in-place confirmations
+  the archived years, with in-place confirmations; an archived year's `Näytä` link keeps
+  24 px from the year's counts and from its `Poista pysyvästi` button, so a click does not
+  hit the wrong one
 - @frontend/src/components/ArchiveYearPage.tsx — one archived year: `Vie CSV` and the
   table, or `Vuotta 2023 ei ole arkistossa.`
 - @frontend/src/components/ArchiveTotalsTable.tsx — the archived year's table: groups,
@@ -95,12 +97,21 @@ keeps the page because Vite answers every path with `index.html`.
   summissa.` when N > 0, or `Vuodelta 2026 ei ole vielä tarkistettuja kuitteja.` for a year
   without reviewed lines
 - @frontend/src/components/StatusLine.tsx — reads the health on mount and every 30 seconds
-- @frontend/src/components/ProductsPage.tsx — the Tuotteet page: search, filter, add form,
-  product table; loads the lists and reloads them after every successful change
-- @frontend/src/components/CategoryPanel.tsx — groups with their categories, then the
-  ungrouped ones; add, rename, move, convert and delete
+- @frontend/src/components/ProductsPage.tsx — the Tuotteet page in two columns (side by
+  side from 900 px, else stacked): the category column, and the product column headed by
+  the selected item (`Kaikki tuotteet`, a group or a category) with that item's tools, the
+  search, the add form and the product table; the selection filters the products; loads
+  the lists and reloads them after every successful change
+- @frontend/src/components/CategoryPanel.tsx — the category column, which stays in view on a
+  wide window: a tree of `Kaikki tuotteet`, the groups with their categories and the
+  ungrouped categories, each a button with `aria-pressed`; a group's toggle
+  (`Piilota kategoriat: <ryhmä>` / `Näytä kategoriat: <ryhmä>`) closes its categories, and
+  groups start open; the buttons `Uusi ryhmä` and `Uusi kategoria` open their forms, one at a
+  time, and the new category's group starts at the selected group
+- @frontend/src/components/CategoryTools.tsx — the tools of the selected group or category:
+  rename, the group dropdown (categories only), convert and delete
 - @frontend/src/components/CategorySelect.tsx — category dropdown with groups as `optgroup`
-  headings that cannot be chosen; the filter variant adds `Kaikki` and whole groups
+  headings that cannot be chosen
 - @frontend/src/components/ConfirmDelete.tsx — delete button that asks `Poistetaanko?` in
   place; no browser dialog; an optional `label` names the first button (`Poista kuitti`)
   and `disabled` turns it off
@@ -137,8 +148,10 @@ proxy answers that way when the backend is down), gives code `network_error` wit
 On the Tuotteet page, each action keeps its own error and shows the backend's `message`
 beside the item or form that caused it (`role="alert"`); the lists stay as they were. A list
 that cannot be loaded shows its error at the top of the page; "Lisää ensin kategoria." is
-shown only after the categories loaded and there were none. A filter whose item was deleted,
-or an add-form choice whose item was deleted or turned into a group, falls back to no choice.
+shown only after the categories loaded and there were none. A selection whose item was
+deleted falls back to `Kaikki tuotteet`; an add-form choice whose item was deleted or turned
+into a group falls back to no choice. The new product form starts at the selected category,
+and the user's own choice holds until the selection changes.
 
 The status line shows one text per failing check, in this order: model, OCR, folders,
 database; `Kaikki palvelut toiminnassa` when all are `ok`; and the error message when the
@@ -332,11 +345,14 @@ system font, so the UI loads nothing from another host.
   | `row-product` | archived year table rows | Products indented under their category |
   | `archive-table`, `archive-name` | the archived year table and its name cells | The name column stays in place (sticky, with the page background) while the amounts scroll; a name wraps at 250 px (the limit is on the name's `span`, because browsers do not apply `max-width` to table cells reliably), and amounts do not wrap, so the table scrolls instead of squeezing the names |
   | `receipt-columns`, `receipt-image`, `receipt-lines` | receipt page | Side by side from 900 px, stacked below |
+  | `products-page`, `products-columns`, `category-column`, `product-column` | Tuotteet page | From 900 px the page spans the window less 24 px on each side: the product column is at most 48 rem (about its width inside `main`) and its table fills it; the category column takes the rest (at least 22 rem), stays in view, and keeps 16 px between its counts and its scroll bar; stacked below 900 px |
+  | `category-tree`, `tree-item`, `tree-toggle`, `category-tools` | Tuotteet page | The tree rows; the selected item is bold with an accent border |
   | `confirm-delete` | a line's delete confirmation and the Arkisto confirmations | Keeps the question and its buttons on one row |
   | `new-receipt-preview` | new receipt form | Keeps the preview small, so the form's buttons stay in sight |
 
-- `main` is at most 1200 px wide and centred (only the Vertailu week table and the archived
-  year table are wider); the header wraps on a narrow window.
+- `main` is at most 1200 px wide and centred (only the Vertailu week table, the archived
+  year table and, from 900 px, the Tuotteet page are wider); the header wraps on a narrow
+  window.
 - The input rule's `font` shorthand resets `font-variant-numeric`, so `input.amount` comes
   after it.
 
