@@ -15,9 +15,10 @@ interface Props {
 type FormKind = "group" | "category";
 
 /**
- * The category column (products two columns PC2, PC3, PC7): a tree of "Kaikki tuotteet",
- * the groups with their categories and the categories without a group, then the buttons
- * that open the new group and new category forms.
+ * The category column (products two columns PC2, PC3, PC7): the buttons that open the new
+ * group and new category forms, kept above the tree so a long tree does not hide them; then
+ * a tree of "Kaikki tuotteet", the groups with their categories and the categories without
+ * a group.
  */
 export function CategoryPanel({ items, selectedId, onSelect, onChanged }: Props) {
   // Closed groups are stored, not open ones, so every group starts open, also a new one.
@@ -103,11 +104,6 @@ export function CategoryPanel({ items, selectedId, onSelect, onChanged }: Props)
   return (
     <section className="category-column" aria-labelledby="categories-heading">
       <h3 id="categories-heading">{fi.categories.heading}</h3>
-      <ul className="category-tree">
-        <li>{selectButton(null, fi.products.allProducts)}</li>
-        {groups.map(group)}
-        {ungrouped.map(category)}
-      </ul>
       <p>
         {formButton("group", fi.categories.newGroup)}
         {formButton("category", fi.categories.newCategory)}
@@ -136,6 +132,11 @@ export function CategoryPanel({ items, selectedId, onSelect, onChanged }: Props)
           onAdded={onChanged}
         />
       )}
+      <ul className="category-tree">
+        <li>{selectButton(null, fi.products.allProducts)}</li>
+        {groups.map(group)}
+        {ungrouped.map(category)}
+      </ul>
     </section>
   );
 }

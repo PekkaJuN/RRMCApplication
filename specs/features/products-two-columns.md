@@ -4,7 +4,8 @@
 - **Status:** Done (Specify, Plan and Tasks approved 2026-11-17; implemented and audited
   2026-11-17; PC11 and AC24 added, approved, implemented and re-audited 2026-11-17; PC11
   and AC24 changed for a wider category column, approved, implemented and re-audited
-  2026-11-17, see [Audit](#audit)).
+  2026-11-17; PC7 and AC23 changed to put the add buttons above the tree, approved
+  2026-11-18, implemented and re-audited 2026-11-18, see [Audit](#audit)).
   Implementation notes, for the audit: the new product form's heading became `h4`, under
   the product column's `h3`; the new group and new category forms lost their own `h3`, as
   the button above names them. Removing the filter variant left `CategorySelect`'s
@@ -28,6 +29,9 @@
   - `e2e/products.spec.ts` AC24: the expected widths changed with the approved change of
     AC24 (product column 768 px instead of category column 352 px; the 16 px gaps; 352 px
     at 1000 px). The spec changed first, then the test.
+  - `e2e/products.spec.ts` AC23: the expected Tab order changed with the approved change of
+    PC7 and AC23 (`Uusi ryhmä` and `Uusi kategoria` before the tree). The spec changed
+    first, then the test.
   Most test edits were made with scripts, so `.agents/guardrails/state/test-edits.log` has
   no line for this branch; this list is the record.
 - **Created:** 2026-11-17
@@ -43,6 +47,9 @@
   width before PC11 was right) and approved the change of PC11 and AC24: the product column
   is at most 48 rem, the category column takes the rest, the counts stay at the column's
   right edge with 16 px between them and the column's scroll bar.
+  2026-11-18: the user found the `Uusi ryhmä` and `Uusi kategoria` buttons hard to find
+  below a long tree and approved the change of PC7 and AC23: the buttons, and the form they
+  open, sit above the tree.
 - **Implements:** FR-11, FR-33, FR-34, FR-39 (layout of the existing functions; no new
   requirement)
 - **Affected subsystems:** [ui](../../docs/subsystems/ui/README.md),
@@ -103,9 +110,10 @@ the products are far down.
   the controls of the category panel do now, and an error is shown beside them. With
   `Kaikki tuotteet` selected there are no tools. After a rename, move or conversion the item
   stays selected; after a delete `Kaikki tuotteet` is selected.
-- **PC7 New group and new category.** Below the tree are two buttons, `Uusi ryhmä` and
-  `Uusi kategoria`, each with `aria-expanded` and `aria-controls`. A click opens the form of
-  today below the buttons and moves the focus to its name field; a second click, or
+- **PC7 New group and new category.** Below the heading `Kategoriat` and above the tree are
+  two buttons, `Uusi ryhmä` and `Uusi kategoria`, each with `aria-expanded` and
+  `aria-controls`. A click opens the form of today below the buttons (above the tree) and
+  moves the focus to its name field; a second click, or
   `Peruuta` in the form, closes it. Only one form is open at a time. After a successful add
   the name field is emptied and the form stays open. The `Uusi kategoria` form's group
   dropdown starts at the selected group, or at the group of the selected category; else at
@@ -333,9 +341,9 @@ window 1000 px wide the category column is 352 px (±1 px) wide
 **Given** the example data
 **When** axe runs on the page as opened, with `Maitotuotteet` selected, with `Ruoka` closed
 and with the `Uusi ryhmä` form open; and the user presses Tab from the last navigation link
-**Then** axe finds no WCAG 2.1 AA violation; Tab reaches, in this order, `Kaikki tuotteet`,
-`Piilota kategoriat: Auto`, `Auto`, `Autohuolto`, and reaches `Uusi ryhmä` and
-`Uusi kategoria` before the search box `Hae`
+**Then** axe finds no WCAG 2.1 AA violation; Tab reaches, in this order, `Uusi ryhmä`,
+`Uusi kategoria`, `Kaikki tuotteet`, `Piilota kategoriat: Auto`, `Auto`, `Autohuolto`, and
+later the search box `Hae`
 
 ## Files to Modify
 | File | Change |
@@ -601,6 +609,10 @@ in the spec's Overview at the end.
   `frontend/e2e/products.spec.ts` for the changed widths, the 16 px before the count and
   the 352 px at 1000 px. Green: P9's grid and padding in `styles.css`. Docs: the ui README's
   class table. Run the whole E2E suite, then re-audit.
+- [x] **T13 Add buttons above the tree (PC7, AC23 changed).** Red: the AC23 test in
+  `frontend/e2e/products.spec.ts` for the new Tab order (G7 record). Green: the buttons
+  and the forms before the tree in `CategoryPanel.tsx`. Docs: the ui README's
+  `CategoryPanel` line. Run the frontend checks and the whole E2E suite, then re-audit.
 - [x] **T10 Checks and audit.** Frontend tests, lint, format check, type check and E2E;
   `review-audit` against AC1–AC23; status `Done`.
 
@@ -619,6 +631,11 @@ Audited 2026-11-17.
   column 1504 px) before the grid `minmax(22rem, 1fr) minmax(0, 48rem)` and the column's
   16 px right padding; a screenshot at 1920 px showed the counts at the column's right
   edge and the product column at its earlier width.
+- Re-audit for the changed PC7 and AC23 (2026-11-18): the changed AC23 test was seen failing
+  (Tab reached `Kaikki tuotteet` first) before the buttons and forms moved above the tree in
+  `CategoryPanel.tsx`; then it passed with the whole E2E suite. The unit tests of AC15–AC17
+  find the buttons by role, so they did not change. Axe still finds no violation in AC23's
+  four states.
 - Tests: frontend 446 passed; E2E 50 passed; lint, format check and type check green.
 - Coverage: `CategoryPanel.tsx` and `CategoryTools.tsx` 100 % lines, `ProductsPage.tsx`
   98.8 % lines (the untouched product row's rename `Peruuta`). The branches left are
