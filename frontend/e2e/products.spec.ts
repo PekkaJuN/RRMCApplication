@@ -239,14 +239,14 @@ test("AC23: the page passes axe in its states, and Tab follows the tree", async 
       break;
     }
   }
-  expect(focusedNames.slice(0, 4)).toEqual([
+  expect(focusedNames.slice(0, 6)).toEqual([
+    "Uusi ryhmä",
+    "Uusi kategoria",
     "Kaikki tuotteet",
     "Piilota kategoriat: Auto",
     "Auto",
     "Autohuolto",
   ]);
-  expect(focusedNames).toContain("Uusi ryhmä");
-  expect(focusedNames).toContain("Uusi kategoria");
   expect(focusedNames.at(-1)).toBe("Hae");
 
   await noViolations(page);

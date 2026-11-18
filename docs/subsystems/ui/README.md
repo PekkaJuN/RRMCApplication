@@ -103,11 +103,12 @@ keeps the page because Vite answers every path with `index.html`.
   search, the add form and the product table; the selection filters the products; loads
   the lists and reloads them after every successful change
 - @frontend/src/components/CategoryPanel.tsx — the category column, which stays in view on a
-  wide window: a tree of `Kaikki tuotteet`, the groups with their categories and the
+  wide window: above the tree, the buttons `Uusi ryhmä` and `Uusi kategoria` and the form
+  they open; a tree of `Kaikki tuotteet`, the groups with their categories and the
   ungrouped categories, each a button with `aria-pressed`; a group's toggle
   (`Piilota kategoriat: <ryhmä>` / `Näytä kategoriat: <ryhmä>`) closes its categories, and
-  groups start open; the buttons `Uusi ryhmä` and `Uusi kategoria` open their forms, one at a
-  time, and the new category's group starts at the selected group
+  groups start open; the add buttons open their forms one at a time, and the new
+  category's group starts at the selected group
 - @frontend/src/components/CategoryTools.tsx — the tools of the selected group or category:
   rename, the group dropdown (categories only), convert and delete
 - @frontend/src/components/CategorySelect.tsx — category dropdown with groups as `optgroup`
