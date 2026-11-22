@@ -10,12 +10,27 @@ interface Props {
   onOpen: (id: number) => void;
 }
 
+/** The longest search text, as on the backend (receipt search PC6). */
+const MAX_SEARCH_LENGTH = 100;
+
+/** The answer to one search; `key` names the search it answers. */
+interface SearchAnswer {
+  key: string;
+  receipts: ReceiptSummary[] | null;
+  error: string | null;
+}
+
 /** The Kuitit page: every receipt with its warning and review state (FR-21). */
 export function ReceiptsPage({ onOpen }: Props) {
   const [receipts, setReceipts] = useState<ReceiptSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [onlyAttention, setOnlyAttention] = useState(false);
+  // The search (receipt search P6): `text` is typed, `submitted` is sent with Hae or Enter.
+  const [text, setText] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const [uncategorized, setUncategorized] = useState(false);
+  const [answer, setAnswer] = useState<SearchAnswer | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,8 +49,40 @@ export function ReceiptsPage({ onOpen }: Props) {
     };
   }, []);
 
+  const name = submitted.trim();
+  const isSearching = name !== "" || uncategorized;
+
+  const searchKey = `${uncategorized}:${name}`;
+
+  useEffect(() => {
+    if (!isSearching) {
+      return;
+    }
+    // A changed search cancels the earlier one, so a slow answer cannot replace a later one.
+    let cancelled = false;
+    void listReceipts({ name, uncategorized }).then((result) => {
+      if (cancelled) {
+        return;
+      }
+      setAnswer(
+        result.ok
+          ? { key: searchKey, receipts: result.data, error: null }
+          : { key: searchKey, receipts: null, error: result.error.message },
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [name, uncategorized, isSearching, searchKey]);
+
+  // Only the answer to the current search counts; an older one is ignored.
+  const current = isSearching && answer?.key === searchKey ? answer : null;
+  const searchError = current?.error ?? null;
   const year = finnishYear(new Date());
+  // The note counts every receipt, whatever the search shows (receipt search PC4).
   const note = receipts ? attention(receipts, year) : null;
+  const listed = isSearching ? (current?.receipts ?? null) : receipts;
+  const shown = listed?.filter((receipt) => !onlyAttention || needsAttention(receipt, year));
 
   return (
     <section aria-labelledby="receipts-heading">
@@ -73,6 +120,40 @@ export function ReceiptsPage({ onOpen }: Props) {
       {error && <p role="alert">{error}</p>}
       {receipts?.length === 0 && <p>{fi.receipts.empty}</p>}
       {receipts && receipts.length > 0 && (
+        <form
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSubmitted(text);
+          }}
+        >
+          <p>
+            <label>
+              {fi.receipts.search}{" "}
+              <input
+                type="search"
+                value={text}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(event) => setText(event.target.value)}
+              />
+            </label>{" "}
+            <button type="submit">{fi.receipts.searchButton}</button>
+          </p>
+          <p>
+            <label>
+              <input
+                type="checkbox"
+                checked={uncategorized}
+                onChange={(event) => setUncategorized(event.target.checked)}
+              />{" "}
+              {fi.receipts.uncategorized}
+            </label>
+          </p>
+        </form>
+      )}
+      {searchError && <p role="alert">{searchError}</p>}
+      {receipts && receipts.length > 0 && shown?.length === 0 && <p>{fi.receipts.noMatches}</p>}
+      {shown && shown.length > 0 && (
         <div className="table-box">
           <table aria-label={fi.receipts.table}>
             <thead>
@@ -85,35 +166,33 @@ export function ReceiptsPage({ onOpen }: Props) {
               </tr>
             </thead>
             <tbody>
-              {receipts
-                .filter((receipt) => !onlyAttention || needsAttention(receipt, year))
-                .map((receipt) => (
-                  <tr key={receipt.id}>
-                    <td>
-                      <a
-                        href={receiptPath(receipt.id)}
-                        onClick={(event) => {
-                          if (isPlainLeftClick(event)) {
-                            event.preventDefault();
-                            onOpen(receipt.id);
-                          }
-                        }}
-                      >
-                        {receipt.purchase_date
-                          ? formatDate(receipt.purchase_date)
-                          : fi.receipts.missing}
-                      </a>
-                    </td>
-                    <td>{receipt.store || fi.receipts.missing}</td>
-                    <td className="amount">
-                      {receipt.total_cents === null
-                        ? fi.receipts.missing
-                        : formatCents(receipt.total_cents)}
-                    </td>
-                    <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
-                    <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
-                  </tr>
-                ))}
+              {shown.map((receipt) => (
+                <tr key={receipt.id}>
+                  <td>
+                    <a
+                      href={receiptPath(receipt.id)}
+                      onClick={(event) => {
+                        if (isPlainLeftClick(event)) {
+                          event.preventDefault();
+                          onOpen(receipt.id);
+                        }
+                      }}
+                    >
+                      {receipt.purchase_date
+                        ? formatDate(receipt.purchase_date)
+                        : fi.receipts.missing}
+                    </a>
+                  </td>
+                  <td>{receipt.store || fi.receipts.missing}</td>
+                  <td className="amount">
+                    {receipt.total_cents === null
+                      ? fi.receipts.missing
+                      : formatCents(receipt.total_cents)}
+                  </td>
+                  <td>{receipt.warning ? fi.receipts.mismatch : ""}</td>
+                  <td>{receipt.reviewed ? fi.receipts.reviewed : fi.receipts.unreviewed}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

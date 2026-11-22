@@ -26,6 +26,7 @@ from app.storage.migrate import MIGRATIONS_DIR, migrate
 from app.storage.receipt_repository import LineCategory, ReceiptRepository
 from tests.integration.conftest import BASE_URL
 from tests.receipt_import_data import jpeg, png
+from tests.receipt_search_data import seed_search_receipts
 
 TIME = "2026-10-28T10:00:01Z"
 JPEG = b"\xff\xd8\xff\xe0synthetic jpeg"
@@ -175,6 +176,76 @@ def test_ac3_empty_list(api: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+# Receipt search spec T3: GET /api/receipts?name=&uncategorized=
+
+
+def search(api: TestClient, ids: dict[str, int], query: str) -> list[str]:
+    response = api.get(f"/api/receipts?{query}")
+    assert response.status_code == 200
+    names = {receipt_id: key for key, receipt_id in ids.items()}
+    return [names[item["id"]] for item in response.json()]
+
+
+ALL = ["R5", "R1", "R2", "R3", "R4"]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("name=maito", ["R1", "R4"]),  # AC1
+        ("name=kaurajuoma", ["R2"]),  # AC2
+        ("name=AJUOM", ["R2"]),  # AC2
+        ("name=%20%20%C3%84YRI%C3%84%20%20", ["R5"]),  # AC3
+        ("name=kevytmaito%20%20%201l", ["R1"]),  # AC3
+        ("name=", ALL),  # AC4
+        ("name=%20%20", ALL),  # AC4
+        ("uncategorized=true", ["R2", "R4"]),  # AC5
+        ("uncategorized=false", ALL),  # AC5
+        ("name=maito&uncategorized=true", ["R4"]),  # AC6
+        ("name=kaurajuoma&uncategorized=true", []),  # AC6
+        ("name=banaani", []),  # AC7
+    ],
+)
+def test_search_ac1_to_ac7(
+    api: TestClient, db: sqlite3.Connection, query: str, expected: list[str]
+) -> None:
+    ids = seed_search_receipts(db)
+
+    assert search(api, ids, query) == expected
+
+
+def test_search_unfiltered_list_is_unchanged(api: TestClient, db: sqlite3.Connection) -> None:
+    ids = seed_search_receipts(db)
+
+    assert search(api, ids, "") == ALL
+    assert api.get("/api/receipts?name=porkkana").json() == [
+        {
+            "id": ids["R2"],
+            "purchase_date": "2026-10-04",
+            "store": None,
+            "total_cents": None,
+            "warning": True,
+            "reviewed": True,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "query", ["name=" + "a" * 101, "name=%20" + "a" * 101, "uncategorized=yes"]
+)
+def test_search_ac8_invalid_parameters(api: TestClient, query: str) -> None:
+    response = api.get(f"/api/receipts?{query}")
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_request"
+
+
+def test_search_ac8_100_characters_after_trimming_pass(api: TestClient) -> None:
+    response = api.get("/api/receipts?name=%20" + "a" * 100 + "%20")
+
+    assert response.status_code == 200
 
 
 # Receipt (PC2)

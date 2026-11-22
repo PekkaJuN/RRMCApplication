@@ -50,8 +50,23 @@ export interface Receipt {
   subtotals: Subtotal[];
 }
 
-export function listReceipts(): Promise<ApiResult<ReceiptSummary[]>> {
-  return apiGet<ReceiptSummary[]>("/api/receipts");
+/** The conditions of the receipt search (receipt search PC1, PC2). */
+export interface ReceiptFilter {
+  name?: string;
+  uncategorized?: boolean;
+}
+
+/** A blank name and `uncategorized` false are left out, so no filter is the plain list. */
+export function listReceipts(filter: ReceiptFilter = {}): Promise<ApiResult<ReceiptSummary[]>> {
+  const query = new URLSearchParams();
+  if (filter.name?.trim()) {
+    query.set("name", filter.name);
+  }
+  if (filter.uncategorized) {
+    query.set("uncategorized", "true");
+  }
+  const search = query.toString();
+  return apiGet<ReceiptSummary[]>(search ? `/api/receipts?${search}` : "/api/receipts");
 }
 
 export function getReceipt(id: number): Promise<ApiResult<Receipt>> {

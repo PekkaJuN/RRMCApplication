@@ -1,6 +1,7 @@
 """SQL for receipts and their lines. Holds no rules; import owns those."""
 
 import sqlite3
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Literal
@@ -12,6 +13,21 @@ type CategorySource = Literal["remembered", "model", "user"]
 _RECEIPT_SELECT = (
     "SELECT id, image_hash, file_name, imported_at, store, purchase_date, total_cents, ocr_text,"
     " reviewed FROM receipts"
+)
+
+_SUMMARY_SELECT = (
+    "SELECT receipts.id, store, purchase_date, total_cents, reviewed,"
+    " COALESCE(SUM(receipt_lines.amount_cents), 0) AS line_sum_cents"
+    " FROM receipts LEFT JOIN receipt_lines ON receipt_lines.receipt_id = receipts.id"
+)
+_SUMMARY_ORDER = (
+    " GROUP BY receipts.id ORDER BY purchase_date IS NOT NULL, purchase_date DESC, receipts.id DESC"
+)
+# Closed with ")" after the conditions (receipt search P4).
+_MATCHING_LINE = (
+    " WHERE EXISTS (SELECT 1 FROM receipt_lines AS m"
+    " LEFT JOIN products AS p ON p.id = m.product_id"
+    " WHERE m.receipt_id = receipts.id AND "
 )
 
 
@@ -292,16 +308,35 @@ class ReceiptRepository:
         )
         return cursor.rowcount == 1
 
-    def summaries(self) -> list[ReceiptSummaryRow]:
-        """Every receipt with its line sum: receipts without a purchase date first, then the
-        newest date first; the newest import first within a date (receipt-review PC1)."""
-        rows = self._connection.execute(
-            "SELECT receipts.id, store, purchase_date, total_cents, reviewed,"
-            " COALESCE(SUM(receipt_lines.amount_cents), 0) AS line_sum_cents"
-            " FROM receipts LEFT JOIN receipt_lines ON receipt_lines.receipt_id = receipts.id"
-            " GROUP BY receipts.id"
-            " ORDER BY purchase_date IS NOT NULL, purchase_date DESC, receipts.id DESC"
-        )
+    def summaries(
+        self,
+        *,
+        name_key: str | None = None,
+        uncategorized: bool = False,
+        key: Callable[[str], str] | None = None,
+    ) -> list[ReceiptSummaryRow]:
+        """Receipts with their line sum: receipts without a purchase date first, then the
+        newest date first; the newest import first within a date (receipt-review PC1).
+
+        With a condition, only receipts with one line that meets every condition (receipt
+        search P4): `name_key` is in the line's name folded by `key`, or in its product's
+        key; `uncategorized` is a line without a category that is not a deposit refund. The
+        line sum stays the sum of all lines."""
+        conditions: list[str] = []
+        parameters: list[str] = []
+        if name_key:
+            if key is None:
+                raise ValueError("a name condition needs the key function")
+            # Line names are stored as display names; SQLite cannot fold Ä to ä, so the
+            # caller's key function does it. instr() matches % and _ literally.
+            self._connection.create_function("name_key", 1, key, deterministic=True)
+            conditions.append("(instr(name_key(m.name), ?) > 0 OR instr(p.name_key, ?) > 0)")
+            parameters += [name_key, name_key]
+        if uncategorized:
+            conditions.append("m.category_id IS NULL AND m.is_deposit_refund = 0")
+        # Only the fixed fragments above are joined; the search text is a bound parameter.
+        where = _MATCHING_LINE + " AND ".join(conditions) + ")" if conditions else ""
+        rows = self._connection.execute(_SUMMARY_SELECT + where + _SUMMARY_ORDER, parameters)
         return [
             ReceiptSummaryRow(
                 id=row["id"],

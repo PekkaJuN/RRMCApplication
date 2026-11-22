@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
 
@@ -46,11 +46,16 @@ def create_review_router(
         finally:
             connection.close()
 
+    # The search text is a query parameter, so it stays out of the request log (receipt
+    # search P2). A plain bool would also accept yes, on and 1 (AC8).
     @router.get("/receipts")
     def list_receipts(
         service: Annotated[ReviewService, Depends(review_service)],
+        name: str = "",
+        uncategorized: Literal["true", "false"] = "false",
     ) -> list[ReceiptSummaryOut]:
-        return [ReceiptSummaryOut.from_summary(summary) for summary in service.summaries()]
+        summaries = service.summaries(name, uncategorized=uncategorized == "true")
+        return [ReceiptSummaryOut.from_summary(summary) for summary in summaries]
 
     @router.get("/receipts/{receipt_id}")
     def get_receipt(

@@ -116,6 +116,8 @@ IDs are stable. Specs reference them (e.g. "implements FR-12").
 | FR-49 | *Next release:* the user can also choose the period as a free date range, from a start date to an end date, in addition to the options in FR-25. The same rules apply: only receipts whose purchase date falls inside the range are counted, and weeks and months at the range's edges count only their days inside it. The CSV export (FR-26) uses the same date range, so it can also cover a period such as the 15th to the 14th. |
 | FR-54 | The user can view the current calendar year (in Finnish time) on its own page, `Vuosi tuotteineen`: the totals of the whole year and of each month, per group, category and product, counted from reviewed receipts only, sorted by name as on the archived year page (FR-53); the number of unreviewed receipts of the year is shown. These totals can be exported as CSV in the archive file's format. Details in the [year with products spec](features/year-products.md). |
 | FR-55 | The Kuitit page tells how many unreviewed receipts have no purchase date, and how many are dated in earlier years and in which years, and lets the user show only these receipts in the list. Details in the [unreviewed receipts note spec](features/unreviewed-receipts-note.md). |
+| FR-56 | The user can search the receipts on the Kuitit page by a product name: a receipt is shown when one of its lines has the search text in its own name or its linked product's name, ignoring case and extra spaces. Details in the [receipt search spec](features/receipt-search.md). |
+| FR-57 | The user can show only the receipts that have a line without a category (deposit refunds do not count), alone or together with the product name search on the same line. Details in the [receipt search spec](features/receipt-search.md). |
 | FR-44 | Deposit refunds are not deducted from spending. A deposit refund line has no category and is not counted in category, group, weekly or monthly totals, or in exported totals. It is shown on its receipt and counted only in the receipt-total check (FR-20). |
 
 ### 6.6 Export
@@ -255,7 +257,7 @@ category, category source, product). The data model is defined in `docs/datamode
 |---|---|
 | MVP | FR-1 to FR-27, FR-29 to FR-39, FR-43 to FR-47, all NFRs except NFR-5 |
 | Next | FR-48 PDF export of the totals summary and the budget comparison, FR-49 free date range for totals, FR-50 monthly budget, FR-51 date fields as `dd.mm.yyyy` |
-| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 and FR-53 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison, FR-54 the current year with products, FR-55 the note on old and undated unreviewed receipts |
+| Later | FR-28 Google Sheets export (with NFR-5), FR-40 to FR-42 and FR-53 archiving (see [section 6.10](#610-archiving-later-release)), FR-52 CSV export of the budget comparison, FR-54 the current year with products, FR-55 the note on old and undated unreviewed receipts, FR-56 and FR-57 the receipt search |
 | Later (candidates) | e-receipt import, content-based duplicate check (same receipt photographed twice), re-parse with a different model, the rest of FR-14 (common character mix-ups and fuzzy matching) |
 
 A suggested order of feature specs for the MVP:

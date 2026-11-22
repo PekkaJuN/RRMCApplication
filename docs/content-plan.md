@@ -60,7 +60,7 @@ Generate after Tier 1 `architecture.md` and `datamodel.md` are at least `In Prog
 | 13 | Calculation | [docs/subsystems/calculation/README.md](subsystems/calculation/README.md) | Category totals per ISO week and month in integer cents; line-sum vs receipt-total check and receipt subtotals; periods and their columns | 4, 12 | Done |
 | 14 | Export | [docs/subsystems/export/README.md](subsystems/export/README.md) | `GET /api/export/lines`, `/totals`, `/totals/pdf`, `/comparison`, `/comparison/pdf`, `/archive/{year}` and `/year`: CSV and PDF files of a period, and the CSV file of an archived year or the current year, behind the exporter interfaces; Google Sheets later | 4, 13, 18, 21 | Done |
 | 15 | UI | [docs/subsystems/ui/README.md](subsystems/ui/README.md) | React UI: receipt image beside an editable table, category dropdowns, live totals, mismatch warning; the stylesheet and the accessibility check | 6, 12, 13 | Done |
-| 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
+| 17 | Review | [docs/subsystems/review/README.md](subsystems/review/README.md) | Receipt endpoints of the review UI: list and receipt search, receipt view with sums, image, category choice, line and receipt edits, review state, deleting and creating a receipt | 6, 9, 12, 13 | Done |
 | 18 | Totals | [docs/subsystems/totals/README.md](subsystems/totals/README.md) | `GET /api/totals`: category totals per ISO week and month of a period, with the unreviewed and undated counts; `GET /api/year/totals`: the current year's totals per group, category and product | 6, 9, 12, 13 | Done |
 | 20 | Budget | [docs/subsystems/budget/README.md](subsystems/budget/README.md) | `/api/budget`: monthly budgets and their comparison with reviewed spending of a calendar month or a 15–14 period | 6, 9, 12, 13, 18 | Done |
 | 21 | Archive | [docs/subsystems/archive/README.md](subsystems/archive/README.md) | `/api/archive`: archiving a finished year into the archive tables and folder, the archived years, permanent delete and an archived year's totals per group, category and product | 4, 6, 9, 13 | Done |
@@ -146,6 +146,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
   export, UI, API, architecture and glossary docs describe it.
 - The unreviewed receipts note spec is Done (audited 2026-11-16): the note and filter on the
   Kuitit page, frontend only. The UI doc describes it.
+- The receipt search spec is Done (audited 2026-11-22): the product name search and the
+  lines without a category filter on `GET /api/receipts` and the Kuitit page. The review,
+  storage, UI and API docs describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget, export and archive terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

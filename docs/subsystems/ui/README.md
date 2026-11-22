@@ -184,6 +184,18 @@ the current year is the one in `Europe/Helsinki`, as on the Vuosi tuotteineen pa
 filter is not remembered. The texts are in the
 [unreviewed receipts note spec](../../../specs/features/unreviewed-receipts-note.md).
 
+Above the list, a search form (`role="search"`) has the field `Hae tuotteella`
+(`maxLength` 100), the `Hae` button and the checkbox `Vain kuitit, joilla on rivejä ilman
+kategoriaa`. A search runs on `Hae` or Enter; the checkbox searches at once, with the last
+searched text. Without a condition the page shows the list it loaded when it opened, without
+a request. Each answer is kept with the search it answers, and an effect's cleanup cancels a
+changed search, so a slow earlier answer is never shown. The note counts the full list;
+`Näytä vain nämä kuitit` filters the search result. A result with no receipts shows
+`Hakuehdoilla ei löytynyt kuitteja.`, and a failed search shows its message with
+`role="alert"` in place of the table; the field and checkbox keep their values. The rules
+are in [review](../review/README.md#receipt-search) and the texts in the
+[receipt search spec](../../../specs/features/receipt-search.md).
+
 The `Uusi kuitti` button above the list opens the new receipt form (receipt-management
 PC11). The form loads the failed images when it opens, and a failed load shows its error beside
 the select; the `Kuva` select offers `Ei kuvaa`

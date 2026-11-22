@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app import texts
 from app.calculation.receipt_check import SubtotalLine, category_subtotals, check_receipt
 from app.categorization.errors import NotFoundError, UnknownCategoryError
-from app.categorization.names import validate_product_name
+from app.categorization.names import normalize_display, normalize_key, validate_product_name
 from app.categorization.service import CategoryService, LineCategoryService
+from app.errors import AppError
 from app.review.errors import (
     DepositRefundAmountError,
     DuplicateImageError,
@@ -26,6 +28,9 @@ from app.storage.db import fits_integer
 from app.storage.receipt_repository import CategorySource, ReceiptRepository
 
 logger = logging.getLogger(__name__)
+
+# The longest search text, as the longest product name (receipt search PC6).
+MAX_SEARCH_LENGTH = 100
 
 
 @dataclass(frozen=True)
@@ -115,8 +120,18 @@ class ReviewService:
         self._catalog = catalog
         self._receipts = receipts
 
-    def summaries(self) -> list[ReceiptSummary]:
-        """Every receipt in list order (PC1), with the warning of FR-20."""
+    def summaries(self, name: str = "", uncategorized: bool = False) -> list[ReceiptSummary]:
+        """The receipts in list order (PC1), with the warning of FR-20. `name` and
+        `uncategorized` keep the receipts with one line that meets both (receipt search P3);
+        a blank `name` is no condition.
+
+        Raises: AppError `invalid_request` for a search text over 100 characters."""
+        display = normalize_display(name)
+        if len(display) > MAX_SEARCH_LENGTH:
+            raise AppError("invalid_request", texts.INVALID_REQUEST, 422)
+        rows = self._receipts.summaries(
+            name_key=display.casefold() or None, uncategorized=uncategorized, key=normalize_key
+        )
         return [
             ReceiptSummary(
                 id=row.id,
@@ -126,7 +141,7 @@ class ReviewService:
                 warning=check_receipt(row.total_cents, [row.line_sum_cents]).warning,
                 reviewed=row.reviewed,
             )
-            for row in self._receipts.summaries()
+            for row in rows
         ]
 
     def edit_line(self, receipt_id: int, line_id: int, edit: LineEdit) -> ReceiptView:
