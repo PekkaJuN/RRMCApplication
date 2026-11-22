@@ -33,6 +33,39 @@ it("AC20: lists the receipts with GET /api/receipts", async () => {
   expect(await listReceipts()).toEqual({ ok: true, data: [SUMMARY_B, SUMMARY_A] });
 });
 
+/** Records the query string of each GET /api/receipts. */
+function recordSearches(): string[] {
+  const searches: string[] = [];
+  server.use(
+    http.get("/api/receipts", ({ request }) => {
+      searches.push(new URL(request.url).search);
+      return HttpResponse.json([SUMMARY_A]);
+    }),
+  );
+  return searches;
+}
+
+it("receipt search P5: no filter requests the plain list", async () => {
+  const searches = recordSearches();
+
+  await listReceipts();
+  await listReceipts({ name: "  ", uncategorized: false });
+
+  expect(searches).toEqual(["", ""]);
+});
+
+it("receipt search P5: sends the name and the uncategorized condition", async () => {
+  const searches = recordSearches();
+
+  expect(await listReceipts({ name: "maito", uncategorized: true })).toEqual({
+    ok: true,
+    data: [SUMMARY_A],
+  });
+  await listReceipts({ name: "ä & b" });
+
+  expect(searches).toEqual(["?name=maito&uncategorized=true", "?name=%C3%A4+%26+b"]);
+});
+
 it("AC22: reads one receipt with GET /api/receipts/{id}", async () => {
   server.use(http.get("/api/receipts/3", () => HttpResponse.json(RECEIPT_A)));
 

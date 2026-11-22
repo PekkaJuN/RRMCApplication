@@ -12,6 +12,7 @@ from app.categorization.errors import (
     UnknownCategoryError,
 )
 from app.categorization.names import normalize_key
+from app.errors import AppError
 from app.image_files import image_identifier
 from app.review.errors import (
     DepositRefundAmountError,
@@ -37,6 +38,7 @@ from app.review.service import (
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository
 from tests.receipt_import_data import jpeg, png
+from tests.receipt_search_data import seed_search_receipts
 
 TIME = "2026-10-28T10:00:01Z"
 
@@ -214,6 +216,67 @@ def test_ac7_old_receipt_has_a_warning(service: ReviewService, receipts: Receipt
     assert service.summaries() == [
         ReceiptSummary(row.id, None, None, None, warning=True, reviewed=False)
     ]
+
+
+# Receipt search spec T2: the search text and the conditions.
+
+
+def searched(
+    service: ReviewService, ids: dict[str, int], *, name: str = "", uncategorized: bool = False
+) -> list[str]:
+    names = {receipt_id: key for key, receipt_id in ids.items()}
+    summaries = service.summaries(name=name, uncategorized=uncategorized)
+    return [names[summary.id] for summary in summaries]
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("  ÄYRIÄ  ", ["R5"]), ("kevytmaito   1l", ["R1"]), ("MAITO", ["R1", "R4"])],
+)
+def test_search_ac3_the_text_is_normalized(
+    service: ReviewService, db: sqlite3.Connection, name: str, expected: list[str]
+) -> None:
+    ids = seed_search_receipts(db)
+
+    assert searched(service, ids, name=name) == expected
+
+
+@pytest.mark.parametrize("name", ["", "  "])
+def test_search_ac4_a_blank_text_is_no_condition(
+    service: ReviewService, db: sqlite3.Connection, name: str
+) -> None:
+    ids = seed_search_receipts(db)
+
+    assert searched(service, ids, name=name) == ["R5", "R1", "R2", "R3", "R4"]
+
+
+def test_search_ac5_and_ac6_uncategorized(service: ReviewService, db: sqlite3.Connection) -> None:
+    ids = seed_search_receipts(db)
+
+    assert searched(service, ids, uncategorized=True) == ["R2", "R4"]
+    assert searched(service, ids, name="maito", uncategorized=True) == ["R4"]
+
+
+def test_search_ac8_a_text_over_100_characters_is_refused(service: ReviewService) -> None:
+    with pytest.raises(AppError) as error:
+        service.summaries(name="  " + "a" * 101 + "  ")
+
+    assert (error.value.code, error.value.status) == ("invalid_request", 422)
+
+
+def test_search_ac8_100_characters_with_spaces_around_pass(service: ReviewService) -> None:
+    assert service.summaries(name="  " + "a" * 100 + "  ") == []
+
+
+def test_search_keeps_the_warning_of_all_lines(
+    service: ReviewService, db: sqlite3.Connection
+) -> None:
+    ids = seed_search_receipts(db)
+
+    [summary] = service.summaries(name="porkkana")
+
+    # R2 has no total, so it warns (FR-20) as in the unfiltered list.
+    assert (summary.id, summary.warning) == (ids["R2"], True)
 
 
 def snapshot(db: sqlite3.Connection) -> tuple[list[tuple[object, ...]], list[tuple[object, ...]]]:

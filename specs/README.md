@@ -30,3 +30,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 23 | [Expand and collapse a whole level](features/table-expand-all.md) | Done | FR-53, FR-54 (year table) |
 | 24 | [Note on old and undated unreviewed receipts](features/unreviewed-receipts-note.md) | Done | FR-55 (new), FR-21 |
 | 25 | [Tuotteet page in two columns](features/products-two-columns.md) | Done | FR-11, FR-33, FR-34, FR-39 (layout) |
+| 26 | [Receipt search](features/receipt-search.md) | Done | FR-56 (new), FR-57 (new) |

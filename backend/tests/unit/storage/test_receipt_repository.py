@@ -2,6 +2,7 @@ import sqlite3
 
 import pytest
 
+from app.categorization.names import normalize_key
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import (
     DatedLineRow,
@@ -14,6 +15,7 @@ from app.storage.receipt_repository import (
     StoredLine,
     YearLineRow,
 )
+from tests.receipt_search_data import seed_search_receipts
 
 HASH = "b" * 64
 TIME = "2026-10-28T10:00:00Z"
@@ -607,3 +609,105 @@ def test_year_lines_without_a_product_group_or_category(db: sqlite3.Connection) 
         YearLineRow("2026-03-05", 100, "TUNTEMATON", None, None, is_deposit_refund=False),
         YearLineRow("2026-03-05", -40, "Panttipalautus", None, None, is_deposit_refund=True),
     ]
+
+
+# Receipt search spec T1: the summaries of the receipts with a matching line.
+
+
+def search_ids(
+    repository: ReceiptRepository,
+    ids: dict[str, int],
+    *,
+    name_key: str | None = None,
+    uncategorized: bool = False,
+) -> list[str]:
+    names = {receipt_id: name for name, receipt_id in ids.items()}
+    rows = repository.summaries(name_key=name_key, uncategorized=uncategorized, key=normalize_key)
+    return [names[row.id] for row in rows]
+
+
+def test_search_ac1_part_of_the_line_name(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key="maito") == ["R1", "R4"]
+
+
+@pytest.mark.parametrize("name_key", ["kaurajuoma", "ajuom"])
+def test_search_ac2_the_linked_product(db: sqlite3.Connection, name_key: str) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key=name_key) == ["R2"]
+
+
+def test_search_ac2_the_product_name_alone_is_enough(db: sqlite3.Connection) -> None:
+    # The line name does not contain the text, only its linked product's name does.
+    repository = ReceiptRepository(db)
+    category_id, product_id = category_and_product(db)
+    receipt = repository.add(HASH, "a.jpg", TIME)
+    repository.add_line(
+        receipt.id,
+        1,
+        "RUISL. 500G",
+        189,
+        is_deposit_refund=False,
+        category=LineCategory(category_id, "user", product_id),
+    )
+    repository.add("c" * 64, "b.jpg", TIME)
+
+    rows = repository.summaries(name_key="ruisleipä", key=normalize_key)
+
+    assert [row.id for row in rows] == [receipt.id]
+
+
+def test_search_ac3_finnish_letters_are_folded(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key="äyriä") == ["R5"]
+
+
+def test_search_ac5_lines_without_a_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, uncategorized=True) == ["R2", "R4"]
+    assert search_ids(repository, ids) == ["R5", "R1", "R2", "R3", "R4"]
+
+
+def test_search_ac6_both_conditions_on_the_same_line(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key="maito", uncategorized=True) == ["R4"]
+    assert search_ids(repository, ids, name_key="kaurajuoma", uncategorized=True) == []
+
+
+def test_search_ac7_no_match(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key="banaani") == []
+
+
+def test_search_ac7_percent_and_underscore_match_literally(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    assert search_ids(repository, ids, name_key="%") == []
+    assert search_ids(repository, ids, name_key="_") == []
+
+
+def test_search_a_name_condition_needs_the_key_function(db: sqlite3.Connection) -> None:
+    with pytest.raises(ValueError, match="key function"):
+        ReceiptRepository(db).summaries(name_key="maito")
+
+
+def test_search_sums_every_line_of_a_matched_receipt(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_search_receipts(db)
+
+    rows = repository.summaries(name_key="porkkana", key=normalize_key)
+
+    assert [(row.id, row.line_sum_cents) for row in rows] == [(ids["R2"], 199 + 89)]

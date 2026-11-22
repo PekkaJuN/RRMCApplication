@@ -227,3 +227,213 @@ it("unreviewed-note AC5, AC6: the filter shows only these receipts, then all", a
   expect(await storesShown()).toEqual(ALL_STORES);
   expect(filterButton()).toHaveAttribute("aria-pressed", "false");
 });
+
+// Receipt search (specs/features/receipt-search.md). R1–R4 are reviewed, R5 is unreviewed
+// and undated, as in the spec's test data; the backend's answers are fixed per query.
+
+function searchReceipt(name: string, purchase_date: string | null, reviewed = true) {
+  return {
+    id: Number(name.slice(1)),
+    purchase_date,
+    store: `Kauppa ${name}`,
+    total_cents: 100,
+    warning: false,
+    reviewed,
+  } satisfies ReceiptSummary;
+}
+
+const R1 = searchReceipt("R1", "2026-10-05");
+const R2 = searchReceipt("R2", "2026-10-04");
+const R3 = searchReceipt("R3", "2026-10-03");
+const R4 = searchReceipt("R4", "2026-10-02");
+const R5 = searchReceipt("R5", null, false);
+const SEARCH_ALL = [R5, R1, R2, R3, R4];
+
+const SEARCH_ANSWERS: Record<string, ReceiptSummary[]> = {
+  "": SEARCH_ALL,
+  "?name=maito": [R1, R4],
+  "?uncategorized=true": [R2, R4],
+  "?name=maito&uncategorized=true": [R4],
+  "?name=banaani": [],
+};
+
+/** Answers GET /api/receipts by its query string and records each query string. */
+function searchServer(): string[] {
+  const searches: string[] = [];
+  server.use(
+    http.get("/api/receipts", ({ request }) => {
+      const search = new URL(request.url).search;
+      searches.push(search);
+      return HttpResponse.json(SEARCH_ANSWERS[search] ?? []);
+    }),
+  );
+  return searches;
+}
+
+const searchField = () => screen.getByRole("searchbox", { name: "Hae tuotteella" });
+const searchButton = () => screen.getByRole("button", { name: "Hae" });
+const uncategorizedBox = () =>
+  screen.getByRole("checkbox", { name: "Vain kuitit, joilla on rivejä ilman kategoriaa" });
+const NO_MATCHES = "Hakuehdoilla ei löytynyt kuitteja.";
+
+async function renderSearchPage() {
+  today("2026-11-22T09:00:00Z");
+  const searches = searchServer();
+  const user = userEvent.setup();
+  render(<ReceiptsPage onOpen={() => {}} />);
+  await screen.findByRole("table", { name: "Kuittilista" });
+  return { searches, user };
+}
+
+it("receipt search AC9: Enter searches by product name, an empty search shows all", async () => {
+  const { searches, user } = await renderSearchPage();
+
+  await user.type(searchField(), "maito{Enter}");
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+  expect(searches).toEqual(["", "?name=maito"]);
+
+  await user.clear(searchField());
+  await user.click(searchButton());
+
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(SEARCH_ALL.map((receipt) => receipt.store)),
+  );
+  // No condition shows the list loaded when the page opened, without a request.
+  expect(searches).toEqual(["", "?name=maito"]);
+});
+
+it("receipt search AC9: the Hae button searches", async () => {
+  const { user } = await renderSearchPage();
+
+  await user.type(searchField(), "maito");
+  await user.click(searchButton());
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+});
+
+it("receipt search AC10: the checkbox filters at once, and unchecking shows all", async () => {
+  const { searches, user } = await renderSearchPage();
+
+  await user.click(uncategorizedBox());
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R2", "Kauppa R4"]));
+  expect(searches).toEqual(["", "?uncategorized=true"]);
+
+  await user.click(uncategorizedBox());
+
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(SEARCH_ALL.map((receipt) => receipt.store)),
+  );
+  expect(uncategorizedBox()).not.toBeChecked();
+});
+
+it("receipt search AC10: the checkbox uses the searched text, not unsent typing", async () => {
+  const { searches, user } = await renderSearchPage();
+
+  await user.type(searchField(), "maito{Enter}");
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+  await user.type(searchField(), "x");
+  await user.click(uncategorizedBox());
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R4"]));
+  expect(searches).toEqual(["", "?name=maito", "?name=maito&uncategorized=true"]);
+});
+
+it("receipt search AC12: no match shows the text and keeps the search", async () => {
+  const { user } = await renderSearchPage();
+
+  await user.type(searchField(), "banaani{Enter}");
+
+  expect(await screen.findByText(NO_MATCHES)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(searchField()).toHaveValue("banaani");
+});
+
+it("receipt search AC14: the search text is at most 100 characters", async () => {
+  await renderSearchPage();
+
+  expect(searchField()).toHaveAttribute("maxLength", "100");
+});
+
+it("receipt search P6: a slow earlier answer does not replace a later one", async () => {
+  today("2026-11-22T09:00:00Z");
+  let releaseSlow: () => void = () => {};
+  const slow = new Promise<void>((resolve) => {
+    releaseSlow = resolve;
+  });
+  server.use(
+    http.get("/api/receipts", async ({ request }) => {
+      const search = new URL(request.url).search;
+      if (search === "?name=maito") {
+        await slow;
+      }
+      return HttpResponse.json(SEARCH_ANSWERS[search] ?? []);
+    }),
+  );
+  const user = userEvent.setup();
+  render(<ReceiptsPage onOpen={() => {}} />);
+  await screen.findByRole("table", { name: "Kuittilista" });
+
+  await user.type(searchField(), "maito{Enter}");
+  await user.clear(searchField());
+  await user.type(searchField(), "banaani{Enter}");
+  expect(await screen.findByText(NO_MATCHES)).toBeInTheDocument();
+  releaseSlow();
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.getByText(NO_MATCHES)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+});
+
+it("receipt search AC11: the note counts every receipt, the toggle filters the result", async () => {
+  const { user } = await renderSearchPage();
+  const note = "Tarkistamattomia kuitteja ilman päivämäärää: 1.";
+  expect(await noteText()).toBe(note);
+
+  await user.type(searchField(), "maito{Enter}");
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+  expect(await noteText()).toBe(note);
+
+  await user.click(filterButton());
+
+  expect(await screen.findByText(NO_MATCHES)).toBeInTheDocument();
+  expect(await noteText()).toBe(note);
+});
+
+it.each([
+  [
+    "an error answer",
+    () =>
+      HttpResponse.json(
+        { error: "internal_error", message: "Jokin meni pieleen." },
+        { status: 500 },
+      ),
+    "Jokin meni pieleen.",
+  ],
+  ["no connection", () => HttpResponse.error(), "Taustapalveluun ei saada yhteyttä."],
+])("receipt search AC13: %s shows the alert and keeps the values", async (_, fail, message) => {
+  const { user } = await renderSearchPage();
+  server.use(
+    http.get("/api/receipts", ({ request }) =>
+      new URL(request.url).search === "?name=maito&uncategorized=true"
+        ? fail()
+        : HttpResponse.json(SEARCH_ANSWERS[new URL(request.url).search] ?? []),
+    ),
+  );
+
+  await user.type(searchField(), "maito");
+  await user.click(uncategorizedBox());
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R2", "Kauppa R4"]));
+  await user.click(searchButton());
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(searchField()).toHaveValue("maito");
+  expect(uncategorizedBox()).toBeChecked();
+
+  await user.click(uncategorizedBox());
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});

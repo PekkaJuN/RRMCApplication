@@ -187,3 +187,75 @@ test("unreviewed-note AC5, AC6, AC9: show only the old unreviewed receipts", asy
   await expect(button).toHaveAttribute("aria-pressed", "false");
   await expect(table.getByText(reviewed)).toBeVisible();
 });
+
+// Receipt search (specs/features/receipt-search.md, E2E tests). The line names carry RUN,
+// so the search finds only this run's receipts among those of other journeys.
+
+/** Type in a receipt with one line, and give the line `category` when it is set. */
+async function typeInWithLine(
+  page: Page,
+  store: string,
+  line: string,
+  category?: string,
+): Promise<void> {
+  await openForm(page);
+  await create(page, store);
+  const newLine = page.getByRole("form", { name: "Uusi rivi" });
+  await newLine.getByLabel("Tuote").fill(line);
+  await newLine.getByLabel("Summa").fill("1,25");
+  await newLine.getByRole("button", { name: "Lisää rivi" }).click();
+  await expect(page.getByRole("textbox", { name: `Tuote: ${line}` })).toHaveValue(line);
+  if (category) {
+    const saved = page.waitForResponse((answer) => answer.request().method() === "PATCH");
+    await page.getByRole("combobox", { name: `Kategoria: ${line}` }).selectOption({
+      label: category,
+    });
+    await saved;
+  }
+}
+
+test("receipt search AC9: search the receipts by a product name", async ({ page }) => {
+  const withProduct = `E2E-haku ${RUN} a`;
+  const other = `E2E-haku ${RUN} b`;
+  await typeInWithLine(page, withProduct, `Hakutuote${RUN}`);
+  await typeInWithLine(page, other, `Muutuote${RUN}`);
+
+  await page.goto("/kuitit");
+  const table = page.getByRole("table", { name: "Kuittilista" });
+  await expect(table.getByText(other)).toBeVisible();
+  const field = page.getByRole("searchbox", { name: "Hae tuotteella" });
+  await field.fill(`  HAKUTUOTE${RUN}  `);
+  await field.press("Enter");
+
+  await expect(table.getByText(other)).toHaveCount(0);
+  await expect(table.getByText(withProduct)).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(2);
+  expect(await axeViolations(page)).toEqual([]);
+
+  await field.fill("");
+  await page.getByRole("button", { name: "Hae", exact: true }).click();
+  await expect(table.getByText(other)).toBeVisible();
+  await expect(table.getByText(withProduct)).toBeVisible();
+});
+
+test("receipt search AC10: show the receipts with lines without a category", async ({ page }) => {
+  const uncategorized = `E2E-haku ${RUN} c`;
+  const categorized = `E2E-haku ${RUN} d`;
+  await typeInWithLine(page, uncategorized, `Ilmankategoriaa${RUN}`);
+  await typeInWithLine(page, categorized, `Kategorialla${RUN}`, "Leivät");
+
+  await page.goto("/kuitit");
+  const table = page.getByRole("table", { name: "Kuittilista" });
+  const field = page.getByRole("searchbox", { name: "Hae tuotteella" });
+  await field.fill(`${RUN}`);
+  await field.press("Enter");
+  await expect(table.getByText(categorized)).toBeVisible();
+  await expect(table.getByText(uncategorized)).toBeVisible();
+
+  await page
+    .getByRole("checkbox", { name: "Vain kuitit, joilla on rivejä ilman kategoriaa" })
+    .check();
+
+  await expect(table.getByText(categorized)).toHaveCount(0);
+  await expect(table.getByText(uncategorized)).toBeVisible();
+});
