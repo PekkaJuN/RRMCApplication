@@ -39,6 +39,7 @@ from app.storage.catalog_repository import CatalogRepository
 from app.storage.receipt_repository import LineCategory, LineRow, ReceiptRepository
 from tests.receipt_import_data import jpeg, png
 from tests.receipt_search_data import seed_search_receipts
+from tests.store_search_data import seed_store_receipts
 
 TIME = "2026-10-28T10:00:01Z"
 
@@ -277,6 +278,45 @@ def test_search_keeps_the_warning_of_all_lines(
 
     # R2 has no total, so it warns (FR-20) as in the unfiltered list.
     assert (summary.id, summary.warning) == (ids["R2"], True)
+
+
+# Store search spec T2: the store text.
+
+
+def store_searched(service: ReviewService, ids: dict[str, int], store: str) -> list[str]:
+    names = {receipt_id: key for key, receipt_id in ids.items()}
+    return [names[summary.id] for summary in service.summaries(store=store)]
+
+
+@pytest.mark.parametrize(
+    ("store", "expected"), [("  ÄRRÄ  ", ["S6"]), ("prisma   itäkeskus", ["S2"])]
+)
+def test_store_ac2_the_store_text_is_normalized(
+    service: ReviewService, db: sqlite3.Connection, store: str, expected: list[str]
+) -> None:
+    ids = seed_store_receipts(db)
+
+    assert store_searched(service, ids, store) == expected
+
+
+@pytest.mark.parametrize("store", ["", "  "])
+def test_store_ac3_a_blank_store_text_is_no_condition(
+    service: ReviewService, db: sqlite3.Connection, store: str
+) -> None:
+    ids = seed_store_receipts(db)
+
+    assert store_searched(service, ids, store) == ["S5", "S1", "S2", "S3", "S4", "S6"]
+
+
+def test_store_ac8_a_store_text_over_100_characters_is_refused(service: ReviewService) -> None:
+    with pytest.raises(AppError) as error:
+        service.summaries(store="  " + "a" * 101 + "  ")
+
+    assert (error.value.code, error.value.status) == ("invalid_request", 422)
+
+
+def test_store_ac8_100_characters_with_spaces_around_pass(service: ReviewService) -> None:
+    assert service.summaries(store="  " + "a" * 100 + "  ") == []
 
 
 def snapshot(db: sqlite3.Connection) -> tuple[list[tuple[object, ...]], list[tuple[object, ...]]]:

@@ -33,6 +33,17 @@ logger = logging.getLogger(__name__)
 MAX_SEARCH_LENGTH = 100
 
 
+def _search_key(text: str) -> str | None:
+    """A product or store search text as compared; None for a blank text. Both share one
+    length rule (receipt search AC8, store search AC8).
+
+    Raises: AppError `invalid_request` for a text over 100 characters after trimming."""
+    display = normalize_display(text)
+    if len(display) > MAX_SEARCH_LENGTH:
+        raise AppError("invalid_request", texts.INVALID_REQUEST, 422)
+    return display.casefold() or None
+
+
 @dataclass(frozen=True)
 class LineEdit:
     """The fields a request sends for a line; None is a field not sent (the API refuses
@@ -120,17 +131,20 @@ class ReviewService:
         self._catalog = catalog
         self._receipts = receipts
 
-    def summaries(self, name: str = "", uncategorized: bool = False) -> list[ReceiptSummary]:
+    def summaries(
+        self, name: str = "", uncategorized: bool = False, store: str = ""
+    ) -> list[ReceiptSummary]:
         """The receipts in list order (PC1), with the warning of FR-20. `name` and
         `uncategorized` keep the receipts with one line that meets both (receipt search P3);
-        a blank `name` is no condition.
+        `store` keeps the receipts whose store contains it (store search P2). A blank text
+        is no condition.
 
         Raises: AppError `invalid_request` for a search text over 100 characters."""
-        display = normalize_display(name)
-        if len(display) > MAX_SEARCH_LENGTH:
-            raise AppError("invalid_request", texts.INVALID_REQUEST, 422)
         rows = self._receipts.summaries(
-            name_key=display.casefold() or None, uncategorized=uncategorized, key=normalize_key
+            name_key=_search_key(name),
+            store_key=_search_key(store),
+            uncategorized=uncategorized,
+            key=normalize_key,
         )
         return [
             ReceiptSummary(

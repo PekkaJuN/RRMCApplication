@@ -46,15 +46,16 @@ def create_review_router(
         finally:
             connection.close()
 
-    # The search text is a query parameter, so it stays out of the request log (receipt
-    # search P2). A plain bool would also accept yes, on and 1 (AC8).
+    # The search texts are query parameters, so they stay out of the request log (receipt
+    # search P2, store search P1). A plain bool would also accept yes, on and 1 (AC8).
     @router.get("/receipts")
     def list_receipts(
         service: Annotated[ReviewService, Depends(review_service)],
         name: str = "",
+        store: str = "",
         uncategorized: Literal["true", "false"] = "false",
     ) -> list[ReceiptSummaryOut]:
-        summaries = service.summaries(name, uncategorized=uncategorized == "true")
+        summaries = service.summaries(name, store=store, uncategorized=uncategorized == "true")
         return [ReceiptSummaryOut.from_summary(summary) for summary in summaries]
 
     @router.get("/receipts/{receipt_id}")

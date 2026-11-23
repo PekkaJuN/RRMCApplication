@@ -6,6 +6,9 @@
 - **Affected subsystems:** [review](../../docs/subsystems/review/README.md),
   [ui](../../docs/subsystems/ui/README.md), [storage](../../docs/subsystems/storage/README.md)
 - **Implements:** FR-56 (new), FR-57 (new)
+- **Changed by:** [store search](store-search.md) (2026-11-23): the field `Hae tuotteella`
+  is now labelled `Hakusana`, and the radio `Tuote` of `Hakukohde` makes it a product search
+  (PC1, AC9, AC14). The text below keeps the old label.
 
 ## Problem Statement
 

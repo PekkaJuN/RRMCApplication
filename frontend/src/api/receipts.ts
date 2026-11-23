@@ -50,17 +50,22 @@ export interface Receipt {
   subtotals: Subtotal[];
 }
 
-/** The conditions of the receipt search (receipt search PC1, PC2). */
+/** The conditions of the receipt search (receipt search PC1, PC2; store search PC5). */
 export interface ReceiptFilter {
   name?: string;
+  store?: string;
   uncategorized?: boolean;
 }
 
-/** A blank name and `uncategorized` false are left out, so no filter is the plain list. */
+/** A blank name or store and `uncategorized` false are left out, so no filter is the plain
+ * list. */
 export function listReceipts(filter: ReceiptFilter = {}): Promise<ApiResult<ReceiptSummary[]>> {
   const query = new URLSearchParams();
   if (filter.name?.trim()) {
     query.set("name", filter.name);
+  }
+  if (filter.store?.trim()) {
+    query.set("store", filter.store);
   }
   if (filter.uncategorized) {
     query.set("uncategorized", "true");

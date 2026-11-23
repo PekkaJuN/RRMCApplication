@@ -55,7 +55,7 @@ line edit runs `LineCategoryService` inside its own transaction on the catalog's
 
 | Method | Does | Raises |
 |---|---|---|
-| `summaries(name="", uncategorized=False)` | The receipts in list order with their warning; with a condition only those with a matching line ([receipt search](#receipt-search)) | `AppError` `invalid_request` for a search text over 100 characters |
+| `summaries(name="", uncategorized=False, store="")` | The receipts in list order with their warning; with a condition only those that match ([receipt search](#receipt-search)) | `AppError` `invalid_request` for a search text over 100 characters |
 | `receipt(id)` | The receipt, its lines with category and group names, line sum, difference, warning and subtotals | `NotFoundError` |
 | `edit_line(id, line_id, LineEdit)` | Applies the sent fields to a line on the receipt ([line edits](#line-edits)); returns the receipt | `NotFoundError`, `InvalidNameError`, `InvalidAmountError`, `DepositRefundAmountError`, and the catalog errors of the category choice |
 | `add_line(id, name, amount_cents, is_deposit_refund=...)` | Adds a line after the last one; a normal line gets its name match's category | `NotFoundError`, `InvalidNameError`, `InvalidAmountError`, `DepositRefundAmountError` |
@@ -78,9 +78,18 @@ condition (FR-56, FR-57, [receipt search spec](../../../specs/features/receipt-s
 | `name` | The search text, as a [normalized name](../../glossary.md), is part of the line's own name (normalized the same way) or of its linked product's name |
 | `uncategorized` | It has no category and is not a deposit refund |
 
-Both conditions must hold for the same line. A blank `name` is no condition; a text longer
-than 100 characters after trimming is refused. The list order, the warning and the line sum
-stay those of the whole receipt. Archived receipts are not searched.
+Both conditions must hold for the same line.
+
+The list can also keep only the receipts whose store contains a text (FR-58,
+[store search spec](../../../specs/features/store-search.md)): `store`, as a normalized
+name, is part of the receipt's store normalized the same way. A receipt without a store
+(`''` or `NULL`) never matches. The store is a receipt condition, so with `uncategorized`
+the store and the line are separate conditions; with `name` and `store` both, a receipt must
+meet both.
+
+A blank `name` or `store` is no condition; a text longer than 100 characters after trimming
+is refused (one rule for both). The list order, the warning and the line sum stay those of
+the whole receipt. Archived receipts are not searched.
 
 Every method that takes an id raises `NotFoundError` for an id outside SQLite's integer range
 (`fits_integer`), and `edit_line` raises `UnknownCategoryError` for such a `category_id`;

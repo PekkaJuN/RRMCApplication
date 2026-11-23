@@ -13,6 +13,8 @@ interface Props {
 /** The longest search text, as on the backend (receipt search PC6). */
 const MAX_SEARCH_LENGTH = 100;
 
+type SearchTarget = "product" | "store";
+
 /** The answer to one search; `key` names the search it answers. */
 interface SearchAnswer {
   key: string;
@@ -30,6 +32,8 @@ export function ReceiptsPage({ onOpen }: Props) {
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [uncategorized, setUncategorized] = useState(false);
+  // What the searched text is matched against (store search P5); not remembered (PC6).
+  const [target, setTarget] = useState<SearchTarget>("product");
   const [answer, setAnswer] = useState<SearchAnswer | null>(null);
 
   useEffect(() => {
@@ -49,10 +53,14 @@ export function ReceiptsPage({ onOpen }: Props) {
     };
   }, []);
 
-  const name = submitted.trim();
-  const isSearching = name !== "" || uncategorized;
+  const searched = submitted.trim();
+  // The target picks which condition gets the searched text (store search P5). Without a
+  // searched text both stay "", so changing the target sends nothing (AC11).
+  const productText = target === "product" ? searched : "";
+  const storeText = target === "store" ? searched : "";
+  const isSearching = searched !== "" || uncategorized;
 
-  const searchKey = `${uncategorized}:${name}`;
+  const searchKey = `${uncategorized}:${productText}:${storeText}`;
 
   useEffect(() => {
     if (!isSearching) {
@@ -60,7 +68,7 @@ export function ReceiptsPage({ onOpen }: Props) {
     }
     // A changed search cancels the earlier one, so a slow answer cannot replace a later one.
     let cancelled = false;
-    void listReceipts({ name, uncategorized }).then((result) => {
+    void listReceipts({ name: productText, store: storeText, uncategorized }).then((result) => {
       if (cancelled) {
         return;
       }
@@ -73,7 +81,7 @@ export function ReceiptsPage({ onOpen }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [name, uncategorized, isSearching, searchKey]);
+  }, [productText, storeText, uncategorized, isSearching, searchKey]);
 
   // Only the answer to the current search counts; an older one is ignored.
   const current = isSearching && answer?.key === searchKey ? answer : null;
@@ -139,6 +147,27 @@ export function ReceiptsPage({ onOpen }: Props) {
             </label>{" "}
             <button type="submit">{fi.receipts.searchButton}</button>
           </p>
+          <fieldset>
+            <legend>{fi.receipts.searchTarget}</legend>
+            <label>
+              <input
+                type="radio"
+                name="search-target"
+                checked={target === "product"}
+                onChange={() => setTarget("product")}
+              />{" "}
+              {fi.receipts.targetProduct}
+            </label>{" "}
+            <label>
+              <input
+                type="radio"
+                name="search-target"
+                checked={target === "store"}
+                onChange={() => setTarget("store")}
+              />{" "}
+              {fi.receipts.targetStore}
+            </label>
+          </fieldset>
           <p>
             <label>
               <input

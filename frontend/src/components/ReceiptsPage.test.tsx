@@ -100,7 +100,8 @@ it("receipt-management AC34: the new receipt form opens empty again after cancel
   render(<ReceiptsPage onOpen={() => {}} />);
 
   await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
-  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  // By role: the store search radio is also labelled Kauppa (store search P6).
+  await user.type(screen.getByRole("textbox", { name: "Kauppa" }), "Testikauppa");
   const select = screen.getByLabelText("Kuva");
   await waitFor(() => expect(within(select).getAllByRole("option")).toHaveLength(4));
   await user.selectOptions(select, "IMG_2.jpg");
@@ -108,7 +109,7 @@ it("receipt-management AC34: the new receipt form opens empty again after cancel
 
   expect(screen.queryByRole("form", { name: "Uusi kuitti" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
-  expect(screen.getByLabelText("Kauppa")).toHaveValue("");
+  expect(screen.getByRole("textbox", { name: "Kauppa" })).toHaveValue("");
   expect(screen.getByLabelText("Kuva")).toHaveDisplayValue("Ei kuvaa");
 });
 
@@ -270,7 +271,8 @@ function searchServer(): string[] {
   return searches;
 }
 
-const searchField = () => screen.getByRole("searchbox", { name: "Hae tuotteella" });
+// Store search AC9 renamed the field from "Hae tuotteella" (store search P6).
+const searchField = () => screen.getByRole("searchbox", { name: "Hakusana" });
 const searchButton = () => screen.getByRole("button", { name: "Hae" });
 const uncategorizedBox = () =>
   screen.getByRole("checkbox", { name: "Vain kuitit, joilla on rivejä ilman kategoriaa" });
@@ -436,4 +438,180 @@ it.each([
 
   await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+// Store search (specs/features/store-search.md).
+
+const targetGroup = () => screen.getByRole("group", { name: "Hakukohde" });
+const productTarget = () => screen.getByRole("radio", { name: "Tuote" });
+const storeTarget = () => screen.getByRole("radio", { name: "Kauppa" });
+
+it("store search AC9: the form has the field, the target, the button and the checkbox", async () => {
+  const { searches, user } = await renderSearchPage();
+
+  expect(searchField()).toHaveAttribute("maxLength", "100");
+  expect(targetGroup()).toContainElement(productTarget());
+  expect(targetGroup()).toContainElement(storeTarget());
+  expect(productTarget()).toBeChecked();
+  expect(storeTarget()).not.toBeChecked();
+  expect(searchButton()).toBeInTheDocument();
+  expect(uncategorizedBox()).not.toBeChecked();
+
+  await user.type(searchField(), "maito{Enter}");
+
+  await waitFor(async () => expect(await storesShown()).toEqual(["Kauppa R1", "Kauppa R4"]));
+  expect(searches).toEqual(["", "?name=maito"]);
+});
+
+// S1–S6 of the store search spec; the backend's answers are fixed per query.
+
+function storeReceipt(id: number, store: string | null, purchase_date: string | null) {
+  return {
+    id,
+    purchase_date,
+    store,
+    total_cents: 100,
+    warning: false,
+    reviewed: true,
+  } satisfies ReceiptSummary;
+}
+
+const S1 = storeReceipt(11, "K-Market Keskusta", "2026-10-05");
+const S2 = storeReceipt(12, "Prisma Itäkeskus", "2026-10-04");
+const S3 = storeReceipt(13, "K-Citymarket", "2026-10-03");
+const S4 = storeReceipt(14, "", "2026-10-02");
+const S5 = storeReceipt(15, null, null);
+const S6 = storeReceipt(16, "ÄRRÄ Asema", "2026-10-01");
+const STORE_ALL = [S5, S1, S2, S3, S4, S6];
+
+const STORE_ANSWERS: Record<string, ReceiptSummary[]> = {
+  "": STORE_ALL,
+  "?store=market": [S1, S3],
+  "?name=market": [],
+  "?uncategorized=true": [S2, S3],
+  "?store=k&uncategorized=true": [S2, S3],
+  "?store=lidl": [],
+};
+
+async function renderStorePage() {
+  today("2026-11-23T09:00:00Z");
+  const searches: string[] = [];
+  server.use(
+    http.get("/api/receipts", ({ request }) => {
+      const search = new URL(request.url).search;
+      searches.push(search);
+      return HttpResponse.json(STORE_ANSWERS[search] ?? []);
+    }),
+  );
+  const user = userEvent.setup();
+  render(<ReceiptsPage onOpen={() => {}} />);
+  await screen.findByRole("table", { name: "Kuittilista" });
+  return { searches, user };
+}
+
+it("store search AC10: Kauppa and Enter search by store", async () => {
+  const { searches, user } = await renderStorePage();
+
+  await user.click(storeTarget());
+  await user.type(searchField(), "market{Enter}");
+
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(["K-Market Keskusta", "K-Citymarket"]),
+  );
+  expect(searches).toEqual(["", "?store=market"]);
+});
+
+it("store search AC10: Kauppa and the Hae button search by store", async () => {
+  const { searches, user } = await renderStorePage();
+
+  await user.click(storeTarget());
+  await user.type(searchField(), "market");
+  await user.click(searchButton());
+
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(["K-Market Keskusta", "K-Citymarket"]),
+  );
+  expect(searches).toEqual(["", "?store=market"]);
+});
+
+it("store search AC11: changing the target searches again with the searched text", async () => {
+  const { searches, user } = await renderStorePage();
+  await user.click(storeTarget());
+  await user.type(searchField(), "market{Enter}");
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(["K-Market Keskusta", "K-Citymarket"]),
+  );
+
+  await user.type(searchField(), "x");
+  await user.click(productTarget());
+
+  expect(await screen.findByText(NO_MATCHES)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(searches).toEqual(["", "?store=market", "?name=market"]);
+});
+
+it("store search AC11: without a searched text, changing the target sends nothing", async () => {
+  const { searches, user } = await renderStorePage();
+
+  await user.click(storeTarget());
+
+  expect(storeTarget()).toBeChecked();
+  expect(await storesShown()).toEqual([
+    "–",
+    "K-Market Keskusta",
+    "Prisma Itäkeskus",
+    "K-Citymarket",
+    "–",
+    "ÄRRÄ Asema",
+  ]);
+  expect(searches).toEqual([""]);
+
+  // With the checkbox on, the target change still sends nothing new.
+  await user.click(uncategorizedBox());
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(["Prisma Itäkeskus", "K-Citymarket"]),
+  );
+  await user.click(productTarget());
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(searches).toEqual(["", "?uncategorized=true"]);
+});
+
+it("store search AC12: store search with the checkbox", async () => {
+  const { searches, user } = await renderStorePage();
+
+  await user.click(storeTarget());
+  await user.type(searchField(), "k{Enter}");
+  await user.click(uncategorizedBox());
+
+  await waitFor(async () =>
+    expect(await storesShown()).toEqual(["Prisma Itäkeskus", "K-Citymarket"]),
+  );
+  expect(searches).toContain("?store=k&uncategorized=true");
+});
+
+it("store search AC13: no match, then an error keeps the text and Kauppa", async () => {
+  const { user } = await renderStorePage();
+
+  await user.click(storeTarget());
+  await user.type(searchField(), "lidl{Enter}");
+
+  expect(await screen.findByText(NO_MATCHES)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+  server.use(
+    http.get("/api/receipts", () =>
+      HttpResponse.json(
+        { error: "internal_error", message: "Jokin meni pieleen." },
+        { status: 500 },
+      ),
+    ),
+  );
+  await user.clear(searchField());
+  await user.type(searchField(), "virhe{Enter}");
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jokin meni pieleen.");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(searchField()).toHaveValue("virhe");
+  expect(storeTarget()).toBeChecked();
 });

@@ -23,12 +23,15 @@ _SUMMARY_SELECT = (
 _SUMMARY_ORDER = (
     " GROUP BY receipts.id ORDER BY purchase_date IS NOT NULL, purchase_date DESC, receipts.id DESC"
 )
-# Closed with ")" after the conditions (receipt search P4).
+# Closed with ")" after the line conditions (receipt search P4).
 _MATCHING_LINE = (
-    " WHERE EXISTS (SELECT 1 FROM receipt_lines AS m"
+    "EXISTS (SELECT 1 FROM receipt_lines AS m"
     " LEFT JOIN products AS p ON p.id = m.product_id"
     " WHERE m.receipt_id = receipts.id AND "
 )
+# COALESCE keeps NULL away from the Python function; SQLite may call it even after a
+# failed IS NOT NULL. An empty store never contains a non-empty key (store search P3).
+_MATCHING_STORE = "instr(name_key(COALESCE(receipts.store, '')), ?) > 0"
 
 
 @dataclass(frozen=True)
@@ -312,30 +315,40 @@ class ReceiptRepository:
         self,
         *,
         name_key: str | None = None,
+        store_key: str | None = None,
         uncategorized: bool = False,
         key: Callable[[str], str] | None = None,
     ) -> list[ReceiptSummaryRow]:
         """Receipts with their line sum: receipts without a purchase date first, then the
         newest date first; the newest import first within a date (receipt-review PC1).
 
-        With a condition, only receipts with one line that meets every condition (receipt
-        search P4): `name_key` is in the line's name folded by `key`, or in its product's
-        key; `uncategorized` is a line without a category that is not a deposit refund. The
-        line sum stays the sum of all lines."""
-        conditions: list[str] = []
-        parameters: list[str] = []
-        if name_key:
-            if key is None:
-                raise ValueError("a name condition needs the key function")
-            # Line names are stored as display names; SQLite cannot fold Ä to ä, so the
-            # caller's key function does it. instr() matches % and _ literally.
+        With line conditions, only receipts with one line that meets every line condition
+        (receipt search P4): `name_key` is in the line's name folded by `key`, or in its
+        product's key; `uncategorized` is a line without a category that is not a deposit
+        refund. `store_key` is in the receipt's store folded by `key`; it is a receipt
+        condition, not a line condition (store search P3). The line sum stays the sum of
+        all lines."""
+        if (name_key or store_key) and key is None:
+            raise ValueError("a name or store condition needs the key function")
+        if key is not None:
+            # Names and stores are stored as display names; SQLite cannot fold Ä to ä, so
+            # the caller's key function does it. instr() matches % and _ literally.
             self._connection.create_function("name_key", 1, key, deterministic=True)
-            conditions.append("(instr(name_key(m.name), ?) > 0 OR instr(p.name_key, ?) > 0)")
+        receipt_conditions: list[str] = []
+        line_conditions: list[str] = []
+        parameters: list[str] = []
+        if store_key:
+            receipt_conditions.append(_MATCHING_STORE)
+            parameters.append(store_key)
+        if name_key:
+            line_conditions.append("(instr(name_key(m.name), ?) > 0 OR instr(p.name_key, ?) > 0)")
             parameters += [name_key, name_key]
         if uncategorized:
-            conditions.append("m.category_id IS NULL AND m.is_deposit_refund = 0")
-        # Only the fixed fragments above are joined; the search text is a bound parameter.
-        where = _MATCHING_LINE + " AND ".join(conditions) + ")" if conditions else ""
+            line_conditions.append("m.category_id IS NULL AND m.is_deposit_refund = 0")
+        if line_conditions:
+            receipt_conditions.append(_MATCHING_LINE + " AND ".join(line_conditions) + ")")
+        # Only the fixed fragments above are joined; the search texts are bound parameters.
+        where = " WHERE " + " AND ".join(receipt_conditions) if receipt_conditions else ""
         rows = self._connection.execute(_SUMMARY_SELECT + where + _SUMMARY_ORDER, parameters)
         return [
             ReceiptSummaryRow(

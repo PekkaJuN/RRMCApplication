@@ -27,6 +27,7 @@ from app.storage.receipt_repository import LineCategory, ReceiptRepository
 from tests.integration.conftest import BASE_URL
 from tests.receipt_import_data import jpeg, png
 from tests.receipt_search_data import seed_search_receipts
+from tests.store_search_data import seed_store_receipts
 
 TIME = "2026-10-28T10:00:01Z"
 JPEG = b"\xff\xd8\xff\xe0synthetic jpeg"
@@ -244,6 +245,49 @@ def test_search_ac8_invalid_parameters(api: TestClient, query: str) -> None:
 
 def test_search_ac8_100_characters_after_trimming_pass(api: TestClient) -> None:
     response = api.get("/api/receipts?name=%20" + "a" * 100 + "%20")
+
+    assert response.status_code == 200
+
+
+# Store search spec T3: GET /api/receipts?store=
+
+ALL_STORES = ["S5", "S1", "S2", "S3", "S4", "S6"]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("store=k-market", ["S1"]),  # AC1
+        ("store=market", ["S1", "S3"]),  # AC1
+        ("store=%20%20%C3%A4rr%C3%A4%20%20", ["S6"]),  # AC2
+        ("store=IT%C3%84", ["S2"]),  # AC2
+        ("store=prisma%20%20%20it%C3%A4keskus", ["S2"]),  # AC2
+        ("store=", ALL_STORES),  # AC3
+        ("store=%20%20", ALL_STORES),  # AC3
+        ("store=a", ["S1", "S2", "S3", "S6"]),  # AC4
+        ("store=k&uncategorized=true", ["S2", "S3"]),  # AC5
+        ("name=maito&store=k", ["S1", "S3"]),  # AC6
+        ("name=maito&store=prisma", []),  # AC6
+        ("store=lidl", []),  # AC7
+    ],
+)
+def test_store_ac1_to_ac7(
+    api: TestClient, db: sqlite3.Connection, query: str, expected: list[str]
+) -> None:
+    ids = seed_store_receipts(db)
+
+    assert search(api, ids, query) == expected
+
+
+def test_store_ac8_a_store_text_over_100_characters_is_refused(api: TestClient) -> None:
+    response = api.get("/api/receipts?store=" + "a" * 101)
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_request"
+
+
+def test_store_ac8_100_characters_after_trimming_pass(api: TestClient) -> None:
+    response = api.get("/api/receipts?store=%20" + "a" * 100 + "%20")
 
     assert response.status_code == 200
 
