@@ -223,7 +223,8 @@ test("receipt search AC9: search the receipts by a product name", async ({ page 
   await page.goto("/kuitit");
   const table = page.getByRole("table", { name: "Kuittilista" });
   await expect(table.getByText(other)).toBeVisible();
-  const field = page.getByRole("searchbox", { name: "Hae tuotteella" });
+  // Store search AC9 renamed the field from "Hae tuotteella" (store search P6).
+  const field = page.getByRole("searchbox", { name: "Hakusana" });
   await field.fill(`  HAKUTUOTE${RUN}  `);
   await field.press("Enter");
 
@@ -246,7 +247,7 @@ test("receipt search AC10: show the receipts with lines without a category", asy
 
   await page.goto("/kuitit");
   const table = page.getByRole("table", { name: "Kuittilista" });
-  const field = page.getByRole("searchbox", { name: "Hae tuotteella" });
+  const field = page.getByRole("searchbox", { name: "Hakusana" });
   await field.fill(`${RUN}`);
   await field.press("Enter");
   await expect(table.getByText(categorized)).toBeVisible();
@@ -258,4 +259,34 @@ test("receipt search AC10: show the receipts with lines without a category", asy
 
   await expect(table.getByText(categorized)).toHaveCount(0);
   await expect(table.getByText(uncategorized)).toBeVisible();
+});
+
+// Store search (specs/features/store-search.md, E2E tests). The stores carry RUN, so the
+// search finds only this run's receipts among those of other journeys.
+
+test("store search AC10, AC11: search the receipts by a part of the store", async ({ page }) => {
+  const wanted = `E2E-kauppahaku ${RUN} Alfa`;
+  const other = `E2E-kauppahaku ${RUN} Beeta`;
+  await openForm(page);
+  await create(page, wanted);
+  await openForm(page);
+  await create(page, other);
+
+  await page.goto("/kuitit");
+  const table = page.getByRole("table", { name: "Kuittilista" });
+  await expect(table.getByText(other)).toBeVisible();
+  await page.getByRole("radio", { name: "Kauppa" }).check();
+  const field = page.getByRole("searchbox", { name: "Hakusana" });
+  await field.fill(`kauppahaku ${RUN} ALF`);
+  await field.press("Enter");
+
+  await expect(table.getByText(other)).toHaveCount(0);
+  await expect(table.getByText(wanted)).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(2);
+  expect(await axeViolations(page)).toEqual([]);
+
+  // AC11: Tuote searches again with the same text; no line name contains it.
+  await page.getByRole("radio", { name: "Tuote" }).check();
+  await expect(page.getByText("Hakuehdoilla ei löytynyt kuitteja.")).toBeVisible();
+  await expect(page.getByRole("table", { name: "Kuittilista" })).toHaveCount(0);
 });

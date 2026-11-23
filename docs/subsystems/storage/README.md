@@ -62,10 +62,14 @@ line linked to the product the category and source `remembered`. The rules are i
 `transaction()`. `summaries()` lists every receipt as `ReceiptSummaryRow` with the sum of its
 line amounts, computed in SQL, in the review list order (no date first, then newest date,
 then newest id). With `name_key` or `uncategorized=True` it keeps the receipts with one line
-that meets both (an `EXISTS` subquery, so the line sum stays that of all lines). Line names
-are stored as display names and SQLite cannot fold `Ä` to `ä`, so a `name_key` needs the
-caller's `key` function, which `summaries` registers on the connection as the SQL function
-`name_key`; storage does not import categorization. `set_reviewed(id, reviewed=...)` and `set_fields(id, store=...,
+that meets both (an `EXISTS` subquery, so the line sum stays that of all lines). With
+`store_key` it keeps the receipts whose store contains it; this is a receipt condition
+outside the `EXISTS`, joined to it with `AND`. The store goes through
+`COALESCE(store, '')`, so `NULL` never reaches the Python function, and an empty store never
+matches. Line names and stores are stored as display names and SQLite cannot fold `Ä` to
+`ä`, so a `name_key` or `store_key` needs the caller's `key` function, which `summaries`
+registers on the connection as the SQL function `name_key`; storage does not import
+categorization. `set_reviewed(id, reviewed=...)` and `set_fields(id, store=...,
 purchase_date=..., total_cents=...)` return `False` when the receipt does not exist.
 `add_line` returns the new line's id; `next_position(receipt_id)` is the position after the
 last line (1 without lines), and positions can have gaps after `delete_line`, which returns

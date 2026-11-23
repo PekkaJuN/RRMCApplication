@@ -16,6 +16,7 @@ from app.storage.receipt_repository import (
     YearLineRow,
 )
 from tests.receipt_search_data import seed_search_receipts
+from tests.store_search_data import seed_store_receipts
 
 HASH = "b" * 64
 TIME = "2026-10-28T10:00:00Z"
@@ -711,3 +712,71 @@ def test_search_sums_every_line_of_a_matched_receipt(db: sqlite3.Connection) -> 
     rows = repository.summaries(name_key="porkkana", key=normalize_key)
 
     assert [(row.id, row.line_sum_cents) for row in rows] == [(ids["R2"], 199 + 89)]
+
+
+# Store search spec T1: the summaries of the receipts whose store contains the text.
+
+
+def store_ids(
+    repository: ReceiptRepository,
+    ids: dict[str, int],
+    *,
+    store_key: str | None = None,
+    name_key: str | None = None,
+    uncategorized: bool = False,
+) -> list[str]:
+    names = {receipt_id: name for name, receipt_id in ids.items()}
+    rows = repository.summaries(
+        name_key=name_key, store_key=store_key, uncategorized=uncategorized, key=normalize_key
+    )
+    return [names[row.id] for row in rows]
+
+
+def test_store_ac1_part_of_the_store_name(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, store_key="k-market") == ["S1"]
+    assert store_ids(repository, ids, store_key="market") == ["S1", "S3"]
+
+
+def test_store_ac2_finnish_letters_are_folded(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, store_key="ärrä") == ["S6"]
+    assert store_ids(repository, ids, store_key="itä") == ["S2"]
+
+
+def test_store_ac4_a_receipt_without_a_store_never_matches(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, store_key="a") == ["S1", "S2", "S3", "S6"]
+
+
+def test_store_ac5_store_and_lines_without_a_category(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, store_key="k", uncategorized=True) == ["S2", "S3"]
+
+
+def test_store_ac6_store_and_product_name_together(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, name_key="maito", store_key="k") == ["S1", "S3"]
+    assert store_ids(repository, ids, name_key="maito", store_key="prisma") == []
+
+
+def test_store_ac7_no_match(db: sqlite3.Connection) -> None:
+    repository = ReceiptRepository(db)
+    ids = seed_store_receipts(db)
+
+    assert store_ids(repository, ids, store_key="lidl") == []
+
+
+def test_store_a_store_condition_needs_the_key_function(db: sqlite3.Connection) -> None:
+    with pytest.raises(ValueError, match="key function"):
+        ReceiptRepository(db).summaries(store_key="market")

@@ -149,6 +149,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The receipt search spec is Done (audited 2026-11-22): the product name search and the
   lines without a category filter on `GET /api/receipts` and the Kuitit page. The review,
   storage, UI and API docs describe it.
+- The store search spec is Done (audited 2026-11-23): the `store` condition
+  on `GET /api/receipts` and the `Hakusana` field with the `Hakukohde` target on the Kuitit
+  page. The review, storage, UI and API docs describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget, export and archive terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

@@ -66,6 +66,16 @@ it("receipt search P5: sends the name and the uncategorized condition", async ()
   expect(searches).toEqual(["?name=maito&uncategorized=true", "?name=%C3%A4+%26+b"]);
 });
 
+it("store search P4: sends the store, leaves a blank one out and keeps the order", async () => {
+  const searches = recordSearches();
+
+  await listReceipts({ store: "ä & b" });
+  await listReceipts({ store: "  " });
+  await listReceipts({ name: "maito", store: "k", uncategorized: true });
+
+  expect(searches).toEqual(["?store=%C3%A4+%26+b", "", "?name=maito&store=k&uncategorized=true"]);
+});
+
 it("AC22: reads one receipt with GET /api/receipts/{id}", async () => {
   server.use(http.get("/api/receipts/3", () => HttpResponse.json(RECEIPT_A)));
 

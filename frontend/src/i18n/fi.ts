@@ -84,7 +84,10 @@ export const fi = {
     earlierUnreviewed: (count: number, years: readonly number[]) =>
       `Tarkistamattomia kuitteja edellisiltä vuosilta: ${count} (${years.join(", ")}).`,
     onlyAttention: "Näytä vain nämä kuitit",
-    search: "Hae tuotteella",
+    search: "Hakusana",
+    searchTarget: "Hakukohde",
+    targetProduct: "Tuote",
+    targetStore: "Kauppa",
     searchButton: "Hae",
     uncategorized: "Vain kuitit, joilla on rivejä ilman kategoriaa",
     noMatches: "Hakuehdoilla ei löytynyt kuitteja.",

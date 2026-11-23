@@ -274,7 +274,8 @@ it("receipt-management AC29: a receipt typed in on the Kuitit page opens without
   render(<App />);
 
   await user.click(screen.getByRole("button", { name: "Uusi kuitti" }));
-  await user.type(screen.getByLabelText("Kauppa"), "Testikauppa");
+  // By role: the store search radio is also labelled Kauppa (store search P6).
+  await user.type(screen.getByRole("textbox", { name: "Kauppa" }), "Testikauppa");
   await user.type(screen.getByLabelText("Päivä"), "05.10.2026");
   await user.type(screen.getByLabelText("Loppusumma"), "3,49");
   await user.click(screen.getByRole("button", { name: "Luo kuitti" }));
