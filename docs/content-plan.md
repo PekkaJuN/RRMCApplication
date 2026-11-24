@@ -33,7 +33,7 @@ Last reviewed: 2026-11-16
 | 5 | Development Guide (required) | [docs/development.md](development.md) | Setup, commands, code standards, testing, local dev | 3 | In Progress |
 | 6 | API Reference (required) | [docs/api-reference.md](api-reference.md) | REST endpoints, auth, request/response formats | 3, 4 | Done |
 | 7 | Glossary | [docs/glossary.md](glossary.md) | Domain terms used across all tiers: catalog, import, reading, line categorization, review, line editing, totals and archive terms | 2 | In Progress |
-| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md); 0006: [agent guardrails](adr/0006-agent-guardrails.md); 0007: [archive tables](adr/0007-archive-tables.md) | 3 | In Progress |
+| 8 | ADRs | [docs/adr/](adr/) | One file per significant decision; created as decisions are made. 0001: [technology stack](adr/0001-tech-stack.md); 0002: [Docker](adr/0002-docker.md); 0003: [receipt-reading model](adr/0003-receipt-reading-model.md); 0004: [line categorization](adr/0004-line-categorization.md); 0005: [PDF library](adr/0005-pdf-library.md); 0006: [agent guardrails](adr/0006-agent-guardrails.md); 0007: [archive tables](adr/0007-archive-tables.md); 0008: [run environment](adr/0008-run-container.md) | 3 | In Progress |
 | 16 | Learnings | [docs/learnings.md](learnings.md) | Log of fixed errors and their solutions, newest first | 5 | In Progress |
 | 19 | Security | [docs/security.md](security.md) | Stored data, protection and known limits | 3, 5, 6 | Done |
 
@@ -152,6 +152,9 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The store search spec is Done (audited 2026-11-23): the `store` condition
   on `GET /api/receipts` and the `Hakusana` field with the `Hakukohde` target on the Kuitit
   page. The review, storage, UI and API docs describe it.
+- The run container spec is implemented (2026-11-24): the run environment in
+  `compose.app.yaml`, its image, and the copy, update, backup and restore scripts. The
+  development, architecture, security, UI and storage docs, AGENTS.md and ADR 0008 describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
   editing, totals, budget, export and archive terms.
 - [security.md](security.md) lists three known limits. The user accepted the unexpected error's message in the log as an exception to NFR-3.

@@ -34,6 +34,7 @@ coverage.xml
 
 # Frontend build and test output
 dist/
+backend/static/
 coverage/
 frontend/test-results/
 frontend/playwright-report/

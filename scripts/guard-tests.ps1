@@ -171,13 +171,16 @@ foreach ($c in @("docker compose run --rm backend-test ls -v /app", "docker comp
 # AC7: the running app's ports, through the shell, web fetch and a browser tool.
 foreach ($c in @("curl http://127.0.0.1:8000/api/receipts", "curl -s localhost:5173/",
         "Invoke-WebRequest http://localhost:5173/", "Invoke-RestMethod -Uri http://127.0.0.1:8000/api/health",
-        "wget http://0.0.0.0:8000/", "curl http://[::1]:5173/")) {
+        "wget http://0.0.0.0:8000/", "curl http://[::1]:5173/",
+        "curl http://127.0.0.1:8080/api/health", "Invoke-WebRequest http://localhost:8080/")) {
     Assert-Shell $c "G2"
 }
 Assert-Call "web [127.0.0.1:8000]" (New-GuardCall -Kind web -Urls @("http://127.0.0.1:8000/api/receipts")) "G2"
 Assert-Call "browser [localhost:5173]" (New-GuardCall -Kind other -Urls @("http://localhost:5173/")) "G2"
+Assert-Call "browser [127.0.0.1:8080]" (New-GuardCall -Kind other -Urls @("http://127.0.0.1:8080/")) "G2"
 Assert-Shell "Invoke-RestMethod -Uri http://127.0.0.1:18000/api/health" ""
 Assert-Shell "curl http://127.0.0.1:18000/api/health" ""
+Assert-Shell "curl http://127.0.0.1:18080/api/health" ""
 Assert-Call "web [example.org]" (New-GuardCall -Kind web -Urls @("https://example.org/docs")) ""
 
 # --- G3 deletion and hard-to-reverse Git (AC8, AC9) --------------------------------------

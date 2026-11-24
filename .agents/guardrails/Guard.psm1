@@ -408,7 +408,7 @@ $script:SubcommandValues = @("-e", "--env", "-v", "--volume", "-w", "--workdir",
 $script:OneServiceCommands = @("run", "exec")
 # Setting COMPOSE_FILE points Compose at another service definition (AC30).
 $script:ComposeFileSetting = '(?i)(^|[^A-Za-z0-9_])COMPOSE_FILE\s*=|env:COMPOSE_FILE([^A-Za-z0-9_]|$)'
-$script:AppUrl = '(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]|host\.docker\.internal):(8000|5173)(?!\d)'
+$script:AppUrl = '(?i)(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]|host\.docker\.internal):(8000|5173|8080)(?!\d)'
 
 # Returns @{ Globals; Subcommand; Arguments } for a `docker compose` or `docker-compose` part,
 # or $null for any other part. Globals are the words before the subcommand.

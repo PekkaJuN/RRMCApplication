@@ -1,4 +1,6 @@
-# Backs up the SQLite database from the Docker volume `rrmc_rrmc-data` to a Windows folder.
+# Backs up the SQLite database of an environment from its Docker volume to a Windows folder:
+# the development environment (-Target dev, the default; volume `rrmc_rrmc-data`) or the run
+# environment (-Target app; volume `rrmc-app-data`).
 #
 # Uses SQLite's backup API, so the copy is consistent even while the app runs, and opens the
 # live database read-only. The copy is built inside the container and checked with
@@ -12,22 +14,53 @@
 # Usage, from the project root:
 #   powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1 -BackupDir D:\rrmc-backup
+#   powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1 -Target app
 #
 # Exit codes: 0 backup written, 3 no database in the volume, 1 any other failure.
 
+# Without CmdletBinding an unknown parameter is ignored, and the script would work on the
+# wrong environment.
+[CmdletBinding()]
 param(
-    [string]$BackupDir = (Join-Path $env:USERPROFILE "rrmc-backup"),
+    [ValidateSet("dev", "app")]
+    [string]$Target = "dev",
+    # Default: %USERPROFILE%\rrmc-backup for dev, the run folder for app.
+    [string]$BackupDir = "",
     # Added to the file name, e.g. "before-restore".
-    [string]$Suffix = ""
+    [string]$Suffix = "",
+    # For the container tests only, and only together: another project and settings file.
+    [string]$ComposeProject = "",
+    [string]$EnvFile = ""
 )
 
 $ErrorActionPreference = "Stop"
+if (($ComposeProject -eq "") -ne ($EnvFile -eq "")) {
+    Write-Host "-ComposeProject and -EnvFile must be given together." -ForegroundColor Red
+    exit 1
+}
+if ($EnvFile) { $EnvFile = (Resolve-Path $EnvFile).Path }
 Set-Location (Split-Path -Parent $PSScriptRoot)
+
+$compose = @("compose")
+if ($ComposeProject) {
+    $env:RRMC_ENV_FILE = $EnvFile
+    $compose += @("-p", $ComposeProject, "--env-file", $EnvFile)
+}
+if ($Target -eq "app") {
+    $compose += @("-f", "compose.app.yaml")
+    $service = "app"
+    $prefix = "rrmc-app-"
+    if (-not $BackupDir) { $BackupDir = "C:\MyApps\RRMCApplication\backup" }
+} else {
+    $service = "backend"
+    $prefix = "rrmc-"
+    if (-not $BackupDir) { $BackupDir = Join-Path $env:USERPROFILE "rrmc-backup" }
+}
 
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 $BackupDir = (Resolve-Path $BackupDir).Path
 
-$name = "rrmc-" + (Get-Date -Format "yyyy-MM-dd_HHmmss")
+$name = $prefix + (Get-Date -Format "yyyy-MM-dd_HHmmss")
 if ($Suffix) { $name += "-$Suffix" }
 $name += ".db"
 if (Test-Path (Join-Path $BackupDir $name)) {
@@ -48,7 +81,7 @@ $code = "import os,shutil,sqlite3,sys; db=sys.argv[1]; out=sys.argv[2]; " +
     "shutil.copyfile(tmp, out); print('Integrity ok, schema version', version)"
 
 $ErrorActionPreference = "Continue"
-& docker compose run --rm --no-deps -v "${BackupDir}:/backup" backend `
+& docker @compose run --rm --no-deps -v "${BackupDir}:/backup" $service `
     python -c $code /data/db/rrmc.db "/backup/$name"
 $exitCode = $LASTEXITCODE
 

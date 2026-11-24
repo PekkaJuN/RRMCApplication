@@ -29,6 +29,7 @@ from app.receipt_reading.factory import create_reader
 from app.review.failed_images import FailedFolder
 from app.review.routes import create_review_router
 from app.settings import Settings, load_settings
+from app.static_ui import STATIC_DIR, add_static_ui
 from app.storage.catalog_repository import CatalogRepository
 from app.storage.db import connect
 from app.storage.migrate import MIGRATIONS_DIR, migrate_database
@@ -46,15 +47,16 @@ def create_app(
     failed_folder: FailedFolder | None = None,
     report_exporter: ReportExporter | None = None,
     archive_files: ArchiveFiles | None = None,
+    static_dir: Path | None = None,
 ) -> FastAPI:
     """Build the application.
 
     `extra_routers`, `engines`, `migrations_dir`, `import_service`, `exporter`, `clock`,
-    `failed_folder`, `report_exporter` and `archive_files` let tests add test-only
-    endpoints, fake servers, throwaway migrations, simulated file failures, a fixed
+    `failed_folder`, `report_exporter`, `archive_files` and `static_dir` let tests add
+    test-only endpoints, fake servers, throwaway migrations, simulated file failures, a fixed
     exporter, a fixed time for new receipts, PDF files and archiving, a failing move of a
-    failed image, a fixed PDF exporter and a failing move of an archived image; production
-    passes none of them, and the engines then follow `settings.engines`.
+    failed image, a fixed PDF exporter, a failing move of an archived image and a built UI;
+    production passes none of them, and the engines then follow `settings.engines`.
     """
     settings = settings or load_settings()
     engines = engines or create_engines(settings)
@@ -102,6 +104,8 @@ def create_app(
     )
     for router in extra_routers:
         app.include_router(router)
+    # Last, because its catch-all route would otherwise win over the API's routes.
+    add_static_ui(app, static_dir or STATIC_DIR)
     return app
 
 

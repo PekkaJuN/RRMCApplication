@@ -2,6 +2,21 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-24: A container test backed up the real database
+
+- **Context:** The Red run of the backup checks, which called @scripts/backup-db.ps1 with the
+  new parameters `-Target`, `-ComposeProject` and `-EnvFile` before the script had them.
+- **Symptom:** The script did not fail. It backed up the real development database into
+  `%TEMP%\rrmc-container-tests`, four times (read-only; nothing left the computer).
+- **Root cause:** A PowerShell script whose `param()` block has no `[CmdletBinding()]` or
+  `[Parameter()]` ignores unknown parameters, so it ran with its defaults: the real project.
+  The agent guard does not look inside scripts.
+- **Solution:** The data scripts have `[CmdletBinding()]`, which refuses an unknown parameter,
+  and refuse a part of the test parameters. @scripts/container-tests.ps1 does not run a script
+  that lacks them.
+- **Prevention:** Give every script that touches data `[CmdletBinding()]`, and never let its
+  defaults be what a failed test falls back to.
+
 ## 2026-11-16: A quoted `|` in a grep pattern was blocked as G1 or G4
 
 - **Context:** A read-only search of the docs for two patterns, written as

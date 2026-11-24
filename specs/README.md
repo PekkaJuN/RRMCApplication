@@ -32,3 +32,4 @@ from [TEMPLATE.md](TEMPLATE.md). The workflow is in `.agents/skills/spec/SKILL.m
 | 25 | [Tuotteet page in two columns](features/products-two-columns.md) | Done | FR-11, FR-33, FR-34, FR-39 (layout) |
 | 26 | [Receipt search](features/receipt-search.md) | Done | FR-56 (new), FR-57 (new) |
 | 27 | [Store search](features/store-search.md) | Done | FR-58 (new), FR-56 (field label) |
+| 28 | [Run container](features/app-container.md) | In Progress | NFR-11 (changed), NFR-1, NFR-2, NFR-4 for the run environment |

@@ -1,6 +1,6 @@
 # 0002. Docker for running and development
 
-- Status: accepted
+- Status: accepted; superseded in part by [ADR 0008](0008-run-container.md)
 - Date: 2026-10-26
 
 ## Context

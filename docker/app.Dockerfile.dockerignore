@@ -1,0 +1,15 @@
+# An allow list: nothing enters the build context unless it is named here, so .env and source/
+# never can. It applies to app.Dockerfile only.
+*
+!backend/app
+!backend/pyproject.toml
+!backend/uv.lock
+!frontend
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/test-results
+frontend/playwright-report
+**/.env
+**/.env.*
+**/__pycache__

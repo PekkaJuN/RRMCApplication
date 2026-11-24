@@ -50,6 +50,7 @@ backend/                 FastAPI app and all processing
     prestart.py          start checks before Uvicorn: settings and migrations
     settings.py          settings from RRMC_* environment variables (.env)
     errors.py            AppError and the API error format
+    static_ui.py         serves the built UI in the run image
     texts.py             Finnish texts of the backend (error messages)
     image_files.py       receipt image file rules shared by import and review: signature,
                          hash, free done name, the safe move
@@ -87,7 +88,9 @@ frontend/                React + Vite + TypeScript UI
   src/i18n/fi.ts         all Finnish UI texts
   src/test/              MSW setup and test data for component tests
   e2e/                   Playwright tests
-scripts/                 container tests, database backup and restore
+docker/                  Dockerfile of the run image and its ignore list
+scripts/                 container tests, database backup and restore, copy to and update of
+                         the run environment
 docs/                    documentation (see content-plan.md)
 specs/                   PRD and feature specs
 source/import/           incoming receipt images        (default; gitignored, real data)
@@ -95,7 +98,8 @@ source/import_done/      imported images               (default; gitignored, rea
 source/import_failed/    images that failed to import   (default; gitignored, real data)
 source/archived/         images of archived years       (default; gitignored, real data)
 source/eval/             evaluation receipts, truth files, results (default; gitignored, real data)
-compose.yaml             Docker Compose: backend and frontend; profiles test, e2e and eval
+compose.yaml             development environment: backend and frontend; profiles test, e2e, eval
+compose.app.yaml         run environment: app
 .env.example             committed example settings file; the real .env is not committed
 ```
 
@@ -323,13 +327,19 @@ interface keeps that choice inside receipt-reading.
 
 - Runs on the user's Windows computer with Docker (NFR-10). Prerequisites: Docker Desktop,
   Git and Ollama. Python, Node.js and Tesseract run in containers.
-- `docker compose up` starts two containers: `backend` (FastAPI with Tesseract) and
-  `frontend` (Vite dev server). The same way of running is used for normal use and for
-  development; there is no separate production build (NFR-11).
+- **Development environment** (`compose.yaml`, project `rrmc`): `backend` (FastAPI with
+  Tesseract) and `frontend` (Vite dev server), with the source folders mounted.
+- **Run environment** (`compose.app.yaml`, project `rrmc-app`), for normal use (NFR-11,
+  [ADR 0008](adr/0008-run-container.md)): one container `app`, in which the backend serves
+  the API and the built UI. Its image has no development tools, mounts no source code and
+  does not run as root. It has its own receipt folders and database volume, and always uses
+  the real engines. The [scripts](development.md#run-environment) copy the development data
+  into it once and update it.
 - Ollama runs on Windows, not in a container. The backend reaches it at
   `http://host.docker.internal:11434` (setting `RRMC_OLLAMA_URL`).
-- Published ports are bound to `127.0.0.1` only: backend `8000`, UI `5173`. CORS allows only
-  the UI origin (NFR-2).
+- Published ports are bound to `127.0.0.1` only: backend `8000`, UI `5173`, run environment
+  `8080`. CORS allows only the development UI's origin (NFR-2); the run environment's UI and
+  API share one origin.
 - The import folders on Windows are mounted into the backend container. The SQLite database
   lives in a Docker volume, because SQLite file locking is unreliable on Windows folders
   mounted into Linux containers.
@@ -395,6 +405,7 @@ Each Tier 2 doc is created with the first spec that touches its subsystem.
 - [ADR 0001: Technology stack](adr/0001-tech-stack.md)
 - [ADR 0007: Archive tables](adr/0007-archive-tables.md)
 - [ADR 0002: Docker](adr/0002-docker.md)
+- [ADR 0008: Run environment](adr/0008-run-container.md)
 - [ADR 0003: Receipt reading model](adr/0003-receipt-reading-model.md)
 - [ADR 0004: Line categorization](adr/0004-line-categorization.md)
 - [ADR 0005: PDF library](adr/0005-pdf-library.md)

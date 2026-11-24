@@ -29,7 +29,14 @@ The navigation links are real links (`/`, `/tuonti`, `/kuitit`, `/yhteenveto`, `
 and the `Näytä` link of an archived year; a plain
 left click (`isPlainLeftClick`) is handled in the page without reloading, the current link
 has `aria-current="page"` (Kuitit also on a receipt, Arkisto also on an archived year), the back button works, and a reload
-keeps the page because Vite answers every path with `index.html`.
+keeps the page because every path is answered with `index.html`: by Vite in development, by
+the backend in the run environment.
+
+In the run environment (<http://127.0.0.1:8080>) there is no Vite. `npm run build` writes the
+UI to `dist/` while the run image is built, and the backend serves it from its `static`
+folder (@backend/app/static_ui.py). Its catch-all route comes after every API route: a file of
+the UI is served as it is, an unknown path under `/api` is the API's JSON 404, and every other
+path gets `index.html`. Without the folder, as in development, the route does not exist.
 
 ## Key Files and Entry Points
 
