@@ -19,18 +19,23 @@ computer. It does not protect data from someone who can already use the computer
 |---|---|---|
 | Receipt images | Import, done, failed and archive folders on this computer | `source/import`, `source/import_done`, `source/import_failed`, `source/archived` |
 | Receipts, lines, products, raw OCR text, archived receipts and lines | SQLite database | Docker volume `rrmc_rrmc-data` |
+| Run environment: receipt images | Run folder on this computer | `C:\MyApps\RRMCApplication\source` |
+| Run environment: database | SQLite database | Docker volume `rrmc-app-data` |
+| Database backups | Backup folders on this computer | `%USERPROFILE%\rrmc-backup`, `C:\MyApps\RRMCApplication\backup` |
 | Evaluation images and results | Evaluation folder (development tool) | `source/eval` |
 | CSV and PDF exports | Wherever the browser saves them | The user's download folder |
 | Logs | Standard output of the containers | Docker's log of each container |
 | Settings | `.env` file | Project root |
 
 The app does not encrypt any of this. Protection at rest comes from the computer: its user
-account and disk encryption.
+account and disk encryption. Keep the run folder `C:\MyApps\RRMCApplication` and the backups out
+of cloud-synced folders.
 
 ## Network
 
-- **Ports:** Compose publishes the backend and the UI on `127.0.0.1` only (`compose.yaml`), so
-  other computers cannot reach them. Inside their containers they listen on `0.0.0.0`,
+- **Ports:** Compose publishes the backend and the UI on `127.0.0.1` only (`compose.yaml`), and
+  the run environment on `127.0.0.1:8080` (`compose.app.yaml`), so other computers cannot
+  reach them. Inside their containers they listen on `0.0.0.0`,
   because Docker's port mapping needs that.
 - **Outgoing:** the backend's only external call is to Ollama at `RRMC_OLLAMA_URL`, on this
   computer. The call carries OCR text and product names over plain HTTP between the container
@@ -101,13 +106,18 @@ guardrails therefore keep the agent away from real data, not only from changing 
 | ID | Blocks | Does not stop |
 |---|---|---|
 | G1 | File tools and shell commands that name `.env` or `.env.<x>` (not `.env.example`), `source/`, SQLite files or `service_account*.json`; recursive searches from the project root | A path built at run time (variables, string joins, encodings); a program that opens the files itself |
-| G2 | `docker compose` commands that start, enter, show the logs or configuration of, or copy from `backend`, `frontend` or `eval`, in any project, `rrmc-test` too (only the container tests script starts those); an extra mount for `run` or `create` (`-v`, `--volume`, `--mount`); another compose file or project folder (`-f`, `--file`, `--project-directory`, setting `COMPOSE_FILE`); plain `docker run`, `exec`, `cp`, `logs`, `inspect`; calls to ports `8000` and `5173` | Other ports set in `.env` (the guard cannot read it); a script file that runs such commands; `COMPOSE_FILE` inside a settings file |
+| G2 | `docker compose` commands that start, enter, show the logs or configuration of, or copy from `backend`, `frontend` or `eval`, in any project, `rrmc-test` too (only the container tests script starts those); an extra mount for `run` or `create` (`-v`, `--volume`, `--mount`); another compose file or project folder (`-f`, `--file`, `--project-directory`, setting `COMPOSE_FILE`); plain `docker run`, `exec`, `cp`, `logs`, `inspect`; calls to ports `8000`, `5173` and `8080` | Other ports set in `.env` (the guard cannot read it); a script file that runs such commands; `COMPOSE_FILE` inside a settings file |
 | G3 | Volume removal and pruning, recursive or forced deletes, `restore-db.ps1`, `git push`, hard resets, `clean`, discarding changes (`checkout --`, `checkout .`, `checkout -f`, `restore`, `switch -f` and `--discard-changes`, `stash drop` and `clear`, `rm -f`), history rewrites, remote changes | Deletes through other programs or scripts |
 | G4 | Writes to `.claude/settings.json`, `.claude/hooks/`, `.codex/`, `.agents/guardrails/`, `scripts/guard-tests.ps1` | Writes through a script file the guard cannot see into |
 | G5 | Every call but reading files after three red check runs in a row, until the user writes | Failures of commands that are not in the Commands table |
 | G6 | The same, when the edits between those runs touched one and the same file, through file tools or shell commands (shell changes are found through `git status` and write times at each check run) | Changes to files Git ignores; a change outside a Git repository |
 | G7 | Nothing: a test edit after a red run gets a reminder and is recorded for the audit | Test edits made through shell commands (no reminder, not recorded) |
 | G8 | Ending a turn once, when a changed part's checks were not green since the change | — |
+
+Agents never run `copy-to-app.ps1`, `update-app.ps1`, `backup-db.ps1` or `restore-db.ps1`
+themselves, for either environment; the guard does not see inside them. Only
+@scripts/container-tests.ps1 runs them, against test projects. A user who sets another
+`RRMC_APP_PORT` adds that port to the guard, because the guard cannot read `.env`.
 
 Layers:
 

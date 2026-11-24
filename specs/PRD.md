@@ -221,7 +221,7 @@ years. Details will be in the archiving spec (`features/archiving.md`).
 | ID | Requirement |
 |---|---|
 | NFR-10 | Runs on Windows (the user's machine) with Docker. Prerequisites: Docker Desktop, Git and Ollama. Python, Node.js and Tesseract with `fin` and `eng` run in containers; Ollama runs on Windows. |
-| NFR-11 | Setup and start are documented in `docs/development.md` and work from a clean checkout with `docker compose up`. The same way of running is used for normal use and for development. |
+| NFR-11 | Setup and start are documented in `docs/development.md` and work from a clean checkout. Normal use runs in a run environment built from a known version of the code, without development tools and with its own data; development runs with `docker compose up` on separate data. |
 | NFR-15 | The user interface is in Finnish. Documentation and code are in English (see `AGENTS.md`). |
 
 ### 7.5 Quality
@@ -326,6 +326,7 @@ Resolved:
 - Hardware and processing time: CPU only, 3 minutes per receipt: NFR-8, open question 1 (2026-10-28).
 - Single user stays: no buyer or family-member field on receipts (2026-10-21).
 - Installation and development use Docker; Ollama stays on Windows; settings are in one `.env` file; one way of running for normal use and development: FR-32, NFR-10, NFR-11 (2026-10-23).
+- The one way of running was replaced by a run environment beside the development environment, with its own data copied once: NFR-11, ADR 0008 (2026-11-24).
 - Archiving is by calendar year, started by the user; archived data is excluded from
   active totals and exports: FR-40, FR-42 (2026-10-20). Any finished year, separate tables
   in the same database, categories stored as names, read-only archive view with yearly and

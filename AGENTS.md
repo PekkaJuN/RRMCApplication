@@ -26,19 +26,23 @@ This file holds the rules that apply to every task. Detailed workflows live in s
 | Frontend | React + Vite + TypeScript: receipt image and editable table side by side |
 | Storage | SQLite |
 | Export | CSV first, behind a common exporter interface. Google Sheets (gspread) later. |
-| Runtime | Docker Compose: `backend` and `frontend` containers; Ollama runs on Windows. Settings in one `.env` file. |
+| Runtime | Docker Compose, two environments: development (`backend`, `frontend`; project `rrmc`) and run (`app`; project `rrmc-app`, for normal use). Ollama runs on Windows. Settings in one `.env` file. |
 
 Significant choices are recorded as ADRs in `docs/adr/`. The stack is
-[ADR 0001](docs/adr/0001-tech-stack.md); Docker is [ADR 0002](docs/adr/0002-docker.md).
+[ADR 0001](docs/adr/0001-tech-stack.md); Docker is [ADR 0002](docs/adr/0002-docker.md); the
+run environment is [ADR 0008](docs/adr/0008-run-container.md).
 
 ### Layout
 
 ```
 backend/            FastAPI app (app/), tests (tests/), Dockerfile, pyproject.toml, uv.lock
 frontend/           React + Vite UI (src/), E2E tests (e2e/), Dockerfile, package.json
-compose.yaml        Docker Compose: backend, frontend; profiles test, e2e and eval
+compose.yaml        development environment: backend, frontend; profiles test, e2e and eval
+compose.app.yaml    run environment: app
+docker/             Dockerfile of the run image
 .env.example        all settings with defaults; copy to .env (never committed)
-scripts/            container tests, database backup and restore
+scripts/            container tests; database backup and restore, copy to and update of the
+                    run environment (agents run only the tests)
 docs/               documentation (see Documentation)
 specs/              feature specs (see Workflows)
 source/import/      incoming receipt images      (gitignored, real data)
@@ -47,8 +51,11 @@ source/import_failed/ images that failed to import (gitignored, real data)
 source/eval/        model evaluation receipts and results (gitignored, real data)
 ```
 
-The import folders are configurable. Paths above are defaults. The database is in the Docker
-volume `rrmc_rrmc-data`. The backend's structure is in
+The import folders are configurable. Paths above are defaults. The development database is in
+the Docker volume `rrmc_rrmc-data`. The run environment's data is real too: the folder
+`C:\MyApps\RRMCApplication` and the volume `rrmc-app-data`. Agents never run the data scripts
+(`backup-db`, `restore-db`, `copy-to-app`, `update-app`) themselves
+([security](docs/security.md#agent-guardrails)). The backend's structure is in
 [docs/architecture.md](docs/architecture.md#folder-structure).
 
 ### Commands

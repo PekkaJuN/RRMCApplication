@@ -161,6 +161,9 @@ None yet.
   `receipts`, whose lines reference it).
 - The database must stay in a Docker volume, not in a Windows folder
   ([ADR 0002](../../adr/0002-docker.md)).
+- There are two databases: the development environment's in the volume `rrmc_rrmc-data`, the
+  run environment's in `rrmc-app-data` ([ADR 0008](../../adr/0008-run-container.md)). Each is
+  migrated when its own environment starts. Data is copied from the first to the second once.
 
 ## Related Documents
 

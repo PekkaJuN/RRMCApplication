@@ -84,6 +84,71 @@ reads it.
 
 ## Running the app
 
+There are two environments ([ADR 0008](adr/0008-run-container.md)). They share `.env` (model,
+Ollama address, log level) but no data, code or ports.
+
+| | Run environment | Development environment |
+|---|---|---|
+| For | normal use | changing the code |
+| Compose file, project | `compose.app.yaml`, `rrmc-app` | `compose.yaml`, `rrmc` |
+| Address | <http://127.0.0.1:8080> | <http://127.0.0.1:5173> |
+| Code | built into the image; changes only with an update | the source folders, live |
+| Receipt folders | `C:\MyApps\RRMCApplication\source` | `source/` |
+| Database volume | `rrmc-app-data` | `rrmc_rrmc-data` |
+
+### Run environment
+
+| Task | Command |
+|---|---|
+| Start | `docker compose -f compose.app.yaml up -d` |
+| Stop | `docker compose -f compose.app.yaml down` |
+| Follow the log | `docker compose -f compose.app.yaml logs -f app` |
+
+The app does not start with Windows or Docker Desktop. `RRMC_APP_PORT`, `RRMC_APP_SOURCE_DIR`
+and `RRMC_APP_DB_VOLUME` in `.env` change the port, the receipt folders and the volume.
+
+**Warning:** never set `RRMC_APP_DB_VOLUME` to `rrmc_rrmc-data`. Both environments would then
+use one database. Never run `down -v` unless you mean to delete all receipt data.
+
+**First start: copy the development data once.** The app must not be running. The script
+only reads the development data, and refuses when the run environment already has a database
+or files, so do this before the first start:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/copy-to-app.ps1
+```
+
+Then start the app with the update below. The data is never copied again. If the script says
+that copying the images of a folder failed, the database is already copied and a second run
+refuses. Finish by hand: copy that folder and the ones after it (order `import`,
+`import_done`, `import_failed`, `archived`) with their subfolders to the run folder, replacing
+files of the same name. Do this before the first start, because an import moves files.
+
+**Update to the checked-out commit.** The working tree must be clean. The script runs the
+backend and frontend tests, backs up the app database (suffix `before-update`), builds the
+image `rrmc-app:<commit>`, tags it `latest`, restarts the app and waits for its health check.
+A failure before the restart leaves the running app as it was:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/update-app.ps1
+```
+
+When the new version does not become healthy, the script prints the commands that start the
+previous image and restore the backup. Each update leaves an image; remove old ones by hand.
+
+**Back up and restore.** The scripts are those of the development environment, described
+[below](#development-environment), with `-Target app`. Backups go to
+`C:\MyApps\RRMCApplication\backup` as `rrmc-app-<time>.db`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1 -Target app
+powershell -ExecutionPolicy Bypass -File scripts/restore-db.ps1 -Target app -BackupFile C:\MyApps\RRMCApplication\backup\rrmc-app-2026-11-24_151500.db
+```
+
+Give the right `-Target`: the restore does not check which environment a file came from.
+
+### Development environment
+
 | Task | Command |
 |---|---|
 | Start (after the first build) | `docker compose up` |
@@ -218,14 +283,17 @@ docker compose --profile e2e run --rm e2e npx playwright test --project=style --
 
 `scripts/container-tests.ps1` checks what only a running Docker setup can show: ports bound
 to `127.0.0.1`, start refused without a settings file, an invalid setting stopping the
-backend, data surviving a rebuild, Tesseract in the image, and the Git ignore rules. It uses
-a separate Compose project `rrmc-test` with its own settings, ports (`18000`, `15173`) and
-folders under `%TEMP%\rrmc-container-tests`, so the real app, `.env` and the real database
-are never touched. It deletes nothing; at the end it prints the cleanup command:
+backend, data surviving a rebuild, Tesseract in the image, and the Git ignore rules. It also
+checks the run environment: its configuration and image, and the backup, restore, copy and
+update scripts. It uses the Compose projects `rrmc-test` and `rrmc-app-test` with their own
+settings, ports (`18000`, `15173`, `18080`), image name, volumes and folders under
+`%TEMP%\rrmc-container-tests`, so the real apps, `.env` and the real databases are never
+touched. The update is tested in a temporary clone. The run takes several minutes.
 
-```powershell
-docker compose -p rrmc-test down -v --rmi local
-```
+The scripts take test parameters for this (another project and settings file), accepted only
+together. The tests run no script that lacks them. The test databases and folders are emptied
+and refilled; volumes, images, clones and backups of synthetic data stay. At the end it
+prints the cleanup commands.
 
 ### Manual checks
 

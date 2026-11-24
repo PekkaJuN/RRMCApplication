@@ -1,0 +1,40 @@
+# The run environment (specs/features/app-container.md, ADR 0008). compose.yaml is the
+# development environment. The two share no data, code or ports.
+name: rrmc-app
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        # The commit, set by scripts/update-app.ps1.
+        RRMC_REVISION: ${RRMC_APP_TAG:-}
+    # RRMC_APP_IMAGE is for the container tests, RRMC_APP_TAG for scripts/update-app.ps1.
+    image: ${RRMC_APP_IMAGE:-rrmc-app}:${RRMC_APP_TAG:-latest}
+    env_file:
+      - path: ${RRMC_ENV_FILE:-.env}
+        required: true
+    environment:
+      # Wins over the settings file: the run environment never uses the fakes.
+      RRMC_ENGINES: real
+    ports:
+      - "127.0.0.1:${RRMC_APP_PORT:-8080}:8000"
+    # Only the app's own data. Never mount source code or development data here.
+    volumes:
+      - ${RRMC_APP_SOURCE_DIR:-C:/MyApps/RRMCApplication/source}/import:/data/import
+      - ${RRMC_APP_SOURCE_DIR:-C:/MyApps/RRMCApplication/source}/import_done:/data/import_done
+      - ${RRMC_APP_SOURCE_DIR:-C:/MyApps/RRMCApplication/source}/import_failed:/data/import_failed
+      - ${RRMC_APP_SOURCE_DIR:-C:/MyApps/RRMCApplication/source}/archived:/data/archived
+      - app-db:/data/db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      retries: 12
+
+volumes:
+  app-db:
+    # Never rrmc_rrmc-data: that is the development database.
+    name: ${RRMC_APP_DB_VOLUME:-rrmc-app-data}
