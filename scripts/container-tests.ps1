@@ -684,6 +684,28 @@ Write-Result "App PC5 copy names the folder of a failed image copy" `
 Reset-AppDatabase
 Clear-Files $AppSource
 
+# Runs a script in a console window of its own, as the user does, and with no run image.
+# Returns the exit code; the output goes to the console.
+function Invoke-InConsole([string]$Path, [string[]]$Arguments) {
+    if ((Get-Content -Raw $Path) -notmatch "(?m)^\[CmdletBinding\(" -or
+            @((Get-Command $Path).Parameters.Keys) -notcontains "EnvFile") { return -1 }
+    Remove-Item env:RRMC_ENV_FILE -ErrorAction SilentlyContinue
+    & docker image rm "${AppImage}:latest" 2>&1 | Out-Null
+    $process = Start-Process powershell -WindowStyle Hidden -PassThru -ArgumentList (
+        @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Path) + $Arguments)
+    # Reading the handle keeps the exit code after the process ends.
+    $process.Handle | Out-Null
+    if (-not $process.WaitForExit(600000)) { $process.Kill(); return -2 }
+    return $process.ExitCode
+}
+
+# Regression: the first copy, from a console, before any run image exists.
+$exitCode = Invoke-InConsole $CopyScript $CopyArgs
+Write-Result "App AC17 first copy from a console without an image" `
+    ($exitCode -eq 0 -and (Get-AppFileHashes) -eq (Get-DevFileHashes)) "exit $exitCode"
+Reset-AppDatabase
+Clear-Files $AppSource
+
 # App T7: some of the test parameters could reach real data, so they are refused.
 $result = Invoke-Script $CopyScript @("-AppProject", $AppProject, "-EnvFile", $AppSettings)
 Write-Result "App T7 test parameters only together" `
@@ -743,6 +765,14 @@ function Get-ContainerImage([string]$Id) {
     if ($Id -eq "") { return "none" }
     return (& docker inspect --format "{{.Image}}" $Id | Out-String).Trim()
 }
+
+# Regression: the first update, from a console, before any run image exists.
+Reset-AppDatabase
+$exitCode = Invoke-InConsole $UpdateScript @("-DevProject", $Project, "-AppProject", $AppProject,
+    "-EnvFile", $AppSettings, "-BackupDir", $UpdateBackups, "-HealthTimeoutSeconds", "20")
+Write-Result "App AC31 first update from a console without an image" `
+    ($exitCode -eq 0 -and (Get-AppContainer) -ne "") "exit $exitCode"
+Invoke-App $AppSettings @("down") | Out-Null
 
 # App AC31: the first update, without an app database.
 Reset-AppDatabase

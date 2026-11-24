@@ -2,6 +2,19 @@
 
 Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 
+## 2026-11-24: The first copy to the run environment failed in a console
+
+- **Context:** The user's first run of @scripts/copy-to-app.ps1, before any run image existed.
+- **Symptom:** `failed to get console: The handle is invalid.`, then `Could not check the app
+  data; nothing was copied.` The line `pull access denied ... 'docker login'` above it is
+  harmless: Compose looks for the local image on Docker Hub before building it.
+- **Root cause:** The script captures the output of `docker compose run`. With no image, Compose
+  builds inside that call, which fails when output is captured but the script has a console.
+  The container tests redirected everything and already had an image.
+- **Solution:** The scripts build the image in an uncaptured call first.
+- **Prevention:** Two container checks run the copy and the update in a console of their own
+  without an image.
+
 ## 2026-11-24: A container test backed up the real database
 
 - **Context:** The Red run of the backup checks, which called @scripts/backup-db.ps1 with the

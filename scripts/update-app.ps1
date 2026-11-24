@@ -74,6 +74,11 @@ if ($LASTEXITCODE -eq 0) {
     $label = $latest.Config.Labels.PSObject.Properties["org.opencontainers.image.revision"]
     # An image built by hand has no revision; its id still finds it.
     $previous = if ($label -and $label.Value) { "${image}:$($label.Value)" } else { $latest.Id }
+} else {
+    # The backup runs in the image. Built on its own, because a build inside the captured call
+    # below fails in a console ("failed to get console").
+    & docker @appCompose build app
+    if ($LASTEXITCODE -ne 0) { Stop-Update "Update stopped: image build failed; the running app is unchanged." }
 }
 
 # 4. The backup.

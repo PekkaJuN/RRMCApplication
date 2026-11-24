@@ -1,7 +1,7 @@
 # Feature: Run container
 
 ## Overview
-- **Status:** In Progress
+- **Status:** Done
 - **Created:** 2026-11-24
 - **Updated:** 2026-11-24: Specify approved by the user; Plan added
   ([P10](#p10-spec-changes) refines Files to Modify). The user moved the run environment's
@@ -727,6 +727,9 @@ build"; the rest of ADR 0002 stands. ADR 0002 gets the status line
 - T8 (2026-11-24): P7's clone gets the working tree's uncommitted files in a commit of its own,
   so the checks test the code at hand, and a shortened test suite to keep the run short. P6
   names the previous image by its id when `latest` has no revision label.
+- Bug fix after T11 (2026-11-24): P4 builds the image before its first `run`, and P6 builds it
+  before the backup when there is none. Built inside a captured call in a console, the build
+  failed with `failed to get console`. Two container checks run the scripts in a console.
 - T6 incident (2026-11-24, G1 and G2): the Red run called the old `backup-db.ps1`, which ignored
   the unknown test parameters and backed up the real development database four times into
   `%TEMP%`. The database was opened read-only and nothing left the computer; the user was told
@@ -810,7 +813,7 @@ projects `rrmc-test` and `rrmc-app-test`; no task runs a new script against `rrm
   log), `.env.example`, ADR 0002 status line, `docs/content-plan.md`, `specs/README.md`.
   *Proof:* the AC34 read-through, and every command shown in the new docs was run in a test
   project or appears in a passing container check.
-- [ ] **T11 Audit.** Run `.agents/skills/review-audit/SKILL.md` against this spec. *Proof:*
+- [x] **T11 Audit.** Run `.agents/skills/review-audit/SKILL.md` against this spec. *Proof:*
   audit verdict PASS, recorded under `## Audit`.
 
 ## Audit
@@ -819,25 +822,26 @@ projects `rrmc-test` and `rrmc-app-test`; no task runs a new script against `rrm
 - Acceptance criteria: 33/34 met with passing checks; AC16 met except for the E2E baseline
   (finding 2)
 - Tests: backend 1661 passed (baseline 1642 + 19 new), frontend 466 (baseline 466), E2E 53,
-  container checks 75 (baseline 23), guard 458. Lint, format check and type check pass.
+  container checks 77 (baseline 23), guard 458. Lint, format check and type check pass.
   `static_ui.py` coverage 100 % lines and branches; overall coverage was not measured
 - Security: `pip-audit` and `npm audit --omit=dev` found nothing; ports on `127.0.0.1`; one
   incident during the work (finding 3)
 - `compose.yaml` unchanged (`git diff`)
-- Docs updated: yes; spec status: In Progress
+- Docs updated: yes; spec status: Done
 
 | # | Severity | File | Finding | Recommendation |
 |---|---|---|---|---|
-| 1 | Medium | `copy-to-app.ps1`, `update-app.ps1` | The coverage target asks for a container test of every exit path. Five checks were added; the paths where Git, `docker ps`, `docker tag`, the app data check or a mount lookup fails have none, because they need a broken Docker or Git | User: accept, or ask for tests |
-| 2 | Low | — | T9's E2E baseline was not taken before T2 (stale container). No E2E test file changed, and 53 pass | User: accept |
+| 1 | Medium | `copy-to-app.ps1`, `update-app.ps1` | The coverage target asks for a container test of every exit path. Five checks were added; the paths where Git, `docker ps`, `docker tag`, the app data check or a mount lookup fails have none, because they need a broken Docker or Git | Accepted by the user 2026-11-24 |
+| 2 | Low | — | T9's E2E baseline was not taken before T2 (stale container). No E2E test file changed, and 53 pass | Accepted by the user 2026-11-24 |
 | 3 | High, fixed | `container-tests.ps1` | The T6 Red run copied the real development database into `%TEMP%` (P10, `docs/learnings.md`) | User: delete the copies, if not done |
 | 4 | Low, later | `static_ui.py` | `index.html` has no `Cache-Control`; after an update a browser may show the old one until a reload | Propose `no-cache` as a spec change |
 | 5 | Low, later | `compose.app.yaml` | When the image is missing, Compose asks Docker Hub for `rrmc-app` before building | Propose a `pull_policy` as a spec change |
+| 6 | High, fixed | `copy-to-app.ps1`, `update-app.ps1` | Found by the user after the first verdict: the copy failed in a console when no run image existed, and the update had the same fault (P10, `docs/learnings.md`) | Fixed, with two console checks |
 
 G7: the test edits log has no line for this work. Edits to the checks in
 `container-tests.ps1` after a red run are in [P10](#p10-spec-changes) (T4, T5), backed by AC9
 and AC12; in T7 the unneeded `-DevEnvFile` argument was dropped to match P4. In
 `test_static_ui.py` one constant was renamed for lint (S105).
 
-Verdict: REQUEST CHANGES — no code change is known to be needed; the user decides findings 1
-and 2, then the spec can be marked Done.
+Verdict: PASS — first REQUEST CHANGES; the user accepted findings 1 and 2, and finding 6 was
+fixed. Findings 4 and 5 are left for later spec changes.

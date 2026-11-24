@@ -76,6 +76,11 @@ $running = (& docker @appCompose ps --status running -q app | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) { Stop-Copy "Could not check the app; nothing was copied." }
 if ($running) { Stop-Copy "Stop the app first: nothing was copied." }
 
+# The image is built on its own: a build inside the captured `run` below fails in a console
+# ("failed to get console").
+& docker @appCompose build app
+if ($LASTEXITCODE -ne 0) { Stop-Copy "The image build failed; nothing was copied." }
+
 # 3. The app data must be empty. Running the app's image also creates its volume and folders.
 # Python code in single quotes only: Windows PowerShell 5.1 drops double quotes from arguments.
 $checkCode = @'

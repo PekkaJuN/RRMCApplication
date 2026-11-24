@@ -152,7 +152,7 @@ No modules yet: the foundation code is covered by the Tier 1 and Tier 2 docs. Ad
 - The store search spec is Done (audited 2026-11-23): the `store` condition
   on `GET /api/receipts` and the `Hakusana` field with the `Hakukohde` target on the Kuitit
   page. The review, storage, UI and API docs describe it.
-- The run container spec is implemented (2026-11-24): the run environment in
+- The run container spec is Done (audited 2026-11-24): the run environment in
   `compose.app.yaml`, its image, and the copy, update, backup and restore scripts. The
   development, architecture, security, UI and storage docs, AGENTS.md and ADR 0008 describe it.
 - The glossary has the catalog, import, reading, line categorization, review, line
