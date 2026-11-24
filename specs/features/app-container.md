@@ -1,7 +1,8 @@
 # Feature: Run container
 
 ## Overview
-- **Status:** Done
+- **Status:** Done (audited 2026-11-24; PC10, PC11 and AC35–AC37 added, approved by the user,
+  implemented and audited 2026-11-24)
 - **Created:** 2026-11-24
 - **Updated:** 2026-11-24: Specify approved by the user; Plan added
   ([P10](#p10-spec-changes) refines Files to Modify). The user moved the run environment's
@@ -101,6 +102,14 @@ copied again.
 - **PC9 Docs and decision.** A new ADR supersedes the "one way of running" part of ADR 0002.
   The PRD's NFR-11, the development guide, the architecture, the security doc and `AGENTS.md`
   describe both environments.
+
+- **PC10 The new UI shows after an update.** Every answer that is `index.html` tells the browser
+  to check with the server before reusing its copy (`Cache-Control: no-cache`). Other files of
+  the UI are not changed: a changed script or style has a new name.
+- **PC11 No registry for the run image.** Compose never looks for the run image in a registry.
+  When the image is missing, Compose builds it from the repository, and the misleading
+  `pull access denied ... 'docker login'` line is gone. An existing image is not rebuilt by
+  `up` or `run`, so the app keeps running a known version.
 
 ### User task (G4)
 The agent guardrails block calls to ports `8000` and `5173` only. Port `8080` (or the value
@@ -339,7 +348,31 @@ to copy the data once; `.env.example` lists `RRMC_APP_PORT`, `RRMC_APP_SOURCE_DI
 `RRMC_APP_DB_VOLUME` with their defaults; NFR-11 no longer says there is one way of running;
 a new ADR records the decision, and ADR 0002 links to it.
 
+### AC35: index.html is checked before reuse
+**Given** the backend with a built UI
+**When** `GET /`, `GET /index.html` and `GET /kuitit/12` are requested, and the script file of
+AC5
+**Then** the first three answer 200 with the header `Cache-Control: no-cache`, and the script
+file's answer has no `Cache-Control` header.
+
+### AC36: A missing run image is built, not pulled
+**Given** the run image `<image>:latest` does not exist
+**When** `docker compose -f compose.app.yaml run --rm --no-deps app python -c "print(1)"` runs
+with its output redirected
+**Then** it exits 0, the image exists afterwards, and the output has neither `Pulling` nor
+`pull access denied`.
+
+### AC37: An existing run image is not rebuilt
+**Given** the run image exists with image id X
+**When** `docker compose -f compose.app.yaml up -d` runs without `--build`, after a change in the
+build context (in the temporary clone of the update checks)
+**Then** `<image>:latest` still has the id X.
+
 ## Files to Modify
+The change of PC10 and PC11 touches `backend/app/static_ui.py`,
+`backend/tests/unit/test_static_ui.py`, `compose.app.yaml`, `scripts/container-tests.ps1`,
+`docs/subsystems/ui/README.md` and `docs/learnings.md` (the "harmless" pull line).
+
 | File | Change |
 |---|---|
 | `compose.app.yaml` | New: run environment, service `app` (PC1–PC3) |
@@ -393,6 +426,7 @@ a new ADR records the decision, and ADR 0002 links to it.
 | AC4 | static UI setup | client path | same | `GET /kuitit/12`, `GET /tuonti` | 200, `index.html` | none |
 | AC5 | static UI setup | asset | `static/assets/a.js` | `GET /assets/a.js` | 200, JavaScript content type | none |
 | AC6 | static UI setup | API 404 | same | `GET /api/does-not-exist` | 404 JSON | none |
+| AC35 | static UI setup | cache header | same | `GET /`, `/index.html`, `/kuitit/12`, `/assets/a.js` | `no-cache` on the first three, no header on the last | none |
 | AC15 | static UI setup | API first | same | `GET /api/health` | the health JSON | fake engines |
 | AC4 | static UI setup | path outside | same | `GET /../pyproject.toml` (encoded) | not the file: 404 or `index.html` | none |
 
@@ -420,6 +454,8 @@ for this.
 | AC27–AC31 | update | `update-app.ps1` with test project, a temporary clone at a test commit; a failing test injected in the clone; a health URL that never answers | as in the ACs | PASS |
 | AC32 | guard | an override that mounts `./backend` into `app` | `FAIL` reported | PASS |
 | AC33 | ignore | `git check-ignore` | ignored | PASS |
+| AC36 | missing image | remove the test image tag, `run` | built; no pull line | PASS |
+| AC37 | existing image | change a file in the clone, `up -d` | same image id | PASS |
 
 ### E2E tests
 None new. The UI does not change; the E2E journeys keep running against the development
@@ -739,6 +775,11 @@ build"; the rest of ADR 0002 stands. ADR 0002 gets the status line
 
 No AC changes.
 
+### P11 Change: no-cache and no registry (PC10, PC11)
+- `static_ui.py` adds `Cache-Control: no-cache` to every answer that is `index.html` (AC35).
+- `compose.app.yaml` sets `pull_policy: never` (AC36, AC37). Compose still builds a
+  missing image then (the AC36 check). `build` is not used, because it rebuilds on every `up`.
+
 ### Data flow and data model
 No change to the schema, the API or the data flow inside the app. The run environment has its
 own copy of the data; nothing flows between the environments after the one-time copy.
@@ -815,6 +856,10 @@ projects `rrmc-test` and `rrmc-app-test`; no task runs a new script against `rrm
   project or appears in a passing container check.
 - [x] **T11 Audit.** Run `.agents/skills/review-audit/SKILL.md` against this spec. *Proof:*
   audit verdict PASS, recorded under `## Audit`.
+- [x] **T12 no-cache.** AC35. Red: unit test. Green: `static_ui.py`. *Proof:* backend checks.
+- [x] **T13 No registry.** AC36, AC37. Red: container checks (AC37 holds already and guards).
+  Green: `pull_policy`. *Proof:* those checks print `PASS`.
+- [x] **T14 Docs and audit** of the change. *Proof:* audit verdict PASS under `## Audit`.
 
 ## Audit
 
@@ -834,8 +879,8 @@ projects `rrmc-test` and `rrmc-app-test`; no task runs a new script against `rrm
 | 1 | Medium | `copy-to-app.ps1`, `update-app.ps1` | The coverage target asks for a container test of every exit path. Five checks were added; the paths where Git, `docker ps`, `docker tag`, the app data check or a mount lookup fails have none, because they need a broken Docker or Git | Accepted by the user 2026-11-24 |
 | 2 | Low | — | T9's E2E baseline was not taken before T2 (stale container). No E2E test file changed, and 53 pass | Accepted by the user 2026-11-24 |
 | 3 | High, fixed | `container-tests.ps1` | The T6 Red run copied the real development database into `%TEMP%` (P10, `docs/learnings.md`) | User: delete the copies, if not done |
-| 4 | Low, later | `static_ui.py` | `index.html` has no `Cache-Control`; after an update a browser may show the old one until a reload | Propose `no-cache` as a spec change |
-| 5 | Low, later | `compose.app.yaml` | When the image is missing, Compose asks Docker Hub for `rrmc-app` before building | Propose a `pull_policy` as a spec change |
+| 4 | Low, later | `static_ui.py` | `index.html` has no `Cache-Control`; after an update a browser may show the old one until a reload | Fixed by PC10 |
+| 5 | Low, later | `compose.app.yaml` | When the image is missing, Compose asks Docker Hub for `rrmc-app` before building | Fixed by PC11 |
 | 6 | High, fixed | `copy-to-app.ps1`, `update-app.ps1` | Found by the user after the first verdict: the copy failed in a console when no run image existed, and the update had the same fault (P10, `docs/learnings.md`) | Fixed, with two console checks |
 
 G7: the test edits log has no line for this work. Edits to the checks in
@@ -844,4 +889,20 @@ and AC12; in T7 the unneeded `-DevEnvFile` argument was dropped to match P4. In
 `test_static_ui.py` one constant was renamed for lint (S105).
 
 Verdict: PASS — first REQUEST CHANGES; the user accepted findings 1 and 2, and finding 6 was
-fixed. Findings 4 and 5 are left for later spec changes.
+fixed. Findings 4 and 5 were left for later spec changes
+(done in the audit below).
+
+### Audit: PC10 and PC11 (2026-11-24)
+- Acceptance criteria: 3/3 met: AC35 (`test_static_ui.py`), AC36 and AC37 (container checks).
+  AC35 and AC36 failed before the change; AC37 held already and guards against
+  `pull_policy: build`
+- Tests: backend 1665 passed (1661 + 4 new), E2E 53, container checks 79. Backend lint, format
+  check and type check pass. `static_ui.py` coverage 100 % lines and branches. Frontend and
+  guard tests were not rerun: no such file changed
+- Security: `pip-audit` and `npm audit --omit=dev` found nothing
+- Files: as listed in Files to Modify; G7: the test edits log has no line for this change, and
+  no existing test was changed
+- Docs updated: yes; spec status: Done
+- Findings: none
+
+Verdict: PASS

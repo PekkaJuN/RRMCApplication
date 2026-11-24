@@ -36,7 +36,8 @@ In the run environment (<http://127.0.0.1:8080>) there is no Vite. `npm run buil
 UI to `dist/` while the run image is built, and the backend serves it from its `static`
 folder (@backend/app/static_ui.py). Its catch-all route comes after every API route: a file of
 the UI is served as it is, an unknown path under `/api` is the API's JSON 404, and every other
-path gets `index.html`. Without the folder, as in development, the route does not exist.
+path gets `index.html`. `index.html` is sent with `Cache-Control: no-cache`, so the browser
+shows the new UI after an update. Without the folder, as in development, the route does not exist.
 
 ## Key Files and Entry Points
 

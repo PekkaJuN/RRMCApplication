@@ -69,6 +69,18 @@ def test_ac5_a_file_of_the_ui_is_served(ui: TestClient) -> None:
     assert response.text == SCRIPT
 
 
+@pytest.mark.parametrize("path", ["/", "/index.html", "/kuitit/12"])
+def test_ac35_index_html_is_checked_before_reuse(ui: TestClient, path: str) -> None:
+    response = ui.get(path)
+
+    assert response.status_code == 200
+    assert response.headers.get("cache-control") == "no-cache"
+
+
+def test_ac35_other_files_have_no_cache_header(ui: TestClient) -> None:
+    assert "cache-control" not in ui.get("/assets/a.js").headers
+
+
 @pytest.mark.parametrize("path", ["/api", "/api/", "/api/does-not-exist"])
 def test_ac6_unknown_api_path_is_a_json_404(ui: TestClient, path: str) -> None:
     response = ui.get(path)
