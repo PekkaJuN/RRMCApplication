@@ -30,6 +30,10 @@ def add_static_ui(app: FastAPI, static_dir: Path) -> None:
         if path == "api" or path.startswith("api/"):
             raise StarletteHTTPException(404)
         # The UI's own paths, such as /kuitit/12, are resolved in the browser.
-        return FileResponse(files.get(path, index))
+        file = files.get(path, index)
+        # index.html names the scripts of its version, so an old copy would show the old UI
+        # after an update. The other files get a new name when they change.
+        headers = {"Cache-Control": "no-cache"} if file == index else None
+        return FileResponse(file, headers=headers)
 
     app.add_api_route("/{path:path}", serve_ui, methods=["GET"], include_in_schema=False)

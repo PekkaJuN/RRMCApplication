@@ -706,6 +706,15 @@ Write-Result "App AC17 first copy from a console without an image" `
 Reset-AppDatabase
 Clear-Files $AppSource
 
+# App AC36: a missing image is built, and no registry is asked for it.
+& docker image rm "${AppImage}:latest" 2>&1 | Out-Null
+$output = Invoke-App $AppSettings @("run", "--rm", "--no-deps", "app", "python", "-c", "print(1)")
+$exitCode = $LASTEXITCODE
+& docker image inspect "${AppImage}:latest" 2>&1 | Out-Null
+Write-Result "App AC36 a missing image is built, not pulled" `
+    ($exitCode -eq 0 -and $LASTEXITCODE -eq 0 -and $output -notmatch "Pulling|pull access denied") `
+    "exit $exitCode, output: $output"
+
 # App T7: some of the test parameters could reach real data, so they are refused.
 $result = Invoke-Script $CopyScript @("-AppProject", $AppProject, "-EnvFile", $AppSettings)
 Write-Result "App T7 test parameters only together" `
@@ -866,6 +875,19 @@ Write-Result "App PC7 update stops on a failing backup" `
     ($result.Exit -eq 1 -and $result.Output -match "(?m)^Update stopped: backup failed; nothing was updated\." -and
         (Get-ImageId "latest") -eq $latestId -and (Get-ImageId $commit) -eq "") "exit $($result.Exit): $($result.Output)"
 Reset-AppDatabase
+
+# App AC37: `up` does not rebuild an existing image, although the code has changed.
+Write-CloneFile "backend/app/clone_change.py" "# synthetic`n"
+$env:RRMC_ENV_FILE = $AppSettings
+Push-Location $Clone
+$output = Invoke-Docker @("compose", "-p", $AppProject, "--env-file", $AppSettings,
+    "-f", "compose.app.yaml", "up", "-d")
+$exitCode = $LASTEXITCODE
+Pop-Location
+Write-Result "App AC37 an existing image is not rebuilt" `
+    ($exitCode -eq 0 -and $latestId -ne "" -and (Get-ImageId "latest") -eq $latestId -and
+        (Get-ContainerImage (Get-AppContainer)) -eq $latestId) "exit $exitCode, output: $output"
+Invoke-App $AppSettings @("down") | Out-Null
 
 # App T8: some of the test parameters could reach real data, so they are refused.
 $result = Invoke-Script $UpdateScript @("-AppProject", $AppProject, "-BackupDir", $UpdateBackups)

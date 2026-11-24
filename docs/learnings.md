@@ -7,7 +7,8 @@ Fixed errors, newest first: context, symptom, root cause, solution, prevention.
 - **Context:** The user's first run of @scripts/copy-to-app.ps1, before any run image existed.
 - **Symptom:** `failed to get console: The handle is invalid.`, then `Could not check the app
   data; nothing was copied.` The line `pull access denied ... 'docker login'` above it is
-  harmless: Compose looks for the local image on Docker Hub before building it.
+  harmless: Compose looked for the local image on Docker Hub before building it.
+  `pull_policy: never` in @compose.app.yaml now prevents that.
 - **Root cause:** The script captures the output of `docker compose run`. With no image, Compose
   builds inside that call, which fails when output is captured but the script has a console.
   The container tests redirected everything and already had an image.

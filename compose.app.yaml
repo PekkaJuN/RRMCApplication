@@ -12,6 +12,8 @@ services:
         RRMC_REVISION: ${RRMC_APP_TAG:-}
     # RRMC_APP_IMAGE is for the container tests, RRMC_APP_TAG for scripts/update-app.ps1.
     image: ${RRMC_APP_IMAGE:-rrmc-app}:${RRMC_APP_TAG:-latest}
+    # The image is only built here: never look for it in a registry.
+    pull_policy: never
     env_file:
       - path: ${RRMC_ENV_FILE:-.env}
         required: true
